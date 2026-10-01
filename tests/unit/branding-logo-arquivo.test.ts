@@ -100,6 +100,16 @@ describe("pareceSvg — a recusa que tem frase própria", () => {
     expect(pareceSvg(JPEG_JFIF)).toBe(false);
   });
 
+  it("aceita PNG legítimo mesmo quando há metadado XML nos primeiros 1 KB", () => {
+    const xml = bytesDe('<?xml version="1.0"?><x:xmpmeta>metadata</x:xmpmeta>');
+    const pngComXmp = new Uint8Array(PNG.length + xml.length);
+    pngComXmp.set(PNG, 0);
+    pngComXmp.set(xml, PNG.length);
+
+    expect(farejarTipo(pngComXmp)).toBe("image/png");
+    expect(pareceSvg(pngComXmp)).toBe(false);
+  });
+
   it("um SVG com 2 KB de comentário antes da tag ainda é pego", () => {
     // A janela de farejamento é de 1 KB; a tag raiz depois disso ESCAPA daqui —
     // e é por isso que `pareceSvg` não é a defesa, só a mensagem. Este caso
