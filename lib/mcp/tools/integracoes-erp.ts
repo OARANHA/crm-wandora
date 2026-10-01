@@ -50,9 +50,12 @@ function mensagemDeFalha(motivo: string): string {
   }
 }
 
-function resposta<T>(
-  resultado: ConsultaErpResultado<T>,
-): { dados?: T; erro?: string; mensagem?: string; detalhes?: Record<string, unknown> } {
+function resposta<T>(resultado: ConsultaErpResultado<T>): {
+  dados?: T;
+  erro?: string;
+  mensagem?: string;
+  detalhes?: Record<string, unknown>;
+} {
   if (resultado.ok) return { dados: resultado.dados };
   return {
     erro: resultado.motivo,
@@ -138,14 +141,18 @@ const estoqueInputShape = {
     .min(1)
     .max(100)
     .optional()
-    .describe("Código exato do produto. Se a pessoa informou só o nome, procure o produto primeiro."),
+    .describe(
+      "Código exato do produto. Se a pessoa informou só o nome, procure o produto primeiro.",
+    ),
   deposito: z
     .string()
     .trim()
     .min(1)
     .max(120)
     .optional()
-    .describe("Nome do depósito. Se omitido e houver um único depósito, ele é usado automaticamente."),
+    .describe(
+      "Nome do depósito. Se omitido e houver um único depósito, ele é usado automaticamente.",
+    ),
   somente_visiveis_catalogo: z.boolean().optional().default(false),
   limite: z.number().int().min(1).max(100).optional().default(50),
 };
@@ -244,7 +251,8 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
     if (!input.codigo && !input.cliente && !input.cpf_cnpj && !input.status && !input.numero_nfe) {
       return {
         erro: "filtro_obrigatorio",
-        mensagem: "informe ao menos um identificador, cliente, status ou número da nota para procurar pedidos.",
+        mensagem:
+          "informe ao menos um identificador, cliente, status ou número da nota para procurar pedidos.",
       };
     }
     const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {

@@ -181,7 +181,9 @@ export function consultarInformacoesVendaVendaErp(
   credenciais: CredenciaisVendaErp,
   codigoVenda: number,
 ): Promise<unknown> {
-  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.fiscalInformacoesVenda, { Codigo: codigoVenda });
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.fiscalInformacoesVenda, {
+    Codigo: codigoVenda,
+  });
 }
 
 export function consultarNfeVendaErp(

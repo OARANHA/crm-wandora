@@ -57,8 +57,7 @@ export async function listarConexoesErp(
 }
 
 export type SalvarVendaErpResultado =
-  | { ok: true; conexao: ConexaoErpSegura }
-  | { ok: false; motivo: string };
+  { ok: true; conexao: ConexaoErpSegura } | { ok: false; motivo: string };
 
 export async function salvarConexaoVendaErp(
   admin: SupabaseClient,
@@ -117,8 +116,7 @@ export async function salvarConexaoVendaErp(
 }
 
 export type TesteVendaErpResultado =
-  | { ok: true; conexao: ConexaoErpSegura }
-  | { ok: false; motivo: string; status?: number | null };
+  { ok: true; conexao: ConexaoErpSegura } | { ok: false; motivo: string; status?: number | null };
 
 export async function testarConexaoVendaErpSalva(
   admin: SupabaseClient,

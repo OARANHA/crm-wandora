@@ -70,9 +70,7 @@ describe("tools ERP READ — comportamento do agente", () => {
       ctx,
     )) as { produtos: Array<{ codigo: string | null; preco: number | null }> };
 
-    expect(resultado.produtos).toEqual([
-      expect.objectContaining({ codigo: "316", preco: 199.9 }),
-    ]);
+    expect(resultado.produtos).toEqual([expect.objectContaining({ codigo: "316", preco: 199.9 })]);
     expect(crmErpSearchProducts.description).toContain("crm_erp_read_stock");
     expect(service.buscarProdutosErp).toHaveBeenCalledWith(
       ctx.supabase,
@@ -103,7 +101,11 @@ describe("tools ERP READ — comportamento do agente", () => {
       ctx,
     )) as {
       deposito: string;
-      estoque: Array<{ codigo: string | null; estoque_atual: number | null; saldo_reservado: number | null }>;
+      estoque: Array<{
+        codigo: string | null;
+        estoque_atual: number | null;
+        saldo_reservado: number | null;
+      }>;
     };
 
     expect(resultado).toEqual({

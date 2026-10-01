@@ -30,7 +30,11 @@ export async function POST(): Promise<Response> {
     organizationId: authz.org.orgId,
     resourceType: "erp_connection",
     requestId,
-    metadata: { provider: "vendaerp", ok: resultado.ok, motivo: resultado.ok ? null : resultado.motivo },
+    metadata: {
+      provider: "vendaerp",
+      ok: resultado.ok,
+      motivo: resultado.ok ? null : resultado.motivo,
+    },
   });
 
   if (!resultado.ok) {
@@ -38,14 +42,24 @@ export async function POST(): Promise<Response> {
       return fail("not_found", "Conexão VendaERP não encontrada.", 404, { requestId });
     }
     if (resultado.motivo === "cifra_indisponivel") {
-      return fail("erp_crypto_unavailable", "A chave de criptografia da instalação não está disponível.", 500, {
-        requestId,
-      });
+      return fail(
+        "erp_crypto_unavailable",
+        "A chave de criptografia da instalação não está disponível.",
+        500,
+        {
+          requestId,
+        },
+      );
     }
     if (resultado.motivo === "rate_limited") {
-      return fail("rate_limited", "O VendaERP atingiu o limite da chave. Tente novamente mais tarde.", 429, {
-        requestId,
-      });
+      return fail(
+        "rate_limited",
+        "O VendaERP atingiu o limite da chave. Tente novamente mais tarde.",
+        429,
+        {
+          requestId,
+        },
+      );
     }
     return fail("erp_test_failed", resultado.motivo, 422, { requestId });
   }

@@ -14,11 +14,10 @@ describe("cliente VendaERP", () => {
 
   it("preserva o nome do depósito e booleano na consulta de estoque", () => {
     expect(
-      montarUrlVendaErp(
-        "https://erp.exemplo.test",
-        "/api/request/Estoque/BuscarQuantidades",
-        { deposito: "PADRÃO", visivelCatalogo: false },
-      ),
+      montarUrlVendaErp("https://erp.exemplo.test", "/api/request/Estoque/BuscarQuantidades", {
+        deposito: "PADRÃO",
+        visivelCatalogo: false,
+      }),
     ).toBe(
       "https://erp.exemplo.test/api/request/Estoque/BuscarQuantidades?deposito=PADR%C3%83O&visivelCatalogo=false",
     );
@@ -39,7 +38,9 @@ describe("cliente VendaERP", () => {
   });
 
   it("usa exatamente os três cabeçalhos de autenticação do contrato", () => {
-    expect(cabecalhosVendaErp({ authorizationToken: "segredo", user: "usuario", app: "app" })).toMatchObject({
+    expect(
+      cabecalhosVendaErp({ authorizationToken: "segredo", user: "usuario", app: "app" }),
+    ).toMatchObject({
       "Authorization-Token": "segredo",
       User: "usuario",
       App: "app",

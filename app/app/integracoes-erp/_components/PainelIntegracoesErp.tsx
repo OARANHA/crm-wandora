@@ -21,7 +21,9 @@ export function PainelIntegracoesErp({
 }) {
   const t = useT();
   const [conexoes, setConexoes] = useState<readonly ConexaoErpSegura[]>(inicial);
-  const [baseUrl, setBaseUrl] = useState(inicial.find((c) => c.provider === "vendaerp")?.base_url ?? "");
+  const [baseUrl, setBaseUrl] = useState(
+    inicial.find((c) => c.provider === "vendaerp")?.base_url ?? "",
+  );
   const [token, setToken] = useState("");
   const [user, setUser] = useState("");
   const [app, setApp] = useState("");
@@ -91,7 +93,9 @@ export function PainelIntegracoesErp({
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle>VendaERP</CardTitle>
             <Badge variant="secondary">{t("Somente leitura")}</Badge>
-            {venda?.last_test_ok === true ? <Badge variant="success">{t("Conectado")}</Badge> : null}
+            {venda?.last_test_ok === true ? (
+              <Badge variant="success">{t("Conectado")}</Badge>
+            ) : null}
           </div>
           <CardDescription>
             {t("Limite declarado pela API: 1.000 requisições por hora por chave.")}
@@ -114,7 +118,8 @@ export function PainelIntegracoesErp({
               <p className="font-medium">{t("Conexão salva")}</p>
               <p className="mt-1 text-muted-foreground">{venda.base_url}</p>
               <p className="mt-1 text-muted-foreground">
-                Token ••••{venda.auth_token_last4} · User ••••{venda.user_last4} · App ••••{venda.app_last4}
+                Token ••••{venda.auth_token_last4} · User ••••{venda.user_last4} · App ••••
+                {venda.app_last4}
               </p>
               {venda.last_tested_at ? (
                 <p className="mt-1 text-muted-foreground">
@@ -133,18 +138,33 @@ export function PainelIntegracoesErp({
           {canWrite ? (
             <div className="space-y-4 rounded-lg border p-4">
               <div>
-                <p className="font-medium">{venda ? t("Substituir credenciais") : t("Conectar VendaERP")}</p>
+                <p className="font-medium">
+                  {venda ? t("Substituir credenciais") : t("Conectar VendaERP")}
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  {t("Informe os três cabeçalhos exigidos pela API do VendaERP. Os segredos são cifrados antes de serem gravados.")}
+                  {t(
+                    "Informe os três cabeçalhos exigidos pela API do VendaERP. Os segredos são cifrados antes de serem gravados.",
+                  )}
                 </p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="erp-base-url">{t("URL base da API")}</Label>
-                <Input id="erp-base-url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." />
+                <Input
+                  id="erp-base-url"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  placeholder="https://..."
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="erp-token">Authorization-Token</Label>
-                <Input id="erp-token" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="new-password" />
+                <Input
+                  id="erp-token"
+                  type="password"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  autoComplete="new-password"
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="erp-user">User</Label>
@@ -154,10 +174,7 @@ export function PainelIntegracoesErp({
                 <Label htmlFor="erp-app">App</Label>
                 <Input id="erp-app" value={app} onChange={(e) => setApp(e.target.value)} />
               </div>
-              <Button
-                onClick={salvar}
-                disabled={pendente || !baseUrl || !token || !user || !app}
-              >
+              <Button onClick={salvar} disabled={pendente || !baseUrl || !token || !user || !app}>
                 {pendente ? t("Salvando…") : t("Salvar conexão")}
               </Button>
             </div>
@@ -168,7 +185,11 @@ export function PainelIntegracoesErp({
           )}
 
           {mensagem ? <p className="text-sm text-emerald-600">{mensagem}</p> : null}
-          {erro ? <p role="alert" className="text-sm text-destructive">{erro}</p> : null}
+          {erro ? (
+            <p role="alert" className="text-sm text-destructive">
+              {erro}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
     </div>

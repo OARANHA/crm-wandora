@@ -84,7 +84,6 @@ A etapa de escrita deve ser construída sobre o mesmo provider e com gates expl�
 
 O provider ERP nunca deve enviar WhatsApp por conta própria. Documento fiscal recuperado do ERP entra na cadeia de mensageria existente, preservando auditoria, status, janela e transporte do CRM.
 
-
 ## Ferramentas do agente
 
 A V1 publica cinco capacidades no catálogo já existente do Elus, todas como read, requiresRole agent, requiresScope mcp:read e condicionadas ao módulo integracoes_erp:
