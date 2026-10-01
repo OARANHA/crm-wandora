@@ -49,21 +49,21 @@ export default async function LoginPage({
     <main
       data-elus-login
       data-theme="dark"
-      className="fixed inset-0 z-20 overflow-y-auto bg-[#070812] text-white"
+      className="fixed inset-0 z-20 overflow-y-auto bg-[#050611] text-white"
     >
       <div className="relative min-h-[100dvh] overflow-hidden">
         <div
           aria-hidden
-          className="pointer-events-none absolute -left-32 top-[-10rem] h-96 w-96 rounded-full bg-cyan-500/20 blur-3xl"
+          className="pointer-events-none absolute -left-40 top-[-12rem] h-[32rem] w-[32rem] rounded-full bg-cyan-500/15 blur-[120px]"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-24 bottom-[-8rem] h-96 w-96 rounded-full bg-fuchsia-500/20 blur-3xl"
+          className="pointer-events-none absolute -right-32 bottom-[-10rem] h-[34rem] w-[34rem] rounded-full bg-fuchsia-600/15 blur-[130px]"
         />
 
-        <div className="relative mx-auto grid min-h-[100dvh] w-full max-w-[1600px] lg:grid-cols-[minmax(0,1.12fr)_minmax(420px,0.88fr)]">
+        <div className="relative grid min-h-[100dvh] w-full lg:grid-cols-[minmax(0,1.2fr)_minmax(420px,0.8fr)]">
           <section
-            className="relative hidden min-h-[100dvh] overflow-hidden border-r border-white/10 lg:block"
+            className="relative hidden min-h-[100dvh] overflow-hidden border-r border-white/[0.08] lg:block"
             aria-label={t("Apresentação do Elus")}
           >
             {/* Asset aprovado do Elus. O texto da campanha já faz parte da arte. */}
@@ -71,35 +71,47 @@ export default async function LoginPage({
             <img
               src="/brand/elus/login-hero.png"
               alt={t("Elus — Seu atendimento, vendas e rotina trabalhando no automático.")}
-              className="absolute inset-0 h-full w-full object-cover object-[62%_center]"
+              className="absolute inset-0 h-full w-full object-cover object-[58%_center]"
             />
             <div
               aria-hidden
-              className="absolute inset-0 bg-gradient-to-r from-[#070812]/10 via-transparent to-[#070812]/70"
+              className="absolute inset-0 bg-gradient-to-r from-[#050611]/5 via-transparent to-[#050611]/75"
             />
             <div
               aria-hidden
-              className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#070812]/70 to-transparent"
+              className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#050611]/75 to-transparent"
             />
           </section>
 
-          <section className="flex min-h-[100dvh] items-center justify-center px-5 py-10 sm:px-8 lg:px-12 xl:px-20">
-            <div className="w-full max-w-md">
-              <div className="rounded-[28px] border border-violet-300/20 bg-[#0d1020]/80 p-6 shadow-2xl shadow-violet-950/40 backdrop-blur-xl sm:p-8">
+          <section className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-5 py-10 sm:px-8 lg:px-12 xl:px-16">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 top-1/2 h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600/10 blur-[110px]"
+            />
+            <div className="relative w-full max-w-[440px]">
+              <div className="overflow-hidden rounded-[32px] border border-white/[0.09] bg-[#0b0d1d]/82 shadow-[0_28px_90px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
+                <div
+                  aria-hidden
+                  className="h-px w-full bg-gradient-to-r from-transparent via-cyan-300/80 to-transparent"
+                />
+                <div className="p-6 sm:p-8">
                 <div className="mb-8">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src="/brand/elus/logo-horizontal.png"
                     alt={marca.nome}
-                    className="h-auto max-h-12 w-auto max-w-[220px] object-contain"
+                    className="h-auto max-h-12 w-auto max-w-[230px] object-contain drop-shadow-[0_0_28px_rgba(99,102,241,0.22)]"
                   />
                 </div>
 
                 <div className="mb-7 space-y-2">
-                  <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-[2rem]">
-                    {t("Bem-vindo ao")} <span>{marca.nome}</span>
+                  <h1 className="text-3xl font-semibold tracking-[-0.025em] text-white sm:text-[2.15rem]">
+                    {t("Bem-vindo ao")}{" "}
+                    <span className="bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+                      {marca.nome}
+                    </span>
                   </h1>
-                  <p className="max-w-sm text-sm leading-6 text-white/55">
+                  <p className="max-w-sm text-sm leading-6 text-white/60">
                     {t("Acesse sua operação para continuar seus atendimentos, vendas e automações.")}
                   </p>
                 </div>
@@ -170,14 +182,15 @@ export default async function LoginPage({
                   appearance="elus"
                 />
 
-                <div className="mt-7 border-t border-white/10 pt-5 text-center">
-                  <p className="text-xs leading-5 text-white/40">
+                <div className="mt-7 border-t border-white/[0.08] pt-5 text-center">
+                  <p className="text-xs leading-5 text-white/42">
                     {t("Acesso restrito a usuários autorizados do Elus.")}
                   </p>
                 </div>
+                </div>
               </div>
 
-              <p className="mt-5 text-center text-xs text-white/30">
+              <p className="mt-5 text-center text-xs tracking-[0.16em] text-white/30 uppercase">
                 {t("Elus by Wandora")}
               </p>
             </div>

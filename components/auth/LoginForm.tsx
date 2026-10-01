@@ -69,7 +69,7 @@ export function LoginForm({
   };
 
   const inputClassName = elus
-    ? "h-12 rounded-xl border-violet-200/10 bg-white/[0.05] px-4 text-white shadow-none placeholder:text-white/30 hover:border-cyan-300/25 focus-visible:border-violet-400/70 focus-visible:ring-violet-400/20"
+    ? "h-12 rounded-xl border-white/[0.09] bg-[#11152a]/85 px-4 text-white shadow-none placeholder:text-white/28 hover:border-cyan-300/25 focus-visible:border-cyan-300/55 focus-visible:ring-cyan-300/15"
     : undefined;
 
   return (
@@ -112,7 +112,7 @@ export function LoginForm({
               href={forgotHref}
               className={
                 elus
-                  ? "text-xs font-medium text-violet-300 transition-colors hover:text-violet-200"
+                  ? "text-xs font-medium text-cyan-300 transition-colors hover:text-cyan-200"
                   : "text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
               }
             >
@@ -133,7 +133,7 @@ export function LoginForm({
             type="button"
             className={
               elus
-                ? "absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-white/40 transition-colors hover:text-white/80 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-hidden focus-visible:ring-inset"
+                ? "absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-white/40 transition-colors hover:text-white/80 focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-hidden focus-visible:ring-inset"
                 : "absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:outline-hidden focus-visible:ring-inset"
             }
             aria-pressed={showPassword}
@@ -167,7 +167,7 @@ export function LoginForm({
         type="submit"
         className={
           elus
-            ? "h-12 w-full rounded-xl border-0 bg-gradient-to-r from-cyan-500 via-violet-600 to-fuchsia-600 font-semibold text-white shadow-lg shadow-violet-950/40 transition-[transform,filter,opacity] hover:brightness-110 active:scale-[0.99]"
+            ? "h-12 w-full rounded-xl border-0 bg-gradient-to-r from-cyan-500 via-violet-600 to-fuchsia-600 font-semibold text-white shadow-[0_14px_38px_rgba(91,76,240,0.28)] transition-[transform,filter,opacity] hover:brightness-110 active:scale-[0.99]"
             : "w-full"
         }
         disabled={isPending}
