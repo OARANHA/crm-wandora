@@ -1,0 +1,182 @@
+# Elo / Wandora — Portainer Git Stack
+# Deploy source: https://github.com/OARANHA/crm-wandora
+# All runtime configuration is managed as Portainer Stack environment variables.
+# Do not add env_file: .env here.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-elo}
+    image: ${APP_IMAGE:-wandora/elo-app:local}
+    pull_policy: build
+    restart: unless-stopped
+    mem_limit: 768m
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+      SUPABASE_DB_ADMIN_URL: ""
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://elo.wandora.com.br}
+      NEXT_PUBLIC_ADMIN_URL: ${NEXT_PUBLIC_ADMIN_URL:-https://elo.wandora.com.br}
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
+      CPF_ENCRYPTION_KEY: ${CPF_ENCRYPTION_KEY}
+      AI_CRED_AES_KEY: ${AI_CRED_AES_KEY}
+      WAHA_BYO_ENCRYPTION_KEY: ${WAHA_BYO_ENCRYPTION_KEY}
+      IMPERSONATE_COOKIE_SECRET: ${IMPERSONATE_COOKIE_SECRET:-}
+      LGPD_SIGNING_KEY: ${LGPD_SIGNING_KEY:-}
+      WAHA_API_BASE_URL: http://waha:3000
+      WAHA_WEBHOOK_BASE_URL: http://app:3000
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      WAHA_HMAC_SECRET: ${WAHA_HMAC_SECRET}
+      UPSTASH_REDIS_REST_URL: http://srh:80
+      UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN}
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      APP_NAME: ${APP_NAME:-Elo}
+      APP_LOGO_URL: ${APP_LOGO_URL:-}
+      APP_ACCENT_HEX: ${APP_ACCENT_HEX:-}
+      APP_LOCALE: ${APP_LOCALE:-pt-BR}
+      SIGNUP_MODE: ${SIGNUP_MODE:-}
+      NUVEMSHOP_ENABLED: ${NUVEMSHOP_ENABLED:-false}
+      INTERNAL_AGENT_RUN_STUB: ${INTERNAL_AGENT_RUN_STUB:-false}
+    depends_on:
+      srh:
+        condition: service_started
+      waha:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging: *default-logging
+    networks:
+      - internal
+      - wandora-edge
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        APP_VERSION: ${APP_VERSION:-elo}
+    image: ${WORKER_IMAGE:-wandora/elo-worker:local}
+    pull_policy: build
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+      SUPABASE_DB_ADMIN_URL: ""
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
+      WAHA_API_BASE_URL: http://waha:3000
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      waha:
+        condition: service_started
+      srh:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8787/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *default-logging
+    networks:
+      - internal
+
+  waha:
+    image: ${WAHA_IMAGE:-devlikeapro/waha:latest-2026.7.2}
+    restart: unless-stopped
+    mem_limit: 1280m
+    environment:
+      WAHA_API_KEY: "sha512:${WAHA_API_KEY_SHA512}"
+      WHATSAPP_HOOK_URL: http://app:3000/api/v1/webhooks/waha
+      WHATSAPP_HOOK_EVENTS: "message.any,message.ack,message.edited,message.revoked,session.status,state.change"
+      WHATSAPP_HOOK_HMAC: ${WAHA_HMAC_SECRET}
+      WHATSAPP_DEFAULT_ENGINE: ${WHATSAPP_DEFAULT_ENGINE:-NOWEB}
+      WAHA_DASHBOARD_ENABLED: "false"
+      WHATSAPP_RESTART_ALL_SESSIONS: "${WHATSAPP_RESTART_ALL_SESSIONS:-True}"
+    volumes:
+      - elo-waha-data:/app/.sessions
+      - elo-waha-media:/app/.media
+    logging: *default-logging
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    logging: *default-logging
+    networks:
+      - internal
+
+  srh:
+    image: hiett/serverless-redis-http@sha256:5b0bb9239fce53abf87b2018a7a0deb9ec7bd900c5360738fe5fbeeb426f9150
+    restart: unless-stopped
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: ${SRH_TOKEN}
+      SRH_CONNECTION_STRING: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - internal
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+      args:
+        APP_VERSION: ${APP_VERSION:-elo}
+    image: ${SCHEDULER_IMAGE:-wandora/elo-scheduler:local}
+    pull_policy: build
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      TZ: UTC
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
+    logging: *default-logging
+    networks:
+      - internal
+
+volumes:
+  elo-waha-data:
+  elo-waha-media:
+
+networks:
+  internal:
+    driver: bridge
+  wandora-edge:
+    external: true
