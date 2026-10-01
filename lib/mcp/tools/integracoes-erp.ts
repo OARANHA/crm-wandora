@@ -108,7 +108,7 @@ const produtosInputShape = {
 export const crmErpSearchProducts: McpToolDefinition<typeof produtosInputShape> = {
   name: "crm_erp_search_products",
   description:
-    "Consulta produtos no VendaERP com nome, código, código de barras, marca ou categoria e devolve somente campos úteis ao atendimento: nome, preço de venda, saldo, unidade e identificação. Use o resultado real; nunca estime preço ou estoque.",
+    "Consulta produtos no VendaERP com nome, código, código de barras, marca ou categoria e devolve identificação e preço cadastrado. Use para localizar o produto e descobrir seu código. Para confirmar estoque atual ou reservado, use crm_erp_read_stock com o código encontrado; não trate o saldo resumido do cadastro como substituto da consulta de estoque.",
   inputSchema: produtosInputShape,
   category: "read",
   requiresRole: "agent",
