@@ -20,11 +20,7 @@ type LoginFormProps = {
   appearance?: "default" | "elus";
 };
 
-export function LoginForm({
-  next,
-  forgotHref,
-  appearance = "default",
-}: LoginFormProps) {
+export function LoginForm({ next, forgotHref, appearance = "default" }: LoginFormProps) {
   const t = useT();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();

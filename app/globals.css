@@ -47,7 +47,7 @@
   --color-border-strong: #cbd1df;
 
   /* Accent — Elus 360 (11 stops) */
-  --color-accent-50:  #f3f5ff;
+  --color-accent-50: #f3f5ff;
   --color-accent-100: #e7eaff;
   --color-accent-200: #d4d9ff;
   --color-accent-300: #b4bcff;
@@ -64,7 +64,7 @@
   --color-accent-hover: var(--color-accent-700);
 
   /* Neutrals — cool (11 stops, light) */
-  --color-neutral-50:  #f6f8ff;
+  --color-neutral-50: #f6f8ff;
   --color-neutral-100: #f1f3fb;
   --color-neutral-200: #e2e6f1;
   --color-neutral-300: #cbd1df;
@@ -118,7 +118,7 @@
   --shadow-xs: 0 1px 2px 0 rgba(18, 24, 52, 0.04);
   --shadow-sm: 0 1px 2px 0 rgba(18, 24, 52, 0.05), 0 1px 1px 0 rgba(18, 24, 52, 0.03);
   --shadow-md: 0 4px 12px -2px rgba(18, 24, 52, 0.06), 0 2px 4px -1px rgba(18, 24, 52, 0.04);
-  --shadow-lg: 0 12px 32px -6px rgba(18, 24, 52, 0.10), 0 4px 12px -2px rgba(18, 24, 52, 0.06);
+  --shadow-lg: 0 12px 32px -6px rgba(18, 24, 52, 0.1), 0 4px 12px -2px rgba(18, 24, 52, 0.06);
   --shadow-xl: 0 24px 48px -12px rgba(18, 24, 52, 0.16), 0 8px 16px -4px rgba(18, 24, 52, 0.08);
 
   /* Density — Aerada */
@@ -206,14 +206,14 @@
    * não duplicado aqui — assim a relação entre a faixa e o fundo é uma só,
    * e não dois hex que envelhecem separados.
    */
-  --agenda-pessoa-1: #ac4d40;   /* telha */
-  --agenda-pessoa-2: #bd7c20;   /* âmbar */
-  --agenda-pessoa-3: #7e6f01;   /* oliva */
-  --agenda-pessoa-4: #11a19b;   /* turquesa */
-  --agenda-pessoa-5: #0b7a9a;   /* azul */
-  --agenda-pessoa-6: #608bda;   /* índigo */
-  --agenda-pessoa-7: #7b5bad;   /* violeta */
-  --agenda-pessoa-8: #cc77b1;   /* framboesa */
+  --agenda-pessoa-1: #ac4d40; /* telha */
+  --agenda-pessoa-2: #bd7c20; /* âmbar */
+  --agenda-pessoa-3: #7e6f01; /* oliva */
+  --agenda-pessoa-4: #11a19b; /* turquesa */
+  --agenda-pessoa-5: #0b7a9a; /* azul */
+  --agenda-pessoa-6: #608bda; /* índigo */
+  --agenda-pessoa-7: #7b5bad; /* violeta */
+  --agenda-pessoa-8: #cc77b1; /* framboesa */
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -289,7 +289,7 @@
   --shadow-xs: 0 1px 2px 0 rgba(18, 24, 52, 0.04);
   --shadow-sm: 0 1px 2px 0 rgba(18, 24, 52, 0.05), 0 1px 1px 0 rgba(18, 24, 52, 0.03);
   --shadow-md: 0 4px 12px -2px rgba(18, 24, 52, 0.06), 0 2px 4px -1px rgba(18, 24, 52, 0.04);
-  --shadow-lg: 0 12px 32px -6px rgba(18, 24, 52, 0.10), 0 4px 12px -2px rgba(18, 24, 52, 0.06);
+  --shadow-lg: 0 12px 32px -6px rgba(18, 24, 52, 0.1), 0 4px 12px -2px rgba(18, 24, 52, 0.06);
   --shadow-xl: 0 24px 48px -12px rgba(18, 24, 52, 0.16), 0 8px 16px -4px rgba(18, 24, 52, 0.08);
   --background: var(--color-bg);
   --foreground: var(--color-text);
@@ -316,14 +316,14 @@
    * dentro de página escura herdaria os valores escuros, e a amostra de cor
    * mentiria sobre a cor que a pessoa tem.
    */
-  --agenda-pessoa-1: #ac4d40;   /* telha */
-  --agenda-pessoa-2: #bd7c20;   /* âmbar */
-  --agenda-pessoa-3: #7e6f01;   /* oliva */
-  --agenda-pessoa-4: #11a19b;   /* turquesa */
-  --agenda-pessoa-5: #0b7a9a;   /* azul */
-  --agenda-pessoa-6: #608bda;   /* índigo */
-  --agenda-pessoa-7: #7b5bad;   /* violeta */
-  --agenda-pessoa-8: #cc77b1;   /* framboesa */
+  --agenda-pessoa-1: #ac4d40; /* telha */
+  --agenda-pessoa-2: #bd7c20; /* âmbar */
+  --agenda-pessoa-3: #7e6f01; /* oliva */
+  --agenda-pessoa-4: #11a19b; /* turquesa */
+  --agenda-pessoa-5: #0b7a9a; /* azul */
+  --agenda-pessoa-6: #608bda; /* índigo */
+  --agenda-pessoa-7: #7b5bad; /* violeta */
+  --agenda-pessoa-8: #cc77b1; /* framboesa */
 }
 
 [data-theme="dark"] {
@@ -343,7 +343,7 @@
   --color-border-strong: #343d5d;
 
   /* Accent Elus 360; no escuro o papel principal sobe para o 400 por contraste */
-  --color-accent-50:  #f3f5ff;
+  --color-accent-50: #f3f5ff;
   --color-accent-100: #e7eaff;
   --color-accent-200: #d4d9ff;
   --color-accent-300: #b4bcff;
@@ -360,7 +360,7 @@
   --color-accent-hover: var(--color-accent-300);
 
   /* Neutrals — cool (11 stops, dark) */
-  --color-neutral-50:  #f7f8ff;
+  --color-neutral-50: #f7f8ff;
   --color-neutral-100: #e8ebf5;
   --color-neutral-200: #c7ccdc;
   --color-neutral-300: #a8aec2;
@@ -387,11 +387,11 @@
   --color-info-fg: #83ddff;
 
   /* Shadows — heavier in dark */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.40), 0 1px 1px 0 rgba(0, 0, 0, 0.20);
-  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.45), 0 2px 4px -1px rgba(0, 0, 0, 0.30);
-  --shadow-lg: 0 12px 32px -6px rgba(0, 0, 0, 0.55), 0 4px 12px -2px rgba(0, 0, 0, 0.40);
-  --shadow-xl: 0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 8px 16px -4px rgba(0, 0, 0, 0.50);
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4), 0 1px 1px 0 rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.45), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px -6px rgba(0, 0, 0, 0.55), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 8px 16px -4px rgba(0, 0, 0, 0.5);
 
   /* shadcn-compat aliases */
   --background: var(--color-bg);
@@ -532,10 +532,9 @@
   --color-card-foreground: var(--color-text);
 
   /* Tipografia */
-  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, sans-serif;
-  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, monospace;
+  --font-sans:
+    var(--font-atkinson), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Espaçamento. Os valores são px LITERAIS (`--space-6` = 24px), não rem — e
      essa diferença é carregada por quem consome: ver o cálculo de altura em
@@ -592,7 +591,6 @@
 @utility duration-slow {
   transition-duration: var(--duration-slow);
 }
-
 
 @layer base {
   /* O preflight do v4 não pinta mais borda por padrão (`border: 0 solid`, cor
@@ -698,17 +696,32 @@
     overflow-x: clip;
     background-color: var(--color-bg);
     color: var(--color-text);
-    font-family: var(--font-atkinson), ui-sans-serif, system-ui, -apple-system,
-      "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    font-family:
+      var(--font-atkinson),
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      sans-serif;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1,
+      "ss01" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
-  code, kbd, pre, samp {
-    font-family: var(--font-mono), ui-monospace, "SFMono-Regular", Menlo,
-      Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family:
+      var(--font-mono), ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
     font-variant-numeric: tabular-nums;
   }
 
