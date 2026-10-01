@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizarClientesVendaErp,
+  normalizarDepositosVendaErp,
+  normalizarEstoqueVendaErp,
   normalizarPedidosVendaErp,
   normalizarProdutosVendaErp,
+  resolverDepositoEstoque,
 } from "@/lib/integracoes-erp/service";
 import { VENDAERP_ENDPOINTS } from "@/lib/integracoes-erp/vendaerp";
 
@@ -11,12 +14,60 @@ describe("adapter seguro do VendaERP", () => {
   it("mantém os paths e o casing confirmados pelo Swagger", () => {
     expect(VENDAERP_ENDPOINTS).toEqual({
       configuracoesGet: "/api/request/Configuracoes/Get",
+      depositosGetTodos: "/api/request/Depositos/GetTodosDepositos",
       produtosPesquisar: "/api/request/Produtos/Pesquisar",
       estoqueBuscarQuantidades: "/api/request/Estoque/BuscarQuantidades",
       pessoasPesquisar: "/api/request/Pessoas/Pesquisar",
       pedidosPesquisar: "/api/request/Pedidos/Pesquisar",
       fiscalConsultarNfe: "/api/request/Fiscal/ConsultarNFE",
     });
+  });
+
+  it("normaliza depósitos tanto no casing do Swagger quanto no observado ao vivo", () => {
+    expect(
+      normalizarDepositosVendaErp([
+        { id: "d1", nome: "PADRÃO", empresaID: "e1", empresa: "Empresa A" },
+        { ID: "d2", Nome: "FILIAL", EmpresaID: "e2", Empresa: "Empresa B" },
+      ]),
+    ).toEqual([
+      { id: "d1", nome: "PADRÃO", empresaId: "e1", empresa: "Empresa A" },
+      { id: "d2", nome: "FILIAL", empresaId: "e2", empresa: "Empresa B" },
+    ]);
+  });
+
+  it("normaliza a resposta real observada de Estoque/BuscarQuantidades sem inventar disponível", () => {
+    expect(
+      normalizarEstoqueVendaErp({
+        EstoqueItens: [
+          { ProdutoCodigo: "316", EstoqueAtual: -37, SaldoReservado: 0 },
+          { ProdutoCodigo: "316-1", EstoqueAtual: -7, SaldoReservado: 0 },
+        ],
+      }),
+    ).toEqual([
+      { codigo: "316", estoqueAtual: -37, saldoReservado: 0 },
+      { codigo: "316-1", estoqueAtual: -7, saldoReservado: 0 },
+    ]);
+  });
+
+  it("só escolhe depósito automaticamente quando existe um único", () => {
+    expect(
+      resolverDepositoEstoque(undefined, [
+        { id: "d1", nome: "PADRÃO", empresaId: "e1", empresa: "Empresa" },
+      ]),
+    ).toEqual({ ok: true, deposito: "PADRÃO", origem: "unico" });
+
+    const ambiguo = resolverDepositoEstoque(undefined, [
+      { id: "d1", nome: "PADRÃO", empresaId: "e1", empresa: "Empresa" },
+      { id: "d2", nome: "FILIAL", empresaId: "e1", empresa: "Empresa" },
+    ]);
+    expect(ambiguo.ok).toBe(false);
+    if (!ambiguo.ok) expect(ambiguo.motivo).toBe("deposito_ambiguo");
+
+    expect(
+      resolverDepositoEstoque("CENTRAL", [
+        { id: "d1", nome: "PADRÃO", empresaId: "e1", empresa: "Empresa" },
+      ]),
+    ).toEqual({ ok: true, deposito: "CENTRAL", origem: "informado" });
   });
 
   it("projeta produto para o contrato interno sem carregar payload bruto", () => {

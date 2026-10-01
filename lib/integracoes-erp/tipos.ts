@@ -65,6 +65,24 @@ export interface ProdutoErp {
   categoria: string | null;
 }
 
+export interface DepositoErp {
+  id: string | null;
+  nome: string | null;
+  empresaId: string | null;
+  empresa: string | null;
+}
+
+export interface EstoqueItemErp {
+  codigo: string | null;
+  estoqueAtual: number | null;
+  saldoReservado: number | null;
+}
+
+export interface EstoqueErp {
+  deposito: string;
+  itens: EstoqueItemErp[];
+}
+
 export interface ClienteErp {
   id: string | null;
   nome: string | null;

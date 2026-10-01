@@ -8,12 +8,17 @@ import type {
   ClienteErp,
   ConexaoErpSegura,
   CredenciaisVendaErp,
+  DepositoErp,
+  EstoqueErp,
+  EstoqueItemErp,
   NotaErp,
   PedidoErp,
   ProdutoErp,
 } from "./tipos";
 import {
   ErroVendaErp,
+  lerEstoqueVendaErp,
+  listarDepositosVendaErp,
   pesquisarClientesVendaErp,
   pesquisarPedidosVendaErp,
   pesquisarProdutosVendaErp,
@@ -159,7 +164,7 @@ export async function testarConexaoVendaErpSalva(
 
 export type ConsultaErpResultado<T> =
   | { ok: true; dados: T }
-  | { ok: false; motivo: string; status?: number | null };
+  | { ok: false; motivo: string; status?: number | null; detalhes?: Record<string, unknown> };
 
 function objeto(valor: unknown): Record<string, unknown> | null {
   return valor !== null && typeof valor === "object" && !Array.isArray(valor)
@@ -188,6 +193,57 @@ function numero(valor: unknown): number | null {
 
 function booleano(valor: unknown): boolean | null {
   return typeof valor === "boolean" ? valor : null;
+}
+
+export function normalizarDepositosVendaErp(valor: unknown): DepositoErp[] {
+  return listaDeObjetos(valor).map((d) => ({
+    // O Swagger documenta camelCase; resposta real observada em 2026-10-01
+    // veio em PascalCase. O adapter aceita os dois e o resto do Elus não precisa
+    // conhecer essa inconsistência do provider.
+    id: texto(d.id ?? d.ID),
+    nome: texto(d.nome ?? d.Nome),
+    empresaId: texto(d.empresaID ?? d.EmpresaID),
+    empresa: texto(d.empresa ?? d.Empresa),
+  }));
+}
+
+export function normalizarEstoqueVendaErp(valor: unknown): EstoqueItemErp[] {
+  const envelope = objeto(valor);
+  if (!envelope) throw new ErroVendaErp("invalid_response");
+
+  // O Swagger recebido não descreve o corpo de BuscarQuantidades. A forma
+  // abaixo foi observada em resposta autenticada real em 2026-10-01.
+  const itens = envelope.EstoqueItens ?? envelope.estoqueItens;
+  return listaDeObjetos(itens).map((item) => ({
+    codigo: texto(item.ProdutoCodigo ?? item.produtoCodigo),
+    estoqueAtual: numero(item.EstoqueAtual ?? item.estoqueAtual),
+    saldoReservado: numero(item.SaldoReservado ?? item.saldoReservado),
+  }));
+}
+
+export type ResolucaoDepositoEstoque =
+  | { ok: true; deposito: string; origem: "informado" | "unico" }
+  | {
+      ok: false;
+      motivo: "sem_deposito" | "deposito_ambiguo" | "deposito_sem_nome";
+      depositos: DepositoErp[];
+    };
+
+export function resolverDepositoEstoque(
+  informado: string | undefined,
+  depositos: readonly DepositoErp[],
+): ResolucaoDepositoEstoque {
+  const nomeInformado = informado?.trim();
+  if (nomeInformado) return { ok: true, deposito: nomeInformado, origem: "informado" };
+
+  if (depositos.length === 0) return { ok: false, motivo: "sem_deposito", depositos: [] };
+  if (depositos.length > 1) {
+    return { ok: false, motivo: "deposito_ambiguo", depositos: [...depositos] };
+  }
+
+  const nome = depositos[0]?.nome?.trim();
+  if (!nome) return { ok: false, motivo: "deposito_sem_nome", depositos: [...depositos] };
+  return { ok: true, deposito: nome, origem: "unico" };
 }
 
 export function normalizarProdutosVendaErp(valor: unknown): ProdutoErp[] {
@@ -270,17 +326,70 @@ export async function buscarProdutosErp(
 }
 
 /**
- * O endpoint dedicado Estoque/BuscarQuantidades não declara schema de resposta
- * no Swagger recebido. Para não passar JSON opaco ao modelo, a V1 do agente lê
- * estoque por Produtos/Pesquisar, que aceita depósito e documenta estoqueSaldo.
- * É uma chamada só, sem cache e sem inferir campo não contratado.
+ * Consulta o endpoint oficial Estoque/BuscarQuantidades.
+ *
+ * Se o depósito vier informado, não fazemos uma chamada extra para "validar":
+ * o provider é a fonte da verdade e o teste real confirmou que ele aceita o
+ * NOME do depósito. Se não vier, listamos os depósitos; um único é escolhido
+ * automaticamente, vários viram resposta ambígua para o agente decidir com a
+ * pessoa — nunca escolhemos no chute.
+ *
+ * EstoqueAtual e SaldoReservado são preservados separadamente. Não calculamos
+ * "disponível" porque o material recebido ainda não documenta a relação
+ * semântica entre esses dois números.
  */
 export async function lerEstoqueErp(
   admin: SupabaseClient,
   organizationId: string,
-  filtros: Pick<FiltrosProdutosVendaErp, "codigo" | "nome" | "deposito" | "pageSize" | "skip">,
-): Promise<ConsultaErpResultado<ProdutoErp[]>> {
-  return buscarProdutosErp(admin, organizationId, filtros);
+  filtros: {
+    codigo?: string;
+    deposito?: string;
+    visivelCatalogo?: boolean;
+  },
+): Promise<ConsultaErpResultado<EstoqueErp>> {
+  const leitura = await carregarConexaoVendaErp(admin, organizationId);
+  if (!leitura.ok) return { ok: false, motivo: leitura.motivo };
+
+  try {
+    let depositos: DepositoErp[] = [];
+    if (!filtros.deposito?.trim()) {
+      depositos = normalizarDepositosVendaErp(await listarDepositosVendaErp(leitura.credenciais));
+    }
+
+    const resolucao = resolverDepositoEstoque(filtros.deposito, depositos);
+    if (!resolucao.ok) {
+      return {
+        ok: false,
+        motivo: resolucao.motivo,
+        detalhes: { depositos: resolucao.depositos },
+      };
+    }
+
+    let itens = normalizarEstoqueVendaErp(
+      await lerEstoqueVendaErp(leitura.credenciais, {
+        deposito: resolucao.deposito,
+        visivelCatalogo: filtros.visivelCatalogo ?? false,
+      }),
+    );
+
+    const codigo = filtros.codigo?.trim().toLocaleLowerCase("pt-BR");
+    if (codigo) {
+      itens = itens.filter((item) => item.codigo?.trim().toLocaleLowerCase("pt-BR") === codigo);
+    }
+
+    return {
+      ok: true,
+      dados: {
+        deposito: resolucao.deposito,
+        itens,
+      },
+    };
+  } catch (erro) {
+    if (erro instanceof ErroVendaErp) {
+      return { ok: false, motivo: erro.codigo, status: erro.status };
+    }
+    return { ok: false, motivo: "provider_error" };
+  }
 }
 
 export async function buscarClientesErp(

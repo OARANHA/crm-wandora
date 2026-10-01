@@ -39,16 +39,25 @@ function mensagemDeFalha(motivo: string): string {
       return "o VendaERP não respondeu dentro do tempo limite.";
     case "invalid_response":
       return "o VendaERP respondeu num formato diferente do contrato esperado.";
+    case "sem_deposito":
+      return "não há depósito cadastrado no VendaERP para consultar o estoque.";
+    case "deposito_ambiguo":
+      return "há mais de um depósito no VendaERP; escolha qual deve ser consultado.";
+    case "deposito_sem_nome":
+      return "o único depósito retornado pelo VendaERP não tem nome utilizável.";
     default:
       return "não foi possível consultar o VendaERP agora.";
   }
 }
 
-function resposta<T>(resultado: ConsultaErpResultado<T>): { dados?: T; erro?: string; mensagem?: string } {
+function resposta<T>(
+  resultado: ConsultaErpResultado<T>,
+): { dados?: T; erro?: string; mensagem?: string; detalhes?: Record<string, unknown> } {
   if (resultado.ok) return { dados: resultado.dados };
   return {
     erro: resultado.motivo,
     mensagem: mensagemDeFalha(resultado.motivo),
+    ...(resultado.detalhes ? { detalhes: resultado.detalhes } : {}),
   };
 }
 
@@ -123,17 +132,28 @@ export const crmErpSearchProducts: McpToolDefinition<typeof produtosInputShape> 
 };
 
 const estoqueInputShape = {
-  codigo: z.string().trim().min(1).max(100).optional(),
-  nome: z.string().trim().min(1).max(200).optional(),
-  deposito: z.string().trim().min(1).max(120).optional(),
-  limite: limiteSchema,
-  skip: skipSchema,
+  codigo: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("Código exato do produto. Se a pessoa informou só o nome, procure o produto primeiro."),
+  deposito: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .optional()
+    .describe("Nome do depósito. Se omitido e houver um único depósito, ele é usado automaticamente."),
+  somente_visiveis_catalogo: z.boolean().optional().default(false),
+  limite: z.number().int().min(1).max(100).optional().default(50),
 };
 
 export const crmErpReadStock: McpToolDefinition<typeof estoqueInputShape> = {
   name: "crm_erp_read_stock",
   description:
-    "Consulta o saldo documentado dos produtos no VendaERP, opcionalmente por código, nome ou depósito. Devolve produto, saldo e unidade sem expor o payload bruto do sistema externo.",
+    "Consulta o estoque real no VendaERP pelo depósito e, opcionalmente, pelo código exato do produto. Devolve EstoqueAtual e SaldoReservado separados; não derive disponibilidade nem subtraia um do outro sem regra documentada. Se o depósito não for informado e houver mais de um, a resposta traz as opções em vez de escolher por conta própria.",
   inputSchema: estoqueInputShape,
   category: "read",
   requiresRole: "agent",
@@ -143,19 +163,22 @@ export const crmErpReadStock: McpToolDefinition<typeof estoqueInputShape> = {
   handler: async (input, ctx) => {
     const r = await lerEstoqueErp(ctx.supabase, ctx.organizationId, {
       codigo: input.codigo,
-      nome: input.nome,
       deposito: input.deposito,
-      pageSize: input.limite,
-      skip: input.skip,
+      visivelCatalogo: input.somente_visiveis_catalogo,
     });
     if (!r.ok) return resposta(r);
+
+    const estoque = r.dados.itens.slice(0, input.limite);
     return {
-      estoque: r.dados.map((p) => ({
-        codigo: p.codigo,
-        nome: p.nome,
-        saldo: p.estoque,
-        unidade: p.unidade,
+      deposito: r.dados.deposito,
+      estoque: estoque.map((item) => ({
+        codigo: item.codigo,
+        estoque_atual: item.estoqueAtual,
+        saldo_reservado: item.saldoReservado,
       })),
+      ...(r.dados.itens.length > estoque.length
+        ? { truncado: true, total_itens: r.dados.itens.length }
+        : {}),
     };
   },
 };

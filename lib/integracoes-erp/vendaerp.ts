@@ -6,6 +6,7 @@ const TIMEOUT_MS = 12_000;
 
 export const VENDAERP_ENDPOINTS = {
   configuracoesGet: "/api/request/Configuracoes/Get",
+  depositosGetTodos: "/api/request/Depositos/GetTodosDepositos",
   produtosPesquisar: "/api/request/Produtos/Pesquisar",
   estoqueBuscarQuantidades: "/api/request/Estoque/BuscarQuantidades",
   pessoasPesquisar: "/api/request/Pessoas/Pesquisar",
@@ -137,6 +138,10 @@ async function getVendaErp(
 
 export function testarConexaoVendaErp(credenciais: CredenciaisVendaErp): Promise<unknown> {
   return getVendaErp(credenciais, VENDAERP_ENDPOINTS.configuracoesGet);
+}
+
+export function listarDepositosVendaErp(credenciais: CredenciaisVendaErp): Promise<unknown> {
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.depositosGetTodos);
 }
 
 export function pesquisarProdutosVendaErp(

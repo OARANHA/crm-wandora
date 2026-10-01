@@ -33,6 +33,7 @@ O Swagger entregue para esta integração declara:
 - autenticação pelos headers `Authorization-Token`, `User` e `App`;
 - limite de 1.000 requests/hora por chave;
 - leitura de produtos em `Produtos/Pesquisar`;
+- descoberta de depósitos em `Depositos/GetTodosDepositos`;
 - leitura de estoque em `Estoque/BuscarQuantidades`;
 - leitura de pessoas/clientes em `Pessoas/Pesquisar`;
 - leitura de pedidos em `Pedidos/Pesquisar`;
@@ -97,13 +98,14 @@ Elas usam o mesmo catálogo MCP do restante do produto; não existe uma segunda 
 
 Os filtros de busca são redigidos antes de entrar no log de auditoria. O payload do VendaERP não é entregue cru ao modelo: Produto, Pessoa e Pedido passam por projeções internas do Elus.
 
-### Lacunas do Swagger recebido
+### Evidência complementar e lacunas do Swagger
 
-O Swagger recebido não declara schema de resposta para Estoque/BuscarQuantidades nem para Fiscal/ConsultarNFE. A V1 não adivinha esses corpos.
+O Swagger recebido não declara schema de resposta para Estoque/BuscarQuantidades nem para Fiscal/ConsultarNFE. A V1 não inventa esses corpos.
 
-Para a superfície do agente:
+Em 2026-10-01 foi observada, por teste manual autenticado no próprio Swagger UI, a resposta real de Estoque/BuscarQuantidades com envelope EstoqueItens e os campos ProdutoCodigo, EstoqueAtual e SaldoReservado. A tool stock.read passou então a usar o endpoint dedicado. Esses dois números são preservados separadamente; o Elus não calcula "disponível" enquanto a semântica dessa relação não estiver documentada.
 
-- stock.read usa uma única chamada a Produtos/Pesquisar, que aceita deposito e cujo schema Produto documenta estoqueSaldo e estoqueUnidade;
-- invoice.get usa uma única chamada a Pedidos/Pesquisar?numeroNFe=..., porque o schema Pedido documenta numeroNFe, dataFaturamento, chaveAcessoNFe, danfeURL e urlSefaz.
+Depositos/GetTodosDepositos é formalmente documentado no Swagger como Deposito[]. O teste manual também confirmou que o parâmetro deposito de BuscarQuantidades aceita o nome do depósito. Se a tool não receber depósito, o provider lista os depósitos: com um único, usa-o; com vários, devolve as opções e não escolhe sozinho.
 
-Os endpoints dedicados de estoque e fiscal continuam mapeados no provider para uso futuro, mas seus payloads não entram no contexto do agente até que exista contrato de resposta verificável.
+A resposta fiscal dedicada continua sem contrato verificável. Por isso invoice.get segue usando uma única chamada a Pedidos/Pesquisar?numeroNFe=..., cujo schema Pedido documenta numeroNFe, dataFaturamento, chaveAcessoNFe, danfeURL e urlSefaz.
+
+O histórico de evidência, decisões e pendências fica em docs/specs/integracoes-erp-vendaerp-descobertas.md.
