@@ -55,6 +55,28 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Lint ERP changes
+        run: >
+          pnpm exec eslint
+          app/api/v1/integracoes-erp
+          app/app/integracoes-erp
+          lib/integracoes-erp
+          lib/mcp/tools/integracoes-erp.ts
+          lib/mcp/tools/catalogo/integracoes-erp.ts
+          tests/unit/integracoes-erp-*.test.ts
+
+      - name: Check ERP formatting
+        run: >
+          pnpm exec prettier --check
+          ".github/workflows/erp-read-verification.yml"
+          "app/api/v1/integracoes-erp/**/*.{ts,tsx}"
+          "app/app/integracoes-erp/**/*.{ts,tsx}"
+          "lib/integracoes-erp/**/*.ts"
+          "lib/mcp/tools/integracoes-erp.ts"
+          "lib/mcp/tools/catalogo/integracoes-erp.ts"
+          "tests/unit/integracoes-erp-*.test.ts"
+          "docs/specs/integracoes-erp*.md"
+
       - name: ERP unit tests
         run: >
           pnpm vitest run
