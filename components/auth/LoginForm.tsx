@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTransition, useState } from "react";
@@ -13,12 +14,23 @@ import { Label } from "@/components/ui/label";
 import { signInWithPassword } from "@/app/actions/auth/signInWithPassword";
 import { Eye, EyeSlash } from "@/lib/ui/icons";
 
-export function LoginForm({ next }: { next?: string }) {
+type LoginFormProps = {
+  next?: string;
+  forgotHref?: string;
+  appearance?: "default" | "elus";
+};
+
+export function LoginForm({
+  next,
+  forgotHref,
+  appearance = "default",
+}: LoginFormProps) {
   const t = useT();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const elus = appearance === "elus";
 
   const {
     register,
@@ -32,11 +44,8 @@ export function LoginForm({ next }: { next?: string }) {
   const onSubmit = (values: LoginInput) => {
     setServerError(null);
     startTransition(async () => {
-      // Server Action redirects on success — no return value reaches here.
-      // On failure, an error discriminator is returned and rendered inline.
       const res = await signInWithPassword(values, next);
       if (!res) {
-        // Should be unreachable (redirect throws), but guard anyway.
         router.replace(next || "/app");
         return;
       }
@@ -59,57 +68,110 @@ export function LoginForm({ next }: { next?: string }) {
     });
   };
 
+  const inputClassName = elus
+    ? "h-12 rounded-xl border-white/10 bg-white/[0.055] px-4 text-white shadow-none placeholder:text-white/30 hover:border-white/20 focus-visible:border-violet-400/60 focus-visible:ring-violet-400/20"
+    : undefined;
+
   return (
-    <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <form
+      method="post"
+      onSubmit={handleSubmit(onSubmit)}
+      className={elus ? "space-y-5" : "space-y-4"}
+      noValidate
+    >
       <div className="space-y-1.5">
-        <Label htmlFor="email">{t("Email")}</Label>
+        <Label htmlFor="email" className={elus ? "text-sm font-medium text-white/75" : undefined}>
+          {t("Email")}
+        </Label>
         <Input
           id="email"
           type="email"
           autoComplete="email"
           autoFocus
+          className={inputClassName}
           aria-invalid={errors.email ? true : undefined}
           {...register("email")}
         />
         {errors.email && (
-          <p className="text-xs text-destructive">{t(errors.email.message ?? "")}</p>
+          <p className={elus ? "text-xs text-rose-300" : "text-xs text-destructive"}>
+            {t(errors.email.message ?? "")}
+          </p>
         )}
       </div>
+
       <div className="space-y-1.5">
-        <Label htmlFor="password">{t("Senha")}</Label>
+        <div className="flex items-center justify-between gap-4">
+          <Label
+            htmlFor="password"
+            className={elus ? "text-sm font-medium text-white/75" : undefined}
+          >
+            {t("Senha")}
+          </Label>
+          {forgotHref ? (
+            <Link
+              href={forgotHref}
+              className={
+                elus
+                  ? "text-xs font-medium text-violet-300 transition-colors hover:text-violet-200"
+                  : "text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              }
+            >
+              {t("Esqueci minha senha")}
+            </Link>
+          ) : null}
+        </div>
         <div className="relative">
           <Input
             id="password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
-            className="pr-12"
+            className={elus ? `${inputClassName} pr-12` : "pr-12"}
             aria-invalid={errors.password ? true : undefined}
             {...register("password")}
           />
           <button
             type="button"
-            className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:outline-hidden focus-visible:ring-inset"
+            className={
+              elus
+                ? "absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-white/40 transition-colors hover:text-white/80 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-hidden focus-visible:ring-inset"
+                : "absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:outline-hidden focus-visible:ring-inset"
+            }
             aria-pressed={showPassword}
             onClick={() => setShowPassword((visible) => !visible)}
           >
-            {/* Nome em sr-only, não aria-label: getByLabel(/senha/i) casa aria-label e acharia o botão junto do campo. */}
             <span className="sr-only">{t(showPassword ? "Ocultar senha" : "Mostrar senha")}</span>
             {showPassword ? <EyeSlash size={20} aria-hidden /> : <Eye size={20} aria-hidden />}
           </button>
         </div>
         {errors.password && (
-          <p className="text-xs text-destructive">{t(errors.password.message ?? "")}</p>
+          <p className={elus ? "text-xs text-rose-300" : "text-xs text-destructive"}>
+            {t(errors.password.message ?? "")}
+          </p>
         )}
       </div>
+
       {serverError && (
         <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className={
+            elus
+              ? "rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100"
+              : "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          }
           role="alert"
         >
           {serverError}
         </div>
       )}
-      <Button type="submit" className="w-full" disabled={isPending}>
+
+      <Button
+        type="submit"
+        className={
+          elus
+            ? "h-12 w-full rounded-xl border-0 bg-gradient-to-r from-blue-600 via-violet-600 to-fuchsia-600 font-semibold text-white shadow-lg shadow-violet-950/30 transition-[transform,filter,opacity] hover:brightness-110 active:scale-[0.99]"
+            : "w-full"
+        }
+        disabled={isPending}
+      >
         {isPending ? t("Entrando...") : t("Entrar")}
       </Button>
     </form>
