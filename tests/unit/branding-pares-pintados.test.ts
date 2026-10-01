@@ -142,7 +142,7 @@ function daRampa(fonte: Fonte, rampa: ReadonlyMap<number, string>): Cor {
  * que alcança a rampa JÁ emitida. É nessa segunda linha que o defeito morava.
  */
 function pintado(
-  [REDACTED] | null,
+  token: string | null,
   fonte: Fonte,
   bloco: Bloco,
   rampa: ReadonlyMap<number, string>,
