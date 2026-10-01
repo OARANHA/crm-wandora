@@ -131,6 +131,18 @@ Quando a pessoa conhece apenas o nome do produto, o fluxo correto é:
 
 Não foi criado um join escondido que faça múltiplas chamadas sem o agente saber.
 
+## Limite de requests — proteção ainda pendente
+
+O Swagger declara 1.000 requests por hora por chave. O provider já trata HTTP
+429 como rate_limited, e o MCP do Elus tem o próprio rate-limit de tools, mas
+isso **não é a mesma coisa** que contabilizar chamadas consumidas na chave do
+VendaERP.
+
+Nesta etapa não foi criado um contador preventivo por conexão. Isso fica como
+pendência explícita antes de ampliar automação ou escrita, especialmente porque
+uma consulta de estoque sem depósito informado pode consumir duas chamadas:
+listar depósitos e, quando houver exatamente um, consultar o estoque.
+
 ## Fiscal ainda pendente
 
 Fiscal/ConsultarNFE existe e recebe CodigoNFe, mas o Swagger recebido continua
