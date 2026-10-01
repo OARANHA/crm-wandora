@@ -54,11 +54,11 @@ export default async function LoginPage({
       <div className="relative min-h-[100dvh] overflow-hidden">
         <div
           aria-hidden
-          className="pointer-events-none absolute -left-32 top-[-10rem] h-96 w-96 rounded-full bg-cyan-500/18 blur-3xl"
+          className="pointer-events-none absolute -left-32 top-[-10rem] h-96 w-96 rounded-full bg-cyan-500/20 blur-3xl"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-24 bottom-[-8rem] h-96 w-96 rounded-full bg-fuchsia-500/18 blur-3xl"
+          className="pointer-events-none absolute -right-24 bottom-[-8rem] h-96 w-96 rounded-full bg-fuchsia-500/20 blur-3xl"
         />
 
         <div className="relative mx-auto grid min-h-[100dvh] w-full max-w-[1600px] lg:grid-cols-[minmax(0,1.12fr)_minmax(420px,0.88fr)]">
@@ -85,7 +85,7 @@ export default async function LoginPage({
 
           <section className="flex min-h-[100dvh] items-center justify-center px-5 py-10 sm:px-8 lg:px-12 xl:px-20">
             <div className="w-full max-w-md">
-              <div className="rounded-[28px] border border-violet-300/15 bg-[#0d1020]/78 p-6 shadow-2xl shadow-violet-950/35 backdrop-blur-xl sm:p-8">
+              <div className="rounded-[28px] border border-violet-300/20 bg-[#0d1020]/80 p-6 shadow-2xl shadow-violet-950/40 backdrop-blur-xl sm:p-8">
                 <div className="mb-8">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
