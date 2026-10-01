@@ -1,13 +1,34 @@
-import Link from "next/link";
+import type { ReactNode } from "react";
 
-import { EntrarComGoogle } from "@/components/auth/EntrarComGoogle";
 import { LoginForm } from "@/components/auth/LoginForm";
-import { branding } from "@/lib/branding";
+import { marcaDaSaida } from "@/lib/branding/saida";
 import { createClient } from "@/lib/supabase/server";
 import { idiomaDoVisitante } from "@/lib/i18n/idiomaAnonimo";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const metadata = { title: "Entrar" };
+
+function AvisoLogin({
+  children,
+  tipo = "erro",
+}: {
+  children: ReactNode;
+  tipo?: "erro" | "sucesso";
+}) {
+  const sucesso = tipo === "sucesso";
+  return (
+    <div
+      className={
+        sucesso
+          ? "rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100"
+          : "rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100"
+      }
+      role={sucesso ? "status" : "alert"}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default async function LoginPage({
   searchParams,
@@ -15,11 +36,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string; reset?: string; error?: string }>;
 }) {
   const { next, reset, error } = await searchParams;
-  // Fora da árvore de `app/app/layout.tsx` — sem `IdiomaProvider` do lado do
-  // servidor (o cliente já tem o seu, montado em `app/(public)/layout.tsx`).
-  // Quase nunca há sessão aqui (é a própria tela de entrar), mas resolve do
-  // mesmo jeito por segurança — `user` opcional.
-  const supabase = await createClient();
+  const [marca, supabase] = await Promise.all([marcaDaSaida(null), createClient()]);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -29,136 +46,144 @@ export default async function LoginPage({
   const t = (texto: string) => traduzir(texto, idioma);
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Entrar")}</h1>
-        <p className="text-sm text-muted-foreground">{branding().name}</p>
-      </div>
-      {reset === "success" && (
+    <main
+      data-elus-login
+      data-theme="dark"
+      className="fixed inset-0 z-20 overflow-y-auto bg-[#070812] text-white"
+    >
+      <div className="relative min-h-[100dvh] overflow-hidden">
         <div
-          className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm"
-          role="status"
-        >
-          {t("Senha redefinida com sucesso. Entre com a nova senha.")}
-        </div>
-      )}
-      {error === "link_invalido" && (
+          aria-hidden
+          className="pointer-events-none absolute -left-32 top-[-10rem] h-96 w-96 rounded-full bg-blue-600/20 blur-3xl"
+        />
         <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {t("Link inválido ou expirado. Peça um novo em Recuperar senha ou refaça o cadastro.")}
-        </div>
-      )}
-      {/*
-        Os dois avisos abaixo chegaram por frentes diferentes e falam de erros
-        diferentes — o merge os pôs no mesmo lugar, e ficar com um só apagaria um
-        diagnóstico inteiro da tela de login.
-      */}
-      {error === "convite_invalido" && (
-        <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {t(
-            "Sua conta foi confirmada, mas o convite não vale mais — ele expirou ou foi emitido para outro e-mail. Peça um novo a quem te convidou. Não criamos uma empresa nova para você, porque não era isso que você estava fazendo.",
-          )}
-        </div>
-      )}
-      {error === "cadastro_por_convite" && (
-        <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {t(
-            "Sua conta foi confirmada, mas esta instalação aceita cadastro apenas por convite — então não criamos uma empresa para você. Peça um convite a quem administra o sistema; o link dele já traz tudo o que falta.",
-          )}
-        </div>
-      )}
-      {error === "template_padrao" && (
-        <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {t(
-            "Este link veio do modelo de e-mail padrão do Supabase, que não fecha o acesso nesta instalação — pedir outro link não resolve. Quem administra o sistema precisa configurar os modelos de e-mail: na nuvem do Supabase, com ",
-          )}
-          <code>marca-emails.sh</code>
-          {t(
-            "; num Supabase próprio, apontando GOTRUE_MAILER_TEMPLATES_* para as rotas /email-templates/ do app.",
-          )}
-        </div>
-      )}
-      {error === "provisionamento" && (
-        <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {t(
-            "Sua conta foi confirmada, mas houve um erro ao preparar seu ambiente. Tente entrar novamente em instantes.",
-          )}
-        </div>
-      )}
-      {/*
-        As duas recusas da entrada com Google, separadas de propósito: uma é
-        falha da volta (o `code` não virou sessão), a outra é desistência de
-        quem estava do outro lado. A mesma mensagem para as duas mandaria a
-        pessoa "tentar de novo" quando ela só fechou a tela — e procurar
-        defeito onde não há.
-      */}
-      {error === "entrada_com_google" && (
-        <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {t(
-            "Não foi possível concluir a entrada com o Google. Tente novamente — se acontecer de novo, entre com e-mail e senha.",
-          )}
-        </div>
-      )}
-      {error === "entrada_com_google_cancelada" && (
-        <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {t("A entrada com o Google foi cancelada antes de terminar. Nada mudou na sua conta.")}
-        </div>
-      )}
-      {/* A terceira recusa da entrada com Google: a conta está confirmada, mas o
-          acesso dela foi retirado. Não é convite inválido (não havia convite
-          nenhum) nem falha do Google — é decisão de quem administra, e a tela
-          diz exatamente isso, em vez de mandar a pessoa "tentar de novo". */}
-      {error === "acesso_revogado" && (
-        <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {t(
-            "O acesso desta conta foi retirado por quem administra o sistema — então não criamos uma empresa nova para você. Se o acesso deveria continuar, peça a quem administra para restaurá-lo; se você está entrando em outra equipe, peça um convite.",
-          )}
-        </div>
-      )}
-      <LoginForm next={next} />
-      <EntrarComGoogle next={next} />
-      <div className="space-y-2 text-center text-sm">
-        <p>
-          <Link
-            href="/login/forgot"
-            className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          aria-hidden
+          className="pointer-events-none absolute -right-24 bottom-[-8rem] h-96 w-96 rounded-full bg-fuchsia-600/15 blur-3xl"
+        />
+
+        <div className="relative mx-auto grid min-h-[100dvh] w-full max-w-[1600px] lg:grid-cols-[minmax(0,1.12fr)_minmax(420px,0.88fr)]">
+          <section
+            className="relative hidden min-h-[100dvh] overflow-hidden border-r border-white/10 lg:block"
+            aria-label={t("Apresentação do Elus")}
           >
-            {t("Esqueci minha senha")}
-          </Link>
-        </p>
-        <p className="text-muted-foreground">
-          {t("Não tem conta?")}{" "}
-          <Link
-            href="/signup"
-            className="font-medium text-foreground underline underline-offset-4"
-          >
-            {t("Criar conta")}
-          </Link>
-        </p>
+            {/* Asset aprovado do Elus. O texto da campanha já faz parte da arte. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/elus/login-hero.png"
+              alt={t("Elus — Seu atendimento, vendas e rotina trabalhando no automático.")}
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-r from-[#070812]/20 via-transparent to-[#070812]/55"
+            />
+            <div
+              aria-hidden
+              className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#070812]/70 to-transparent"
+            />
+          </section>
+
+          <section className="flex min-h-[100dvh] items-center justify-center px-5 py-10 sm:px-8 lg:px-12 xl:px-20">
+            <div className="w-full max-w-md">
+              <div className="rounded-[28px] border border-white/10 bg-white/[0.055] p-6 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-8">
+                <div className="mb-8">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/brand/elus/logo-horizontal.png"
+                    alt={marca.nome}
+                    className="h-auto max-h-12 w-auto max-w-[220px] object-contain"
+                  />
+                </div>
+
+                <div className="mb-7 space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-[2rem]">
+                    {t("Bem-vindo ao")} <span>{marca.nome}</span>
+                  </h1>
+                  <p className="max-w-sm text-sm leading-6 text-white/55">
+                    {t("Acesse sua operação para continuar seus atendimentos, vendas e automações.")}
+                  </p>
+                </div>
+
+                <div className="mb-5 space-y-3">
+                  {reset === "success" && (
+                    <AvisoLogin tipo="sucesso">
+                      {t("Senha redefinida com sucesso. Entre com a nova senha.")}
+                    </AvisoLogin>
+                  )}
+                  {error === "link_invalido" && (
+                    <AvisoLogin>
+                      {t("Link inválido ou expirado. Peça um novo em Recuperar senha ou refaça o cadastro.")}
+                    </AvisoLogin>
+                  )}
+                  {error === "convite_invalido" && (
+                    <AvisoLogin>
+                      {t(
+                        "Sua conta foi confirmada, mas o convite não vale mais — ele expirou ou foi emitido para outro e-mail. Peça um novo a quem te convidou.",
+                      )}
+                    </AvisoLogin>
+                  )}
+                  {error === "cadastro_por_convite" && (
+                    <AvisoLogin>
+                      {t(
+                        "Esta instalação aceita cadastro apenas por convite. Peça um novo convite a quem administra o sistema.",
+                      )}
+                    </AvisoLogin>
+                  )}
+                  {error === "template_padrao" && (
+                    <AvisoLogin>
+                      {t(
+                        "Este link de confirmação não é compatível com esta instalação. Peça a quem administra o sistema para revisar os modelos de e-mail.",
+                      )}
+                    </AvisoLogin>
+                  )}
+                  {error === "provisionamento" && (
+                    <AvisoLogin>
+                      {t(
+                        "Sua conta foi confirmada, mas houve um erro ao preparar seu ambiente. Tente entrar novamente em instantes.",
+                      )}
+                    </AvisoLogin>
+                  )}
+                  {error === "entrada_com_google" && (
+                    <AvisoLogin>
+                      {t(
+                        "Não foi possível concluir a autenticação anterior. Entre com e-mail e senha.",
+                      )}
+                    </AvisoLogin>
+                  )}
+                  {error === "entrada_com_google_cancelada" && (
+                    <AvisoLogin>
+                      {t("A autenticação anterior foi cancelada. Nada mudou na sua conta.")}
+                    </AvisoLogin>
+                  )}
+                  {error === "acesso_revogado" && (
+                    <AvisoLogin>
+                      {t(
+                        "O acesso desta conta foi retirado por quem administra o sistema. Se o acesso deveria continuar, peça a restauração.",
+                      )}
+                    </AvisoLogin>
+                  )}
+                </div>
+
+                <LoginForm
+                  next={next}
+                  forgotHref="/login/forgot"
+                  appearance="elus"
+                />
+
+                <div className="mt-7 border-t border-white/10 pt-5 text-center">
+                  <p className="text-xs leading-5 text-white/40">
+                    {t("Acesso restrito a usuários autorizados do Elus.")}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-5 text-center text-xs text-white/30">
+                {t("Elus by Wandora")}
+              </p>
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
