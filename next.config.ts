@@ -127,6 +127,13 @@ export default withSentryConfig(nextConfig, {
 
   project: "javascript-nextjs",
 
+  // Candidate self-host: só publica sourcemaps quando a credencial existe.
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  useRunAfterProductionCompileHook: Boolean(process.env.SENTRY_AUTH_TOKEN),
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
 
