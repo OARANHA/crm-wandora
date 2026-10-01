@@ -69,7 +69,7 @@ export function LoginForm({
   };
 
   const inputClassName = elus
-    ? "h-12 rounded-xl border-white/10 bg-white/[0.055] px-4 text-white shadow-none placeholder:text-white/30 hover:border-white/20 focus-visible:border-violet-400/60 focus-visible:ring-violet-400/20"
+    ? "h-12 rounded-xl border-violet-200/10 bg-white/[0.05] px-4 text-white shadow-none placeholder:text-white/30 hover:border-cyan-300/25 focus-visible:border-violet-400/70 focus-visible:ring-violet-400/20"
     : undefined;
 
   return (
@@ -167,7 +167,7 @@ export function LoginForm({
         type="submit"
         className={
           elus
-            ? "h-12 w-full rounded-xl border-0 bg-gradient-to-r from-blue-600 via-violet-600 to-fuchsia-600 font-semibold text-white shadow-lg shadow-violet-950/30 transition-[transform,filter,opacity] hover:brightness-110 active:scale-[0.99]"
+            ? "h-12 w-full rounded-xl border-0 bg-gradient-to-r from-cyan-500 via-violet-600 to-fuchsia-600 font-semibold text-white shadow-lg shadow-violet-950/40 transition-[transform,filter,opacity] hover:brightness-110 active:scale-[0.99]"
             : "w-full"
         }
         disabled={isPending}
