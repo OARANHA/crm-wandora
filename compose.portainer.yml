@@ -12,13 +12,8 @@ x-logging: &default-logging
 services:
   app:
     container_name: elus-app
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        APP_VERSION: ${APP_VERSION:-elus}
-    image: ${APP_IMAGE:-wandora/elus-app:local}
-    pull_policy: build
+    image: ${APP_IMAGE:-ghcr.io/melgarafael/deskcommcrm:1.69.0}
+    pull_policy: ${APP_PULL_POLICY:-missing}
     restart: unless-stopped
     mem_limit: 768m
     expose:
@@ -74,13 +69,8 @@ services:
 
   worker:
     container_name: elus-worker
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-      args:
-        APP_VERSION: ${APP_VERSION:-elus}
-    image: ${WORKER_IMAGE:-wandora/elus-worker:local}
-    pull_policy: build
+    image: ${WORKER_IMAGE:-ghcr.io/melgarafael/deskcomm-worker:1.69.0}
+    pull_policy: ${WORKER_PULL_POLICY:-missing}
     restart: unless-stopped
     mem_limit: 512m
     environment:
@@ -162,13 +152,8 @@ services:
 
   scheduler:
     container_name: elus-scheduler
-    build:
-      context: .
-      dockerfile: Dockerfile.scheduler
-      args:
-        APP_VERSION: ${APP_VERSION:-elus}
-    image: ${SCHEDULER_IMAGE:-wandora/elus-scheduler:local}
-    pull_policy: build
+    image: ${SCHEDULER_IMAGE:-ghcr.io/melgarafael/deskcomm-scheduler:1.69.0}
+    pull_policy: ${SCHEDULER_PULL_POLICY:-missing}
     restart: unless-stopped
     depends_on:
       app:
