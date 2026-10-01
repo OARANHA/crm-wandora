@@ -42,6 +42,7 @@ jobs:
           tests/unit/integracoes-erp-vendaerp-url.test.ts
           tests/unit/integracoes-erp-normalizacao.test.ts
           tests/unit/integracoes-erp-tools.test.ts
+          tests/unit/integracoes-erp-tools-comportamento.test.ts
 
       - name: Catalog invariants touched by ERP tools
         run: >
