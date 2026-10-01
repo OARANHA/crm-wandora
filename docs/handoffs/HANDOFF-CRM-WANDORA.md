@@ -433,3 +433,79 @@ Ao abrir novo chat, pedir:
 > Leia `docs/handoffs/HANDOFF-CRM-WANDORA.md` no repositório `OARANHA/crm-wandora` e continue da seção “Branding / customização — PRÓXIMA FRENTE”.
 
 Assim a conversa pode continuar sem depender do contexto anterior.
+
+
+---
+
+## 2026-10-01 — Login premium do Elus e correções de branding
+
+Branch de trabalho: `feat/elus-login-branding`.
+
+### Assets do Elus
+
+Os assets foram adicionados manualmente pelo proprietário do projeto, sem geração nem alteração automática:
+
+- `public/brand/elus/login-hero.png`
+- `public/brand/elus/logo-horizontal.png`
+- `public/brand/elus/logo-symbol.png`
+
+O código usa o hero e o logo horizontal. O símbolo fica reservado para usos futuros.
+
+### Tela de login
+
+`app/(public)/login/page.tsx` foi redesenhada como uma fachada SaaS escura e responsiva:
+
+- hero/mascote à esquerda em desktop;
+- card glass escuro à direita;
+- logo horizontal do Elus;
+- título “Bem-vindo ao Elus”;
+- e-mail e senha continuam sendo campos reais;
+- mostrar/ocultar senha preservado;
+- recuperação de senha preservada;
+- CTA com gradiente azul → roxo → magenta;
+- fluxo de MFA preservado pela mesma `signInWithPassword`;
+- não foi criado “lembrar de mim”, porque o fluxo atual não possui esse recurso.
+
+Decisão de produto nesta etapa:
+
+- não mostrar “Criar conta” no login;
+- não mostrar “Entrar com Google” no login;
+- cadastro público/landing page/funil ficam para etapa posterior;
+- links de convite existentes continuam sendo a porta para criação de acesso quando aplicável;
+- backend OAuth não foi removido, apenas deixou de ser exposto na tela de login.
+
+A fachada agora resolve o nome com `marcaDaSaida(null)`, isto é, banco acima do `.env`. Isso elimina a divergência em que metadata/título podiam refletir `platform_branding` enquanto o texto do login ainda lia `branding()` do ambiente.
+
+### PNG transparente acusado de SVG
+
+Causa confirmada:
+
+- a rota procurava padrões como `<?xml` nos primeiros 1 KB **antes** de respeitar a assinatura PNG/JPEG;
+- PNGs legítimos podem conter metadados XMP/XML, gerando falso positivo como SVG.
+
+Correção:
+
+- assinatura binária PNG/JPEG tem precedência;
+- a heurística textual de SVG só roda para arquivos que não foram reconhecidos como PNG/JPEG;
+- `pareceSvg()` também retorna `false` imediatamente para formato binário reconhecido;
+- teste de regressão cobre PNG com XML/XMP nos primeiros bytes.
+
+### Cor da marca
+
+A investigação da cadeia atual mostrou:
+
+- gravação de `accent_hex` no banco funciona;
+- `updateBranding` invalida o memo e a tela chama `router.refresh()`;
+- `app/layout.tsx` injeta os tokens em runtime no `<head>`;
+- o CSS da marca sobrescreve os tokens de accent por tema;
+- a suíte já cobre serialização, cascata, contraste e escopo organização/instalação.
+
+Importante: o hex escolhido é a **semente** da identidade. O motor deriva tons diferentes para claro/escuro quando necessário para manter contraste, então o botão pode não usar literalmente o mesmo hex. Não foi alterado esse motor de acessibilidade sem evidência de defeito.
+
+### Estado operacional
+
+- upstream `melgarafael/DeskcommCRM`: intocado;
+- Vigia: intocado;
+- stack Portainer `elus`: sem redeploy;
+- nenhum build pesado foi executado na VPS;
+- alterações permanecem somente na branch/PR até revisão.
