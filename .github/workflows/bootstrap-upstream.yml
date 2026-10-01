@@ -18,8 +18,14 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Import upstream main
+      - name: Import upstream snapshot
         run: |
+          git config user.name "Wandora Bootstrap"
+          git config user.email "actions@users.noreply.github.com"
           git remote add upstream https://github.com/melgarafael/DeskcommCRM.git
           git fetch --depth=1 upstream main
-          git push origin FETCH_HEAD:main --force
+          git rm -r --ignore-unmatch .
+          git checkout FETCH_HEAD -- .
+          git add -A
+          git commit -m "Import DeskcommCRM upstream snapshot"
+          git push origin main
