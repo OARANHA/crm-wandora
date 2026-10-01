@@ -41,7 +41,7 @@ import { logger } from "@/lib/logger";
 
 /**
  * `banco_externo`, `fluxos_atendimento`, `propostas` e `crm_b2b` ligam/desligam por uma linha em `platform_config`
- * (ver o resto deste arquivo). `honorarios` é um MÓDULO DE TABELA (ADR-0002): a fonte da
+ * (ver o resto deste arquivo). `honorarios` e `integracoes_erp` são MÓDULOS DE TABELA (ADR-0002): a fonte da
  * verdade é `modulos_instalados`, escrita só por `fn_modulo_instalar` (`lib/modulos/service.ts`),
  * nunca por esta tela. Os dois mecanismos convivem na mesma lista porque é isso que
  * `deModuloDesligado` (catálogo de tools MCP) precisa: "este módulo, seja qual for o mecanismo
