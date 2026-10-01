@@ -11,6 +11,7 @@ x-logging: &default-logging
 
 services:
   app:
+    container_name: elus-app
     build:
       context: .
       dockerfile: Dockerfile
@@ -20,6 +21,8 @@ services:
     pull_policy: build
     restart: unless-stopped
     mem_limit: 768m
+    expose:
+      - "3000"
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
@@ -45,6 +48,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      JEV_API_BASE_URL: ${JEV_API_BASE_URL:-}
       APP_NAME: ${APP_NAME:-Elus}
       APP_LOGO_URL: ${APP_LOGO_URL:-}
       APP_ACCENT_HEX: ${APP_ACCENT_HEX:-}
@@ -66,9 +70,10 @@ services:
     logging: *default-logging
     networks:
       - internal
-      - wandora-edge
+      - vigia-edge
 
   worker:
+    container_name: elus-worker
     build:
       context: .
       dockerfile: Dockerfile.worker
@@ -107,6 +112,7 @@ services:
       - internal
 
   waha:
+    container_name: elus-waha
     image: ${WAHA_IMAGE:-devlikeapro/waha:latest-2026.7.2}
     restart: unless-stopped
     mem_limit: 1280m
@@ -126,6 +132,7 @@ services:
       - internal
 
   redis:
+    container_name: elus-redis
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]
@@ -139,6 +146,7 @@ services:
       - internal
 
   srh:
+    container_name: elus-srh
     image: hiett/serverless-redis-http@sha256:5b0bb9239fce53abf87b2018a7a0deb9ec7bd900c5360738fe5fbeeb426f9150
     restart: unless-stopped
     environment:
@@ -153,6 +161,7 @@ services:
       - internal
 
   scheduler:
+    container_name: elus-scheduler
     build:
       context: .
       dockerfile: Dockerfile.scheduler
@@ -178,5 +187,6 @@ volumes:
 networks:
   internal:
     driver: bridge
-  wandora-edge:
+  vigia-edge:
     external: true
+    name: vigia-edge
