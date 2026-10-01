@@ -143,7 +143,7 @@ export function pesquisarProdutosVendaErp(
   credenciais: CredenciaisVendaErp,
   filtros: FiltrosProdutosVendaErp = {},
 ): Promise<unknown> {
-  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.produtosPesquisar, filtros);
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.produtosPesquisar, { ...filtros });
 }
 
 export function lerEstoqueVendaErp(
@@ -168,7 +168,7 @@ export function pesquisarPedidosVendaErp(
   credenciais: CredenciaisVendaErp,
   filtros: FiltrosPedidosVendaErp = {},
 ): Promise<unknown> {
-  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.pedidosPesquisar, filtros);
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.pedidosPesquisar, { ...filtros });
 }
 
 export function consultarNfeVendaErp(
