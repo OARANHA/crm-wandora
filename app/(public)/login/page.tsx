@@ -89,13 +89,13 @@ export default async function LoginPage({
               className="pointer-events-none absolute left-1/2 top-1/2 h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600/10 blur-[110px]"
             />
             <div className="relative w-full max-w-[440px]">
-              <div className="overflow-hidden rounded-[32px] border border-white/[0.09] bg-[#0b0d1d]/82 shadow-[0_28px_90px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
+              <div className="overflow-hidden rounded-[32px] border border-white/10 bg-[#0b0d1d]/80 shadow-[0_28px_90px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
                 <div
                   aria-hidden
                   className="h-px w-full bg-gradient-to-r from-transparent via-cyan-300/80 to-transparent"
                 />
                 <div className="p-6 sm:p-8">
-                <div className="mb-8">
+                  <div className="mb-8">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src="/brand/elus/logo-horizontal.png"
@@ -183,7 +183,7 @@ export default async function LoginPage({
                 />
 
                 <div className="mt-7 border-t border-white/[0.08] pt-5 text-center">
-                  <p className="text-xs leading-5 text-white/42">
+                  <p className="text-xs leading-5 text-white/40">
                     {t("Acesso restrito a usuários autorizados do Elus.")}
                   </p>
                 </div>

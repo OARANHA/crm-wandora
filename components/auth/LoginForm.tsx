@@ -69,7 +69,7 @@ export function LoginForm({
   };
 
   const inputClassName = elus
-    ? "h-12 rounded-xl border-white/[0.09] bg-[#11152a]/85 px-4 text-white shadow-none placeholder:text-white/28 hover:border-cyan-300/25 focus-visible:border-cyan-300/55 focus-visible:ring-cyan-300/15"
+    ? "h-12 rounded-xl border-white/10 bg-[#11152a]/80 px-4 text-white shadow-none placeholder:text-white/30 hover:border-cyan-300/30 focus-visible:border-cyan-300/50 focus-visible:ring-cyan-300/20"
     : undefined;
 
   return (
