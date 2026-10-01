@@ -19,4 +19,4 @@ git remote -v | grep -E '^(origin|upstream)[[:space:]]' || true
 
 echo
 echo "No merge was performed."
-echo "Review upstream/main and merge/cherry-pick into a dedicated branch before changing Elo main."
+echo "Review upstream/main and merge/cherry-pick into a dedicated branch before changing Elus main."
