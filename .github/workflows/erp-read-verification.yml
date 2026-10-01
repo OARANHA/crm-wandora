@@ -1,0 +1,53 @@
+name: ERP read verification
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-erp-read:
+    name: Typecheck and ERP read tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: ERP unit tests
+        run: >
+          pnpm vitest run
+          tests/unit/integracoes-erp-provedor.test.ts
+          tests/unit/integracoes-erp-vendaerp-url.test.ts
+          tests/unit/integracoes-erp-normalizacao.test.ts
+          tests/unit/integracoes-erp-tools.test.ts
+
+      - name: Catalog invariants touched by ERP tools
+        run: >
+          pnpm vitest run
+          tests/unit/catalogo-tools-leigo-friendly.test.ts
+          tests/unit/capacidade-alcancavel-pelo-agente.test.ts
+          tests/unit/selecao-por-pacote.test.ts
+          tests/unit/pacote-reserva-vaga-da-critica.test.ts
+          tests/unit/tool-read-nao-muta.test.ts
