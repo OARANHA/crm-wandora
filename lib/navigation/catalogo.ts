@@ -1014,6 +1014,16 @@ export const NAV_CATALOG = [
     section: "Sua empresa",
   },
   {
+    href: "/app/integracoes-erp",
+    label: "Integrações ERP",
+    description: "Conecte o ERP da empresa. VendaERP estreia em modo somente leitura.",
+    icon: "PlugsConnected",
+    group: "organizacao",
+    section: "Dados e acesso",
+    minRole: "viewer",
+    modulo: "integracoes_erp",
+  },
+  {
     // A porta da fonte de dados externa (migration 0372). Fica em "Dados e
     // acesso" porque é o MESMO eixo de API Tokens: por onde dado entra e sai do
     // CRM. NÃO é `admin` como as vizinhas de propósito — a decisão do dono (D2)
