@@ -1,4 +1,4 @@
-name: ERP smoke images
+name: ERP smoke mirror
 
 on:
   push:
@@ -8,42 +8,31 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  packages: read
 
 jobs:
-  build:
-    name: Build ${{ matrix.name }}
+  mirror:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: app
-            dockerfile: Dockerfile
-            image: ghcr.io/oaranha/crm-wandora-app
-          - name: worker
-            dockerfile: Dockerfile.worker
-            image: ghcr.io/oaranha/crm-wandora-worker
-          - name: scheduler
-            dockerfile: Dockerfile.scheduler
-            image: ghcr.io/oaranha/crm-wandora-scheduler
-
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: true
-          tags: ${{ matrix.image }}:erp-smoke-30cf923
-          cache-from: type=gha,scope=erp-smoke-${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=erp-smoke-${{ matrix.name }}
+      - name: Mirror smoke images to ttl.sh
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker pull ghcr.io/oaranha/crm-wandora-app:erp-smoke-30cf923
+          docker tag ghcr.io/oaranha/crm-wandora-app:erp-smoke-30cf923 ttl.sh/9b2d5c4e7a3146b9a1f0e6c8d5a2f730-app:1h
+          docker push ttl.sh/9b2d5c4e7a3146b9a1f0e6c8d5a2f730-app:1h
+
+          docker pull ghcr.io/oaranha/crm-wandora-worker:erp-smoke-30cf923
+          docker tag ghcr.io/oaranha/crm-wandora-worker:erp-smoke-30cf923 ttl.sh/9b2d5c4e7a3146b9a1f0e6c8d5a2f730-worker:1h
+          docker push ttl.sh/9b2d5c4e7a3146b9a1f0e6c8d5a2f730-worker:1h
+
+          docker pull ghcr.io/oaranha/crm-wandora-scheduler:erp-smoke-30cf923
+          docker tag ghcr.io/oaranha/crm-wandora-scheduler:erp-smoke-30cf923 ttl.sh/9b2d5c4e7a3146b9a1f0e6c8d5a2f730-scheduler:1h
+          docker push ttl.sh/9b2d5c4e7a3146b9a1f0e6c8d5a2f730-scheduler:1h
