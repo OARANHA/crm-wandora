@@ -4,8 +4,24 @@ import { motivoDaRecusaDeDestino } from "@/lib/automation/destinos-internos-auto
 import { logger } from "@/lib/logger";
 
 import { carregarConexaoVendaErp, dadosCifradosVendaErp } from "./credenciais";
-import type { ConexaoErpSegura, CredenciaisVendaErp } from "./tipos";
-import { ErroVendaErp, testarConexaoVendaErp } from "./vendaerp";
+import type {
+  ClienteErp,
+  ConexaoErpSegura,
+  CredenciaisVendaErp,
+  NotaErp,
+  PedidoErp,
+  ProdutoErp,
+} from "./tipos";
+import {
+  ErroVendaErp,
+  pesquisarClientesVendaErp,
+  pesquisarPedidosVendaErp,
+  pesquisarProdutosVendaErp,
+  testarConexaoVendaErp,
+  type FiltrosClientesVendaErp,
+  type FiltrosPedidosVendaErp,
+  type FiltrosProdutosVendaErp,
+} from "./vendaerp";
 
 const PROVIDER = "vendaerp";
 const COLUNAS_SEGURAS =
@@ -135,4 +151,191 @@ export async function testarConexaoVendaErpSalva(
   if (!okTeste) return { ok: false, motivo: erro ?? "provider_error", status };
   if (!data) return { ok: false, motivo: "write_failed" };
   return { ok: true, conexao: data as unknown as ConexaoErpSegura };
+}
+
+// ---------------------------------------------------------------------------
+// Leitura para o agente: conexão -> provider -> projeção estável do Elus
+// ---------------------------------------------------------------------------
+
+export type ConsultaErpResultado<T> =
+  | { ok: true; dados: T }
+  | { ok: false; motivo: string; status?: number | null };
+
+function objeto(valor: unknown): Record<string, unknown> | null {
+  return valor !== null && typeof valor === "object" && !Array.isArray(valor)
+    ? (valor as Record<string, unknown>)
+    : null;
+}
+
+function listaDeObjetos(valor: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(valor)) throw new ErroVendaErp("invalid_response");
+  const registros: Record<string, unknown>[] = [];
+  for (const item of valor) {
+    const registro = objeto(item);
+    if (!registro) throw new ErroVendaErp("invalid_response");
+    registros.push(registro);
+  }
+  return registros;
+}
+
+function texto(valor: unknown): string | null {
+  return typeof valor === "string" ? valor : null;
+}
+
+function numero(valor: unknown): number | null {
+  return typeof valor === "number" && Number.isFinite(valor) ? valor : null;
+}
+
+function booleano(valor: unknown): boolean | null {
+  return typeof valor === "boolean" ? valor : null;
+}
+
+export function normalizarProdutosVendaErp(valor: unknown): ProdutoErp[] {
+  return listaDeObjetos(valor).map((p) => ({
+    id: texto(p.id),
+    codigo: texto(p.codigo),
+    nome: texto(p.nome),
+    preco: numero(p.precoVenda),
+    estoque: numero(p.estoqueSaldo),
+    unidade: texto(p.estoqueUnidade),
+    ean: texto(p.ean),
+    marca: texto(p.marca),
+    categoria: texto(p.categoria),
+  }));
+}
+
+export function normalizarClientesVendaErp(valor: unknown): ClienteErp[] {
+  return listaDeObjetos(valor).map((p) => {
+    const nomeFantasia = texto(p.nomeFantasia);
+    const razaoSocial = texto(p.razaoSocial);
+    return {
+      id: texto(p.id),
+      nome: nomeFantasia ?? razaoSocial,
+      nomeFantasia,
+      razaoSocial,
+      cpfCnpj: texto(p.cnpJ_CPF),
+      email: texto(p.email),
+      telefone: texto(p.telefone),
+      celular: texto(p.celular),
+      cidade: texto(p.cidade),
+      uf: texto(p.uf),
+    };
+  });
+}
+
+export function normalizarPedidosVendaErp(valor: unknown): PedidoErp[] {
+  return listaDeObjetos(valor).map((p) => ({
+    id: texto(p.id),
+    codigo: numero(p.codigo),
+    cliente: texto(p.cliente),
+    status: texto(p.status),
+    statusSistema: texto(p.statusSistema),
+    total: numero(p.valorFinal),
+    data: texto(p.data),
+    finalizado: booleano(p.finalizado),
+    numeroNFe: texto(p.numeroNFe),
+    dataFaturamento: texto(p.dataFaturamento),
+    chaveAcessoNFe: texto(p.chaveAcessoNFe),
+    danfeUrl: texto(p.danfeURL),
+    urlSefaz: texto(p.urlSefaz),
+  }));
+}
+
+async function executarLeituraVendaErp<T>(
+  admin: SupabaseClient,
+  organizationId: string,
+  executar: (credenciais: CredenciaisVendaErp) => Promise<T>,
+): Promise<ConsultaErpResultado<T>> {
+  const leitura = await carregarConexaoVendaErp(admin, organizationId);
+  if (!leitura.ok) return { ok: false, motivo: leitura.motivo };
+
+  try {
+    return { ok: true, dados: await executar(leitura.credenciais) };
+  } catch (erro) {
+    if (erro instanceof ErroVendaErp) {
+      return { ok: false, motivo: erro.codigo, status: erro.status };
+    }
+    return { ok: false, motivo: "provider_error" };
+  }
+}
+
+export async function buscarProdutosErp(
+  admin: SupabaseClient,
+  organizationId: string,
+  filtros: FiltrosProdutosVendaErp,
+): Promise<ConsultaErpResultado<ProdutoErp[]>> {
+  return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
+    normalizarProdutosVendaErp(await pesquisarProdutosVendaErp(credenciais, filtros)),
+  );
+}
+
+/**
+ * O endpoint dedicado Estoque/BuscarQuantidades não declara schema de resposta
+ * no Swagger recebido. Para não passar JSON opaco ao modelo, a V1 do agente lê
+ * estoque por Produtos/Pesquisar, que aceita depósito e documenta estoqueSaldo.
+ * É uma chamada só, sem cache e sem inferir campo não contratado.
+ */
+export async function lerEstoqueErp(
+  admin: SupabaseClient,
+  organizationId: string,
+  filtros: Pick<FiltrosProdutosVendaErp, "codigo" | "nome" | "deposito" | "pageSize" | "skip">,
+): Promise<ConsultaErpResultado<ProdutoErp[]>> {
+  return buscarProdutosErp(admin, organizationId, filtros);
+}
+
+export async function buscarClientesErp(
+  admin: SupabaseClient,
+  organizationId: string,
+  filtros: FiltrosClientesVendaErp,
+): Promise<ConsultaErpResultado<ClienteErp[]>> {
+  return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
+    normalizarClientesVendaErp(await pesquisarClientesVendaErp(credenciais, filtros)),
+  );
+}
+
+export async function buscarPedidosErp(
+  admin: SupabaseClient,
+  organizationId: string,
+  filtros: FiltrosPedidosVendaErp,
+): Promise<ConsultaErpResultado<PedidoErp[]>> {
+  return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
+    normalizarPedidosVendaErp(await pesquisarPedidosVendaErp(credenciais, filtros)),
+  );
+}
+
+/**
+ * Fiscal/ConsultarNFE também não declara schema de resposta no Swagger recebido.
+ * O Pedido documentado já contém numeroNFe, chaveAcessoNFe, danfeURL, urlSefaz
+ * e dataFaturamento. A superfície do agente usa Pedidos/Pesquisar?numeroNFe
+ * até existir um contrato de resposta fiscal que possa ser projetado com
+ * segurança; o endpoint fiscal dedicado permanece no provider, mas não é
+ * despejado cru no contexto do modelo.
+ */
+export async function obterNotaErp(
+  admin: SupabaseClient,
+  organizationId: string,
+  codigoNFe: number,
+): Promise<ConsultaErpResultado<NotaErp[]>> {
+  const numeroNFe = String(codigoNFe);
+  const resultado = await buscarPedidosErp(admin, organizationId, {
+    numeroNFe,
+    pageSize: 5,
+    skip: 0,
+  });
+  if (!resultado.ok) return resultado;
+
+  const notas = resultado.dados
+    .filter((pedido) => pedido.numeroNFe === numeroNFe)
+    .map(
+      (pedido): NotaErp => ({
+        numero: numeroNFe,
+        pedidoCodigo: pedido.codigo,
+        statusDoPedido: pedido.status,
+        dataFaturamento: pedido.dataFaturamento,
+        chave: pedido.chaveAcessoNFe,
+        danfeUrl: pedido.danfeUrl,
+        urlSefaz: pedido.urlSefaz,
+      }),
+    );
+  return { ok: true, dados: notas };
 }

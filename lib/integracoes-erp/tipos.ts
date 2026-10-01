@@ -45,3 +45,61 @@ export interface CredenciaisVendaErp {
   user: string;
   app: string;
 }
+
+/**
+ * Projeções estáveis que o restante do Elus consome.
+ *
+ * Os nomes do VendaERP ficam confinados ao adapter do provider. O agente nunca
+ * recebe o objeto cru do Swagger — em especial Pessoa, que também declara
+ * campos de autenticação que não pertencem à conversa.
+ */
+export interface ProdutoErp {
+  id: string | null;
+  codigo: string | null;
+  nome: string | null;
+  preco: number | null;
+  estoque: number | null;
+  unidade: string | null;
+  ean: string | null;
+  marca: string | null;
+  categoria: string | null;
+}
+
+export interface ClienteErp {
+  id: string | null;
+  nome: string | null;
+  nomeFantasia: string | null;
+  razaoSocial: string | null;
+  cpfCnpj: string | null;
+  email: string | null;
+  telefone: string | null;
+  celular: string | null;
+  cidade: string | null;
+  uf: string | null;
+}
+
+export interface PedidoErp {
+  id: string | null;
+  codigo: number | null;
+  cliente: string | null;
+  status: string | null;
+  statusSistema: string | null;
+  total: number | null;
+  data: string | null;
+  finalizado: boolean | null;
+  numeroNFe: string | null;
+  dataFaturamento: string | null;
+  chaveAcessoNFe: string | null;
+  danfeUrl: string | null;
+  urlSefaz: string | null;
+}
+
+export interface NotaErp {
+  numero: string;
+  pedidoCodigo: number | null;
+  statusDoPedido: string | null;
+  dataFaturamento: string | null;
+  chave: string | null;
+  danfeUrl: string | null;
+  urlSefaz: string | null;
+}

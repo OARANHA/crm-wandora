@@ -81,3 +81,29 @@ A etapa de escrita deve ser construída sobre o mesmo provider e com gates expl�
 5. envio ao cliente pela camada de mensagens do Elus.
 
 O provider ERP nunca deve enviar WhatsApp por conta própria. Documento fiscal recuperado do ERP entra na cadeia de mensageria existente, preservando auditoria, status, janela e transporte do CRM.
+
+
+## Ferramentas do agente
+
+A V1 publica cinco capacidades no catálogo já existente do Elus, todas como read, requiresRole agent, requiresScope mcp:read e condicionadas ao módulo integracoes_erp:
+
+- crm_erp_search_products;
+- crm_erp_read_stock;
+- crm_erp_search_customers;
+- crm_erp_search_orders;
+- crm_erp_get_invoice.
+
+Elas usam o mesmo catálogo MCP do restante do produto; não existe uma segunda infraestrutura de tools para ERP. O mesmo gate de módulo retira as capacidades do agente, do MCP externo e da tela quando integracoes_erp não está instalado.
+
+Os filtros de busca são redigidos antes de entrar no log de auditoria. O payload do VendaERP não é entregue cru ao modelo: Produto, Pessoa e Pedido passam por projeções internas do Elus.
+
+### Lacunas do Swagger recebido
+
+O Swagger recebido não declara schema de resposta para Estoque/BuscarQuantidades nem para Fiscal/ConsultarNFE. A V1 não adivinha esses corpos.
+
+Para a superfície do agente:
+
+- stock.read usa uma única chamada a Produtos/Pesquisar, que aceita deposito e cujo schema Produto documenta estoqueSaldo e estoqueUnidade;
+- invoice.get usa uma única chamada a Pedidos/Pesquisar?numeroNFe=..., porque o schema Pedido documenta numeroNFe, dataFaturamento, chaveAcessoNFe, danfeURL e urlSefaz.
+
+Os endpoints dedicados de estoque e fiscal continuam mapeados no provider para uso futuro, mas seus payloads não entram no contexto do agente até que exista contrato de resposta verificável.

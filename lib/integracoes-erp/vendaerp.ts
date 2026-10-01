@@ -4,6 +4,62 @@ import type { CredenciaisVendaErp } from "./tipos";
 
 const TIMEOUT_MS = 12_000;
 
+export const VENDAERP_ENDPOINTS = {
+  configuracoesGet: "/api/request/Configuracoes/Get",
+  produtosPesquisar: "/api/request/Produtos/Pesquisar",
+  estoqueBuscarQuantidades: "/api/request/Estoque/BuscarQuantidades",
+  pessoasPesquisar: "/api/request/Pessoas/Pesquisar",
+  pedidosPesquisar: "/api/request/Pedidos/Pesquisar",
+  fiscalConsultarNfe: "/api/request/Fiscal/ConsultarNFE",
+} as const;
+
+export interface FiltrosProdutosVendaErp {
+  codigo?: string;
+  numeroSerie?: string;
+  nome?: string;
+  genero?: string;
+  categoria?: string;
+  marca?: string;
+  deposito?: string;
+  ean?: string;
+  alteradoApos?: string;
+  pageSize?: number;
+  skip?: number;
+}
+
+export interface FiltrosClientesVendaErp {
+  nomefantasia?: string;
+  cpfcnpj?: string;
+  cidade?: string;
+  uf?: string;
+  alteradoapos?: string;
+  pageSize?: number;
+  skip?: number;
+  email?: string;
+  codigoIdentificadorUnico?: string;
+}
+
+export interface FiltrosPedidosVendaErp {
+  codigo?: number;
+  origem?: string;
+  status?: string;
+  statuscliente?: string;
+  categoria?: string;
+  cliente?: string;
+  pageSize?: number;
+  skip?: number;
+  cpf_cnpj?: string;
+  alteradoApos?: string;
+  dataInicial?: string;
+  dataFinal?: string;
+  empresa?: string;
+  numeroNFe?: string;
+  vendedor?: string;
+  transportadora?: string;
+  possuiNotaFiscal?: boolean;
+  incluirImpostos?: boolean;
+}
+
 export class ErroVendaErp extends Error {
   constructor(
     public readonly codigo: string,
@@ -49,6 +105,7 @@ async function getVendaErp(
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
+    // O wrapper revalida o destino no momento da chamada e força redirect manual.
     const seguro = fetchParaDestinoDaOrganizacao();
     const resposta = await seguro(url, {
       method: "GET",
@@ -79,28 +136,28 @@ async function getVendaErp(
 }
 
 export function testarConexaoVendaErp(credenciais: CredenciaisVendaErp): Promise<unknown> {
-  return getVendaErp(credenciais, "/api/request/Configuracoes/Get");
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.configuracoesGet);
 }
 
 export function pesquisarProdutosVendaErp(
   credenciais: CredenciaisVendaErp,
-  filtros: { codigo?: string; nome?: string; pageSize?: number; skip?: number } = {},
+  filtros: FiltrosProdutosVendaErp = {},
 ): Promise<unknown> {
-  return getVendaErp(credenciais, "/api/request/Produtos/Pesquisar", filtros);
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.produtosPesquisar, filtros);
 }
 
 export function lerEstoqueVendaErp(
   credenciais: CredenciaisVendaErp,
   filtros: { deposito?: string; visivelCatalogo?: boolean } = {},
 ): Promise<unknown> {
-  return getVendaErp(credenciais, "/api/request/Estoque/BuscarQuantidades", filtros);
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.estoqueBuscarQuantidades, filtros);
 }
 
 export function pesquisarClientesVendaErp(
   credenciais: CredenciaisVendaErp,
-  filtros: { nomefantasia?: string; cpfcnpj?: string; email?: string; pageSize?: number; skip?: number } = {},
+  filtros: FiltrosClientesVendaErp = {},
 ): Promise<unknown> {
-  return getVendaErp(credenciais, "/api/request/Pessoas/Pesquisar", {
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.pessoasPesquisar, {
     ...filtros,
     cliente: true,
     fornecedor: false,
@@ -109,14 +166,14 @@ export function pesquisarClientesVendaErp(
 
 export function pesquisarPedidosVendaErp(
   credenciais: CredenciaisVendaErp,
-  filtros: { codigo?: number; cliente?: string; cpf_cnpj?: string; pageSize?: number; skip?: number } = {},
+  filtros: FiltrosPedidosVendaErp = {},
 ): Promise<unknown> {
-  return getVendaErp(credenciais, "/api/request/Pedidos/Pesquisar", filtros);
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.pedidosPesquisar, filtros);
 }
 
 export function consultarNfeVendaErp(
   credenciais: CredenciaisVendaErp,
   codigoNFe: number,
 ): Promise<unknown> {
-  return getVendaErp(credenciais, "/api/request/Fiscal/ConsultarNFE", { CodigoNFe: codigoNFe });
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.fiscalConsultarNfe, { CodigoNFe: codigoNFe });
 }
