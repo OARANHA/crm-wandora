@@ -1,0 +1,25 @@
+name: Bootstrap DeskcommCRM upstream
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    if: github.event.head_commit.message == 'Bootstrap CRM from DeskcommCRM'
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Import upstream main
+        run: |
+          git remote add upstream https://github.com/melgarafael/DeskcommCRM.git
+          git fetch --depth=1 upstream main
+          git push origin FETCH_HEAD:main --force
