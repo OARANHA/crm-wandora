@@ -4,6 +4,8 @@ import {
   normalizarClientesVendaErp,
   normalizarDepositosVendaErp,
   normalizarEstoqueVendaErp,
+  normalizarInformacaoFiscalVendaVendaErp,
+  normalizarNotaVendaErp,
   normalizarPedidosVendaErp,
   normalizarProdutosVendaErp,
   resolverDepositoEstoque,
@@ -19,6 +21,7 @@ describe("adapter seguro do VendaERP", () => {
       estoqueBuscarQuantidades: "/api/request/Estoque/BuscarQuantidades",
       pessoasPesquisar: "/api/request/Pessoas/Pesquisar",
       pedidosPesquisar: "/api/request/Pedidos/Pesquisar",
+      fiscalInformacoesVenda: "/api/request/Fiscal/InformacoesVenda",
       fiscalConsultarNfe: "/api/request/Fiscal/ConsultarNFE",
     });
   });
@@ -132,6 +135,49 @@ describe("adapter seguro do VendaERP", () => {
     });
     expect(cliente).not.toHaveProperty("senha");
     expect(cliente).not.toHaveProperty("salt");
+  });
+
+  it("projeta ConsultarNFE sem carregar o XML fiscal bruto", () => {
+    const nota = normalizarNotaVendaErp({
+      CodigoStatus: 100,
+      MsgStatus: "Autorizado o uso da NF-e",
+      ChaveNFe: "43261046793999000174550020649963961404794580",
+      Numero: 64996396,
+      Lote: 89,
+      UrlImpressaoDanfe: "https://app.vendaerp.com.br/danfe",
+      Xml: "<nfe>conteudo sensivel e grande</nfe>",
+    });
+
+    expect(nota).toEqual({
+      numero: 64996396,
+      codigoStatus: 100,
+      mensagemStatus: "Autorizado o uso da NF-e",
+      chave: "43261046793999000174550020649963961404794580",
+      lote: 89,
+      danfeUrl: "https://app.vendaerp.com.br/danfe",
+    });
+    expect(nota).not.toHaveProperty("Xml");
+    expect(nota).not.toHaveProperty("xml");
+  });
+
+  it("normaliza InformacoesVenda sem inventar timezone para DataEmissao", () => {
+    expect(
+      normalizarInformacaoFiscalVendaVendaErp({
+        Tipo: "NFe",
+        Numero: 64996340,
+        Serie: "02",
+        ChaveAcesso: "43260546793999000174550020649963401293730147",
+        DataEmissao: "27/05/2026 - 13:14",
+        UrlImpressaoUrl: "https://app.vendaerp.com.br/danfe-venda",
+      }),
+    ).toEqual({
+      tipo: "NFe",
+      numero: 64996340,
+      serie: "02",
+      chave: "43260546793999000174550020649963401293730147",
+      dataEmissao: "27/05/2026 - 13:14",
+      danfeUrl: "https://app.vendaerp.com.br/danfe-venda",
+    });
   });
 
   it("projeta do Pedido somente os campos necessários a pedido e nota", () => {

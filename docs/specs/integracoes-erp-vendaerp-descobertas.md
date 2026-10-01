@@ -143,16 +143,64 @@ pendência explícita antes de ampliar automação ou escrita, especialmente por
 uma consulta de estoque sem depósito informado pode consumir duas chamadas:
 listar depósitos e, quando houver exatamente um, consultar o estoque.
 
-## Fiscal ainda pendente
+## Fiscal — resposta real observada em 2026-10-01
 
-Fiscal/ConsultarNFE existe e recebe CodigoNFe, mas o Swagger recebido continua
-sem schema de resposta verificável para o 200.
+O Swagger confirma dois endpoints GET diferentes, mas não declara schema para o
+corpo de 200 de nenhum deles:
 
-Enquanto isso, crm_erp_get_invoice usa Pedidos/Pesquisar com numeroNFe porque o
-schema Pedido documenta os campos fiscais usados pelo Elus.
+### Fiscal/ConsultarNFE
 
-Quando houver uma resposta real fiscal documentada/observada, ela deve entrar
-aqui antes de substituir esse caminho.
+Entrada formal:
+
+- CodigoNFe: número da NFe/NFCe, int32.
+
+Resposta real observada:
+
+- CodigoStatus
+- MsgStatus
+- ChaveNFe
+- Numero
+- Lote
+- UrlImpressaoDanfe
+- Xml
+
+Decisão: crm_erp_get_invoice usa este endpoint diretamente. O contrato interno
+expõe somente numero, codigoStatus, mensagemStatus, chave, lote e danfeUrl.
+
+**Xml é descartado** no adapter. O agente não precisa do XML completo para
+confirmar autorização ou disponibilizar o DANFE, e o XML pode ser volumoso e
+conter dados fiscais/pessoais que não devem ampliar o contexto da conversa.
+
+### Fiscal/InformacoesVenda
+
+Entrada formal:
+
+- Codigo: código da venda, int64.
+
+Resposta real observada:
+
+- Tipo
+- Numero
+- Serie
+- ChaveAcesso
+- DataEmissao
+- UrlImpressaoUrl
+
+Esse endpoint também foi mapeado no provider e normalizado no service. Ele é
+uma segunda visão fiscal, a partir da venda, e não cria uma nova capability do
+agente nesta V1.
+
+DataEmissao permanece string porque a resposta observada usa formato local
+"dd/MM/yyyy - HH:mm" e o provider não documenta timezone no schema de resposta.
+Converter para ISO agora inventaria informação temporal.
+
+### Relação entre as duas consultas
+
+- quando se conhece o número da NFe/NFCe: ConsultarNFE;
+- quando se parte do código de uma venda: InformacoesVenda.
+
+Nenhuma das duas operações emite, altera ou cancela documento fiscal; são
+leituras.
 
 ## Escrita
 

@@ -268,16 +268,15 @@ const notaInputShape = {
 export const crmErpGetInvoice: McpToolDefinition<typeof notaInputShape> = {
   name: "crm_erp_get_invoice",
   description:
-    "Consulta uma nota vinculada a pedido no VendaERP pelo número da NFe/NFCe e devolve apenas os campos fiscais documentados no pedido: chave, data de faturamento e endereços de consulta/DANFE.",
+    "Consulta diretamente uma NFe/NFCe já emitida no VendaERP pelo número e devolve status de autorização, chave, lote e endereço do DANFE. O XML fiscal bruto não é entregue ao agente.",
   inputSchema: notaInputShape,
   category: "read",
   requiresRole: "agent",
   requiresScope: "mcp:read",
   redigirParaAuditoria: redigirBusca,
-  motivoDoVazio: motivoDoVazio("notas"),
   handler: async (input, ctx) => {
     const r = await obterNotaErp(ctx.supabase, ctx.organizationId, input.codigo_nfe);
     const saida = resposta(r);
-    return saida.erro ? saida : { notas: saida.dados };
+    return saida.erro ? saida : { nota: saida.dados };
   },
 };

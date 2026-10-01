@@ -11,12 +11,15 @@ import type {
   DepositoErp,
   EstoqueErp,
   EstoqueItemErp,
+  InformacaoFiscalVendaErp,
   NotaErp,
   PedidoErp,
   ProdutoErp,
 } from "./tipos";
 import {
   ErroVendaErp,
+  consultarInformacoesVendaVendaErp,
+  consultarNfeVendaErp,
   lerEstoqueVendaErp,
   listarDepositosVendaErp,
   pesquisarClientesVendaErp,
@@ -279,6 +282,40 @@ export function normalizarClientesVendaErp(valor: unknown): ClienteErp[] {
   });
 }
 
+export function normalizarNotaVendaErp(valor: unknown): NotaErp {
+  const n = objeto(valor);
+  if (!n) throw new ErroVendaErp("invalid_response");
+
+  // Resposta observada em execução em 2026-10-01. XML é deliberadamente
+  // ignorado: é grande, pode carregar dados fiscais/PII desnecessários e não é
+  // preciso para o agente confirmar autorização, chave ou DANFE.
+  return {
+    numero: numero(n.Numero ?? n.numero),
+    codigoStatus: numero(n.CodigoStatus ?? n.codigoStatus),
+    mensagemStatus: texto(n.MsgStatus ?? n.msgStatus),
+    chave: texto(n.ChaveNFe ?? n.chaveNFe),
+    lote: numero(n.Lote ?? n.lote),
+    danfeUrl: texto(n.UrlImpressaoDanfe ?? n.urlImpressaoDanfe),
+  };
+}
+
+export function normalizarInformacaoFiscalVendaVendaErp(valor: unknown): InformacaoFiscalVendaErp {
+  const n = objeto(valor);
+  if (!n) throw new ErroVendaErp("invalid_response");
+
+  // InformacoesVenda é uma visão fiscal por código da venda. A data observada
+  // vem como texto local do provider ("dd/MM/yyyy - HH:mm"), por isso não é
+  // convertida para ISO sem contrato explícito de timezone.
+  return {
+    tipo: texto(n.Tipo ?? n.tipo),
+    numero: numero(n.Numero ?? n.numero),
+    serie: texto(n.Serie ?? n.serie),
+    chave: texto(n.ChaveAcesso ?? n.chaveAcesso),
+    dataEmissao: texto(n.DataEmissao ?? n.dataEmissao),
+    danfeUrl: texto(n.UrlImpressaoUrl ?? n.urlImpressaoUrl),
+  };
+}
+
 export function normalizarPedidosVendaErp(valor: unknown): PedidoErp[] {
   return listaDeObjetos(valor).map((p) => ({
     id: texto(p.id),
@@ -413,38 +450,34 @@ export async function buscarPedidosErp(
 }
 
 /**
- * Fiscal/ConsultarNFE também não declara schema de resposta no Swagger recebido.
- * O Pedido documentado já contém numeroNFe, chaveAcessoNFe, danfeURL, urlSefaz
- * e dataFaturamento. A superfície do agente usa Pedidos/Pesquisar?numeroNFe
- * até existir um contrato de resposta fiscal que possa ser projetado com
- * segurança; o endpoint fiscal dedicado permanece no provider, mas não é
- * despejado cru no contexto do modelo.
+ * Consulta fiscal direta por número de NFe/NFCe.
+ *
+ * O Swagger não tipa o 200, mas a resposta real foi observada em 2026-10-01.
+ * A projeção interna mantém apenas status, chave, lote e URL de DANFE; o XML
+ * retornado pelo provider não entra no contexto do agente.
  */
 export async function obterNotaErp(
   admin: SupabaseClient,
   organizationId: string,
   codigoNFe: number,
-): Promise<ConsultaErpResultado<NotaErp[]>> {
-  const numeroNFe = String(codigoNFe);
-  const resultado = await buscarPedidosErp(admin, organizationId, {
-    numeroNFe,
-    pageSize: 5,
-    skip: 0,
-  });
-  if (!resultado.ok) return resultado;
+): Promise<ConsultaErpResultado<NotaErp>> {
+  return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
+    normalizarNotaVendaErp(await consultarNfeVendaErp(credenciais, codigoNFe)),
+  );
+}
 
-  const notas = resultado.dados
-    .filter((pedido) => pedido.numeroNFe === numeroNFe)
-    .map(
-      (pedido): NotaErp => ({
-        numero: numeroNFe,
-        pedidoCodigo: pedido.codigo,
-        statusDoPedido: pedido.status,
-        dataFaturamento: pedido.dataFaturamento,
-        chave: pedido.chaveAcessoNFe,
-        danfeUrl: pedido.danfeUrl,
-        urlSefaz: pedido.urlSefaz,
-      }),
-    );
-  return { ok: true, dados: notas };
+/**
+ * Segunda visão fiscal, por código da venda. Ela fica disponível no service para
+ * composições futuras, mas não cria uma sexta capability pública nesta V1.
+ */
+export async function obterInformacaoFiscalDaVendaErp(
+  admin: SupabaseClient,
+  organizationId: string,
+  codigoVenda: number,
+): Promise<ConsultaErpResultado<InformacaoFiscalVendaErp>> {
+  return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
+    normalizarInformacaoFiscalVendaVendaErp(
+      await consultarInformacoesVendaVendaErp(credenciais, codigoVenda),
+    ),
+  );
 }

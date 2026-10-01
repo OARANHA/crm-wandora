@@ -11,6 +11,7 @@ export const VENDAERP_ENDPOINTS = {
   estoqueBuscarQuantidades: "/api/request/Estoque/BuscarQuantidades",
   pessoasPesquisar: "/api/request/Pessoas/Pesquisar",
   pedidosPesquisar: "/api/request/Pedidos/Pesquisar",
+  fiscalInformacoesVenda: "/api/request/Fiscal/InformacoesVenda",
   fiscalConsultarNfe: "/api/request/Fiscal/ConsultarNFE",
 } as const;
 
@@ -174,6 +175,13 @@ export function pesquisarPedidosVendaErp(
   filtros: FiltrosPedidosVendaErp = {},
 ): Promise<unknown> {
   return getVendaErp(credenciais, VENDAERP_ENDPOINTS.pedidosPesquisar, { ...filtros });
+}
+
+export function consultarInformacoesVendaVendaErp(
+  credenciais: CredenciaisVendaErp,
+  codigoVenda: number,
+): Promise<unknown> {
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.fiscalInformacoesVenda, { Codigo: codigoVenda });
 }
 
 export function consultarNfeVendaErp(

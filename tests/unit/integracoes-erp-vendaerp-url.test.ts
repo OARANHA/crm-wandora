@@ -24,6 +24,20 @@ describe("cliente VendaERP", () => {
     );
   });
 
+  it("preserva o casing dos parâmetros fiscais do VendaERP", () => {
+    expect(
+      montarUrlVendaErp("https://erp.exemplo.test", "/api/request/Fiscal/ConsultarNFE", {
+        CodigoNFe: 64996396,
+      }),
+    ).toBe("https://erp.exemplo.test/api/request/Fiscal/ConsultarNFE?CodigoNFe=64996396");
+
+    expect(
+      montarUrlVendaErp("https://erp.exemplo.test", "/api/request/Fiscal/InformacoesVenda", {
+        Codigo: 50,
+      }),
+    ).toBe("https://erp.exemplo.test/api/request/Fiscal/InformacoesVenda?Codigo=50");
+  });
+
   it("usa exatamente os três cabeçalhos de autenticação do contrato", () => {
     expect(cabecalhosVendaErp({ authorizationToken: "segredo", user: "usuario", app: "app" })).toMatchObject({
       "Authorization-Token": "segredo",

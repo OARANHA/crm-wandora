@@ -37,6 +37,7 @@ O Swagger entregue para esta integração declara:
 - leitura de estoque em `Estoque/BuscarQuantidades`;
 - leitura de pessoas/clientes em `Pessoas/Pesquisar`;
 - leitura de pedidos em `Pedidos/Pesquisar`;
+- consulta de informações fiscais por venda em `Fiscal/InformacoesVenda`;
 - consulta de NFe/NFCe em `Fiscal/ConsultarNFE`;
 - criação/alteração de pedido em `Pedidos/Salvar`;
 - salvar e faturar em `Pedidos/SalvarEFaturar`;
@@ -106,6 +107,6 @@ Em 2026-10-01 foi observada, por teste manual autenticado no próprio Swagger UI
 
 Depositos/GetTodosDepositos é formalmente documentado no Swagger como Deposito[]. O teste manual também confirmou que o parâmetro deposito de BuscarQuantidades aceita o nome do depósito. Se a tool não receber depósito, o provider lista os depósitos: com um único, usa-o; com vários, devolve as opções e não escolhe sozinho.
 
-A resposta fiscal dedicada continua sem contrato verificável. Por isso invoice.get segue usando uma única chamada a Pedidos/Pesquisar?numeroNFe=..., cujo schema Pedido documenta numeroNFe, dataFaturamento, chaveAcessoNFe, danfeURL e urlSefaz.
+O Swagger continua sem tipar o corpo dos dois endpoints fiscais, mas em 2026-10-01 foram observadas respostas reais para ambos. invoice.get passou a usar Fiscal/ConsultarNFE diretamente e projeta somente código/mensagem de status, número, chave, lote e URL do DANFE. O campo Xml retornado pelo provider é descartado antes de chegar ao agente. Fiscal/InformacoesVenda também foi mapeado no provider por código da venda, com tipo, número, série, chave, data de emissão e URL de impressão; ele permanece como leitura interna nesta V1, sem criar uma sexta capability pública.
 
 O histórico de evidência, decisões e pendências fica em docs/specs/integracoes-erp-vendaerp-descobertas.md.

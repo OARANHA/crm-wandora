@@ -113,11 +113,19 @@ export interface PedidoErp {
 }
 
 export interface NotaErp {
-  numero: string;
-  pedidoCodigo: number | null;
-  statusDoPedido: string | null;
-  dataFaturamento: string | null;
+  numero: number | null;
+  codigoStatus: number | null;
+  mensagemStatus: string | null;
   chave: string | null;
+  lote: number | null;
   danfeUrl: string | null;
-  urlSefaz: string | null;
+}
+
+export interface InformacaoFiscalVendaErp {
+  tipo: string | null;
+  numero: number | null;
+  serie: string | null;
+  chave: string | null;
+  dataEmissao: string | null;
+  danfeUrl: string | null;
 }
