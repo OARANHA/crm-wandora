@@ -1,4 +1,4 @@
-# Elo / Wandora — Portainer Git Stack
+# Elus / Wandora — Portainer Git Stack
 # Deploy source: https://github.com/OARANHA/crm-wandora
 # All runtime configuration is managed as Portainer Stack environment variables.
 # Do not add env_file: .env here.
@@ -15,8 +15,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        APP_VERSION: ${APP_VERSION:-elo}
-    image: ${APP_IMAGE:-wandora/elo-app:local}
+        APP_VERSION: ${APP_VERSION:-elus}
+    image: ${APP_IMAGE:-wandora/elus-app:local}
     pull_policy: build
     restart: unless-stopped
     mem_limit: 768m
@@ -27,8 +27,8 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       SUPABASE_DB_URL: ${SUPABASE_DB_URL}
       SUPABASE_DB_ADMIN_URL: ""
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://elo.wandora.com.br}
-      NEXT_PUBLIC_ADMIN_URL: ${NEXT_PUBLIC_ADMIN_URL:-https://elo.wandora.com.br}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://elus.wandora.com.br}
+      NEXT_PUBLIC_ADMIN_URL: ${NEXT_PUBLIC_ADMIN_URL:-https://elus.wandora.com.br}
       INTERNAL_SECRET: ${INTERNAL_SECRET}
       CPF_ENCRYPTION_KEY: ${CPF_ENCRYPTION_KEY}
       AI_CRED_AES_KEY: ${AI_CRED_AES_KEY}
@@ -45,7 +45,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      APP_NAME: ${APP_NAME:-Elo}
+      APP_NAME: ${APP_NAME:-Elus}
       APP_LOGO_URL: ${APP_LOGO_URL:-}
       APP_ACCENT_HEX: ${APP_ACCENT_HEX:-}
       APP_LOCALE: ${APP_LOCALE:-pt-BR}
@@ -73,8 +73,8 @@ services:
       context: .
       dockerfile: Dockerfile.worker
       args:
-        APP_VERSION: ${APP_VERSION:-elo}
-    image: ${WORKER_IMAGE:-wandora/elo-worker:local}
+        APP_VERSION: ${APP_VERSION:-elus}
+    image: ${WORKER_IMAGE:-wandora/elus-worker:local}
     pull_policy: build
     restart: unless-stopped
     mem_limit: 512m
@@ -119,8 +119,8 @@ services:
       WAHA_DASHBOARD_ENABLED: "false"
       WHATSAPP_RESTART_ALL_SESSIONS: "${WHATSAPP_RESTART_ALL_SESSIONS:-True}"
     volumes:
-      - elo-waha-data:/app/.sessions
-      - elo-waha-media:/app/.media
+      - elus-waha-data:/app/.sessions
+      - elus-waha-media:/app/.media
     logging: *default-logging
     networks:
       - internal
@@ -157,8 +157,8 @@ services:
       context: .
       dockerfile: Dockerfile.scheduler
       args:
-        APP_VERSION: ${APP_VERSION:-elo}
-    image: ${SCHEDULER_IMAGE:-wandora/elo-scheduler:local}
+        APP_VERSION: ${APP_VERSION:-elus}
+    image: ${SCHEDULER_IMAGE:-wandora/elus-scheduler:local}
     pull_policy: build
     restart: unless-stopped
     depends_on:
@@ -172,8 +172,8 @@ services:
       - internal
 
 volumes:
-  elo-waha-data:
-  elo-waha-media:
+  elus-waha-data:
+  elus-waha-media:
 
 networks:
   internal:
