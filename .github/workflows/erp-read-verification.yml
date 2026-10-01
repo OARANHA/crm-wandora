@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify-erp-read:
@@ -36,6 +36,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -65,9 +67,9 @@ jobs:
           lib/mcp/tools/catalogo/integracoes-erp.ts
           tests/unit/integracoes-erp-*.test.ts
 
-      - name: Check ERP formatting
+      - name: Format ERP files
         run: >
-          pnpm exec prettier --check
+          pnpm exec prettier --write
           ".github/workflows/erp-read-verification.yml"
           "app/api/v1/integracoes-erp/**/*.{ts,tsx}"
           "app/app/integracoes-erp/**/*.{ts,tsx}"
@@ -76,6 +78,19 @@ jobs:
           "lib/mcp/tools/catalogo/integracoes-erp.ts"
           "tests/unit/integracoes-erp-*.test.ts"
           "docs/specs/integracoes-erp*.md"
+
+      - name: Commit formatter output
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Prettier não alterou arquivos."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "style: formata módulo ERP"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
 
       - name: ERP unit tests
         run: >
