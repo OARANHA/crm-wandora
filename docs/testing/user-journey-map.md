@@ -3267,7 +3267,8 @@ funcional `3782d82acfcc04d81abb9a83305359b5735ffe71`.
   - Entrada: conversa já selecionada no Inbox; papel `agent+`.
   - Consulta: pedido/NFe via `/api/v1/conversations/[id]/erp`, sem URL escolhida pelo browser.
   - Preparação: referência VendaERP passa por SSRF/DNS/redirect guard, teto de mídia e MIME documental; bytes entram em `whatsapp-media/{org}/{conversation}`.
-  - Envio: botão usa `useSendMessage` → `POST /api/v1/messages`; a mensagem precisa aparecer no thread com o mesmo histórico/auditoria dos anexos comuns.
+  - Envio: botão usa `useSendMessage` → `POST /api/v1/messages`; o E2E também força o refetch do histórico e exige que a mensagem DANFE continue visível no thread.
   - Segurança negativa: viewer não aciona a capacidade; redirect, host privado, HTML e arquivo >50 MB não podem chegar ao sender.
-  - Prova externa pendente: comportamento real da `danfeUrl` do VendaERP só pode ser marcado como compatível após canário explicitamente autorizado.
-  - Evidência visual versionada: **pendente nesta branch até E2E em banco fresco**; não declarar PASS sem screenshot/trace em `evidence/`.
+  - **Resultado: PASS** no `ERP browser verification`, run `37030957243`, head `23ee7c61a29ffe166a70fc105a96c30d50e7e8bc`. A prova usa banco Supabase local fresco e doubles somente nas bordas externas; não consome chamada real do VendaERP nem envia WhatsApp real.
+  - Evidência visual versionada: `evidence/elus-login-erp-20261002/erp-danfe-atendimento-preparado.jpg`. O artifact original em resolução integral é `erp-browser-visual-evidence` do mesmo run.
+  - **Prova externa continua pendente, por desenho:** o comportamento real da `danfeUrl` do VendaERP (autenticação, MIME, redirect e formato) só pode ser marcado como compatível após canário explicitamente autorizado.

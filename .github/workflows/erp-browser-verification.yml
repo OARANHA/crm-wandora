@@ -15,6 +15,8 @@ on:
       - "supabase/baseline.sql"
       - "supabase/migrations/**"
       - "tests/e2e/integracoes-erp.spec.ts"
+      - "docs/testing/user-journey-map.md"
+      - "evidence/elus-login-erp-20261002/**"
   workflow_dispatch:
 
 permissions:
