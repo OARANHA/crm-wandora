@@ -104,7 +104,7 @@ jobs:
           --reporter=list
 
       - name: Upload visual evidence
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: elus-login-visual-evidence
