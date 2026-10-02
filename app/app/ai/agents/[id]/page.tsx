@@ -19,6 +19,7 @@ import type { CoberturaPorFunil } from "./_components/FunisDoAgente";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { escolherVersoesDaTela } from "@/lib/ai/agents/versoes-da-tela";
 import { fusoUtilizavel } from "@/lib/tempo/fusos";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,14 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
   }
 
   const supabase = await createClient();
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(
+    supabase,
+    activeOrg.orgId,
+    {
+      isPlatformAdmin: user.is_platform_admin,
+      support: Boolean(user.support),
+    },
+  );
   const { data: agentRow } = await supabase
     .from("ai_agents")
     .select(AGENT_COLUMNS)
@@ -218,6 +227,7 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
           credentials={credentials}
           hasVersion={versions.length > 0 && !(versions.length===1 && (versions[0] as AgentVersionRow & {provisioning_origin?:string}).provisioning_origin==="legacy_reconciliation")}
           readOnly={readOnly}
+          podeAdministrarIa={podeAdministrarIa}
         />
       )}
       <AgentTabs
@@ -236,6 +246,7 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
         routerMembership={routerMembership}
         readOnly={readOnly}
         organizationTimezone={fusoUtilizavel(activeOrg.timezone)}
+        podeAdministrarIa={podeAdministrarIa}
       />
     </div>
   );
