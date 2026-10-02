@@ -23,6 +23,7 @@ import { resolverModeloDoPonto } from "@/lib/ai/gateway-binding";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { logger } from "@/lib/logger";
 import { PROVEDORES } from "@/lib/ai/pontos/provedores";
+import { capacidadesDaOrganizacao } from "@/lib/organizacao/capacidades";
 import { tagDeIdioma } from "@/lib/i18n/datas";
 import { CredentialsList } from "./_components/CredentialsList";
 
@@ -41,6 +42,12 @@ export default async function CredentialsPage() {
   }
 
   const supabase = await createClient();
+  const capacidades = await capacidadesDaOrganizacao(supabase, activeOrg.orgId, {
+    isPlatformAdmin: user.is_platform_admin,
+    support: Boolean(user.support),
+  });
+  if (!capacidades.includes("administracao_ia")) redirect("/403");
+
   const { data } = await supabase
     .from("ai_provider_credentials_safe")
     .select(SAFE_COLUMNS)
