@@ -5,6 +5,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { sql } from "./gov-helpers";
+import {
+  alvosDeEscritaNoCorpo,
+  corpoDaProvisionadora,
+  provisionadorasDoCatalogo,
+} from "./molde-de-provisionadora";
 
 /**
  * TODO `onConflict` APONTA PARA UMA CONSTRAINT QUE EXISTE.
@@ -95,8 +100,31 @@ function usosDe(arquivo: string): { usos: Uso[]; naoResolvidos: string[] } {
   return { usos, naoResolvidos };
 }
 
+/**
+ * Tabelas de módulos ADR-0002 não existem no baseline: só a provisionadora.
+ *
+ * Este arquivo tem banco isolado próprio, então, quando um onConflict aponta para
+ * uma tabela ainda ausente, podemos materializar SOMENTE a provisionadora que
+ * declara aquela tabela e conferir a constraint real resultante. Assim o gate não
+ * "perdoa" módulo opcional nem exige que suas tabelas vazem para o baseline.
+ */
+function provisionarTabelaOpcionalSeNecessario(tabela: string): void {
+  const existe = sql(
+    `select to_regclass('public.${tabela}') is not null;`,
+  );
+  if (existe === "t") return;
+
+  const candidatas = provisionadorasDoCatalogo().filter((p) =>
+    alvosDeEscritaNoCorpo(corpoDaProvisionadora(p.nome)).includes(tabela),
+  );
+
+  if (candidatas.length !== 1) return;
+  sql(`select public.${candidatas[0]!.nome}();`);
+}
+
 /** Conjuntos de colunas que o Postgres aceita em `ON CONFLICT` para a tabela. */
 function conjuntosUnicos(tabela: string): string[][] {
+  provisionarTabelaOpcionalSeNecessario(tabela);
   const out = sql(`
     select string_agg(a.attname, ',' order by a.attname)
       from pg_class t
