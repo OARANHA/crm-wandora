@@ -41,7 +41,7 @@ test.describe("Integrações ERP: instalar e abrir VendaERP sem chamada externa"
     await page.getByLabel("App").fill("e2e-app-nao-real");
     await page.getByRole("button", { name: "Salvar conexão" }).click();
 
-    await expect(page.getByRole("alert")).toContainText(/unsafe_url:private_host/i);
+    await expect(page.getByText("unsafe_url:private_host", { exact: true })).toBeVisible();
     await expect(
       page.getByText("Conexão salva", { exact: true }),
       "um destino interno recusado não pode aparecer como conexão salva",
