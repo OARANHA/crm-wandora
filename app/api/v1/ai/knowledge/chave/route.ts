@@ -22,7 +22,11 @@ import { randomUUID } from "node:crypto";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
-import { montarEstadoDaChave } from "@/lib/ai/embeddings/estado";
+import {
+  montarEstadoDaChave,
+  projetarEstadoDaChaveGerenciado,
+} from "@/lib/ai/embeddings/estado";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 export const dynamic = "force-dynamic";
 
@@ -31,14 +35,23 @@ export async function GET(): Promise<Response> {
 
   const authz = await requireRole("manager", { requestId, resource: "ai_knowledge" });
   if (!authz.ok) return authz.response;
-  const { org: activeOrg } = authz;
+  const { user, org: activeOrg } = authz;
 
-  const estado = await montarEstadoDaChave(await createClient(), activeOrg.orgId);
+  const db = await createClient();
+  const estadoCompleto = await montarEstadoDaChave(db, activeOrg.orgId);
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(db, activeOrg.orgId, {
+    isPlatformAdmin: user.is_platform_admin,
+    support: Boolean(user.support),
+  });
+  const estado = podeAdministrarIa
+    ? estadoCompleto
+    : projetarEstadoDaChaveGerenciado(estadoCompleto);
 
   return ok(
     {
       ...estado,
-      // Compatibilidade com clientes da rota anterior.
+      // Compatibilidade com clientes da rota anterior. Em modo gerenciado a
+      // projeção esvazia o inventário antes desta linha.
       credenciais_openai: estado.credenciais_embedding.filter((c) => c.provider === "openai"),
     },
     { requestId },
