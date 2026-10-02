@@ -91,3 +91,12 @@ jobs:
           tests/e2e/integracoes-erp.spec.ts
           --workers=1
           --reporter=list
+
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: erp-browser-visual-evidence
+          path: test-results
+          if-no-files-found: error
+          retention-days: 14
