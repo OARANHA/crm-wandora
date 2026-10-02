@@ -25,6 +25,8 @@ import { mensagemDoEscopo, validarEscopoDaVersao } from "@/lib/ai/agents/escopo"
 import { agentCreateSchema } from "@/lib/ai/guardrails-schema";
 import { agentMcpCreateSchema } from "@/lib/ai/agents/validation";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
+import { resolverInfraIaGerenciada } from "@/lib/ai/infra-gerenciada";
 
 export const dynamic = "force-dynamic";
 
@@ -116,7 +118,32 @@ export async function POST(req: NextRequest): Promise<Response> {
         details: parsed.error.flatten(),
       });
     }
-    const input = parsed.data;
+    let input = parsed.data;
+    const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(admin, activeOrg.orgId, {
+      isPlatformAdmin: authUser.is_platform_admin,
+      support: Boolean(authUser.support),
+    });
+    if (!podeAdministrarIa) {
+      const infra = await resolverInfraIaGerenciada(admin, activeOrg.orgId);
+      if (!infra) {
+        return fail(
+          "managed_ai_unavailable",
+          t("A IA gerenciada desta empresa ainda não está pronta. Fale com quem administra este sistema."),
+          503,
+          { requestId },
+        );
+      }
+      input = {
+        ...input,
+        version: {
+          ...input.version,
+          provider: infra.provider,
+          model: infra.model,
+          credential_id: infra.credentialId,
+          operator_model: null,
+        },
+      };
+    }
 
     // Validate scope before the first write; a rejected form leaves no orphan.
     const escopo = await validarEscopoDaVersao(admin, activeOrg.orgId, input.version);
