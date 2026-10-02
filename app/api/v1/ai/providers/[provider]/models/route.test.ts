@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import type { AuthUser } from "@/lib/auth/types";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 /**
  * O SELETOR DE MODELO DO ATENDENTE NÃO OFERECE MODELO DE BUSCA.
@@ -25,6 +26,9 @@ import type { AuthUser } from "@/lib/auth/types";
 
 vi.mock("@/lib/auth/server", () => ({ loadAuthUser: vi.fn(), resolveActiveOrg: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/lib/organizacao/capacidades", () => ({
+  podeAdministrarIaDaOrganizacao: vi.fn(),
+}));
 
 const ORG_ID = "33333333-3333-4333-8333-333333333333";
 
@@ -112,6 +116,7 @@ describe("GET /api/v1/ai/providers/:provider/models — o que o agente pode esco
   beforeEach(() => {
     vi.clearAllMocks();
     autorizado();
+    vi.mocked(podeAdministrarIaDaOrganizacao).mockResolvedValue(true);
     vi.mocked(createClient).mockResolvedValue(
       stubDoBanco(CATALOGO) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
@@ -148,6 +153,12 @@ describe("GET /api/v1/ai/providers/:provider/models — o que o agente pode esco
     // Lista vazia é o estado em que o `ModelPicker` cai no campo de texto —
     // melhor do que oferecer um modelo que não conversa.
     expect(corpo.data.models).toEqual([]);
+  });
+
+  it("sem entitlement técnico devolve 403 antes de expor o catálogo", async () => {
+    vi.mocked(podeAdministrarIaDaOrganizacao).mockResolvedValueOnce(false);
+    const res = await listar();
+    expect(res.status).toBe(403);
   });
 
   it("provedor que a lista não conhece continua 404", async () => {
