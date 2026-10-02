@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 
 // ---------------------------------------------------------------------------
 // GET /api/v1/admin/tenants/[id]
@@ -157,4 +159,107 @@ export async function GET(
   });
 
   return ok({ organization: org, counts, integrations }, { requestId });
+}
+
+
+const entitlementSchema = z
+  .object({
+    ai_provider_admin: z.boolean(),
+  })
+  .strict();
+
+/**
+ * PATCH /api/v1/admin/tenants/[id]
+ *
+ * Grant comercial manual para a administração técnica de IA. É uma ponte
+ * explícita até a cobrança do revendedor conceder o mesmo entitlement pelo
+ * plano. Não lê nem altera o rótulo legado `settings.plan`.
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const requestId = randomUUID();
+  const { id: tenantId } = await params;
+
+  const supportDenied = await requireSupportWrite(tenantId);
+  if (supportDenied) return supportDenied;
+
+  let adminCtx: Awaited<ReturnType<typeof requirePlatformAdmin>>;
+  try {
+    adminCtx = await requirePlatformAdmin();
+  } catch {
+    return fail("forbidden", "Platform admin required", 403, { requestId });
+  }
+
+  const parsed = entitlementSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return fail("validation_failed", "Invalid request body", 422, {
+      requestId,
+      details: parsed.error.flatten(),
+    });
+  }
+
+  const admin = createAdminClient();
+  const { data: org, error: readError } = await admin
+    .from("organizations")
+    .select("id, slug, settings")
+    .eq("id", tenantId)
+    .maybeSingle();
+
+  if (readError) {
+    return fail("internal_error", "Failed to read tenant", 500, { requestId });
+  }
+  if (!org) {
+    return fail("not_found", "Tenant not found", 404, { requestId });
+  }
+
+  const settings =
+    org.settings && typeof org.settings === "object" && !Array.isArray(org.settings)
+      ? (org.settings as Record<string, unknown>)
+      : {};
+  const atuais =
+    settings.commercial_entitlements &&
+    typeof settings.commercial_entitlements === "object" &&
+    !Array.isArray(settings.commercial_entitlements)
+      ? (settings.commercial_entitlements as Record<string, unknown>)
+      : {};
+
+  const novoValor = parsed.data.ai_provider_admin;
+  const { data: gravado, error: updateError } = await admin
+    .from("organizations")
+    .update({
+      settings: {
+        ...settings,
+        commercial_entitlements: {
+          ...atuais,
+          ai_provider_admin: novoValor,
+        },
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", tenantId)
+    .select("id")
+    .maybeSingle();
+
+  if (updateError || !gravado) {
+    return fail("internal_error", "Failed to update tenant entitlement", 500, { requestId });
+  }
+
+  void audit({
+    action: "platform_admin.ai_provider_admin_changed",
+    actorUserId: adminCtx.user.id,
+    actingAsPlatformAdmin: true,
+    bypassedRls: true,
+    organizationId: tenantId,
+    resourceType: "organization",
+    resourceId: tenantId,
+    requestId,
+    metadata: {
+      tenant_slug: org.slug,
+      ai_provider_admin: novoValor,
+    },
+  });
+
+  return ok({ ai_provider_admin: novoValor }, { requestId });
 }
