@@ -38,8 +38,6 @@ describe("credenciais de ERP ficam fechadas aos papéis de sessão", () => {
       estado,
       "erp_connections deve ser acessível somente pelo host/service_role; credenciais cifradas " +
         "não são superfície PostgREST de anon/authenticated",
-    ).toBe(
-      "true|0|false|false|false|false|false|false|false|false|true|true|true|true",
-    );
+    ).toBe("true|0|false|false|false|false|false|false|false|false|true|true|true|true");
   });
 });
