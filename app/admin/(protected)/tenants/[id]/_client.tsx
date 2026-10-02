@@ -54,6 +54,13 @@ export function TenantOverviewClient({ id }: TenantOverviewClientProps) {
           organizationId={organization.id}
           status={organization.status}
           displayName={organization.display_name}
+          aiProviderAdmin={
+            (
+              organization.settings as {
+                commercial_entitlements?: { ai_provider_admin?: unknown };
+              } | null
+            )?.commercial_entitlements?.ai_provider_admin === true
+          }
         />
       </div>
     </div>
