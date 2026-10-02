@@ -212,3 +212,21 @@ Nada desta descoberta altera a fronteira de autoridade da V1:
 - exclusão: desabilitada.
 
 A etapa atual continua estritamente READ-ONLY.
+
+## DANFE como documento de atendimento — lacuna preservada
+
+A resposta observada de `Fiscal/ConsultarNFE` prova a existência de
+`UrlImpressaoDanfe`; ela **não** prova o protocolo do recurso apontado:
+
+- não há schema de MIME;
+- não há garantia documentada de PDF;
+- não há prova de que a URL seja pública/sem autenticação adicional;
+- não há política documentada de redirects da URL de impressão.
+
+Por isso a ponte do Inbox não envia a URL diretamente ao gateway WhatsApp e não
+reutiliza as credenciais VendaERP fora dos endpoints oficiais. Ela tenta
+materializar a referência com a guarda de egress da organização e aceita apenas
+um documento que passe pela validação real de bytes/MIME. Um canário futuro,
+autorizado separadamente, ainda é necessário para afirmar compatibilidade real
+da `danfeUrl` com esse caminho.
+\n

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "titulo": "Integrações ERP — módulo oficial opcional, leitura VendaERP V1",
-  "descricao": "A instalação habilita o módulo pela provisionadora da ADR-0002; a organização configura a conexão; UI e tools usam o mesmo service/provider. A V1 termina em leitura e devolve falha explícita. Configuração/teste e tools deixam trilha auditável.",
+  "titulo": "Integrações ERP — VendaERP read-only + entrega humana de DANFE",
+  "descricao": "O módulo continua read-only no ERP. No Inbox, um humano agent+ localiza pedido/nota; o Elus materializa a referência de DANFE com guards de egress, grava no whatsapp-media da conversa e entrega pelo sender core já existente. O agente de IA continua apenas consultando tools read.",
   "lanes": [
     {
       "id": "instalacao",
@@ -127,6 +127,41 @@
       "type": "test",
       "label": "tests/e2e/integracoes-erp.spec.ts",
       "sublabel": "instala pela UI, abre VendaERP e prova SSRF com loopback antes de qualquer fetch"
+    },
+    {
+      "id": "inboxerp",
+      "lane": "organizacao",
+      "type": "ui",
+      "label": "Inbox → ErpDanfeCard",
+      "sublabel": "a conversa atual fixa contato/destino; agent+ pesquisa pedido e prepara DANFE"
+    },
+    {
+      "id": "rotaerpconversa",
+      "lane": "runtime",
+      "type": "api",
+      "label": "/api/v1/conversations/[id]/erp",
+      "sublabel": "RBAC agent+, Zod e escopo explícito de organização/conversa; GET consulta, POST só prepara"
+    },
+    {
+      "id": "danfeguard",
+      "lane": "runtime",
+      "type": "service",
+      "label": "lib/integracoes-erp/danfe.ts",
+      "sublabel": "fetch externo sem credencial ERP, DNS/SSRF/redirect guard, teto 50 MB e MIME documental"
+    },
+    {
+      "id": "whatsappmedia",
+      "lane": "runtime",
+      "type": "database",
+      "label": "Storage whatsapp-media",
+      "sublabel": "path canônico {org}/{conversation}/...; preview por signed URL temporária"
+    },
+    {
+      "id": "sendercore",
+      "lane": "runtime",
+      "type": "service",
+      "label": "POST /api/v1/messages → sendMessageHandler → lib/channels",
+      "sublabel": "sender único; grava messages, audit message.sent e event_log"
     }
   ],
   "edges": [
@@ -243,6 +278,54 @@
       "from": "tools",
       "to": "auditoria",
       "label": "runtime audita com filtros redigidos"
+    },
+    {
+      "id": "e20",
+      "from": "inboxerp",
+      "to": "rotaerpconversa",
+      "label": "busca pedido e prepara DANFE na conversa atual"
+    },
+    {
+      "id": "e21",
+      "from": "rotaerpconversa",
+      "to": "service",
+      "label": "reusa leituras normalizadas do VendaERP"
+    },
+    {
+      "id": "e22",
+      "from": "rotaerpconversa",
+      "to": "danfeguard",
+      "label": "materializa somente a danfeUrl normalizada"
+    },
+    {
+      "id": "e23",
+      "from": "danfeguard",
+      "to": "whatsappmedia",
+      "label": "grava bytes validados no bucket existente"
+    },
+    {
+      "id": "e24",
+      "from": "whatsappmedia",
+      "to": "sendercore",
+      "label": "sender assina e entrega o mesmo objeto"
+    },
+    {
+      "id": "e25",
+      "from": "inboxerp",
+      "to": "sendercore",
+      "label": "useSendMessage chama a rota canônica após decisão humana"
+    },
+    {
+      "id": "e26",
+      "from": "sendercore",
+      "to": "auditoria",
+      "label": "message.sent mantém a trilha normal"
+    },
+    {
+      "id": "e27",
+      "from": "rotaerpconversa",
+      "to": "auditoria",
+      "label": "preparo deixa rastro sem URL/credencial"
     }
   ]
-}
+}\n

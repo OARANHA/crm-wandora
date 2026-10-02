@@ -3260,3 +3260,15 @@ Evidência versionada:
 `evidence/elus-login-erp-20261002/integracoes-erp-vendaerp.png`. A inspeção original
 veio do artifact `erp-browser-visual-evidence`, run 36987808174, sobre o mesmo head
 funcional `3782d82acfcc04d81abb9a83305359b5735ffe71`.
+
+### Integrações ERP — DANFE no atendimento
+
+- [P0] **Atendente envia DANFE pela conversa correta, sem sender paralelo.**
+  - Entrada: conversa já selecionada no Inbox; papel `agent+`.
+  - Consulta: pedido/NFe via `/api/v1/conversations/[id]/erp`, sem URL escolhida pelo browser.
+  - Preparação: referência VendaERP passa por SSRF/DNS/redirect guard, teto de mídia e MIME documental; bytes entram em `whatsapp-media/{org}/{conversation}`.
+  - Envio: botão usa `useSendMessage` → `POST /api/v1/messages`; a mensagem precisa aparecer no thread com o mesmo histórico/auditoria dos anexos comuns.
+  - Segurança negativa: viewer não aciona a capacidade; redirect, host privado, HTML e arquivo >50 MB não podem chegar ao sender.
+  - Prova externa pendente: comportamento real da `danfeUrl` do VendaERP só pode ser marcado como compatível após canário explicitamente autorizado.
+  - Evidência visual versionada: **pendente nesta branch até E2E em banco fresco**; não declarar PASS sem screenshot/trace em `evidence/`.
+\n

@@ -637,6 +637,9 @@ export const AUDIT_ACTIONS = [
   // e resultado; credenciais nunca entram na trilha.
   "integracao_erp.conexao_salva",
   "integracao_erp.conexao_testada",
+  // Documento fiscal lido do ERP e materializado no Storage da conversa antes
+  // do clique de envio. Não carrega URL externa nem credencial.
+  "integracao_erp.danfe_preparada",
   "fidelidade.ponto_dado",
   "fidelidade.ponto_resgatado",
   "financeiro.recorrencia_gerada",

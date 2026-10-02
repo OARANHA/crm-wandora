@@ -109,3 +109,61 @@ Depositos/GetTodosDepositos é formalmente documentado no Swagger como Deposito[
 O Swagger continua sem tipar o corpo dos dois endpoints fiscais, mas em 2026-10-01 foram observadas respostas reais para ambos. invoice.get passou a usar Fiscal/ConsultarNFE diretamente e projeta somente código/mensagem de status, número, chave, lote e URL do DANFE. O campo Xml retornado pelo provider é descartado antes de chegar ao agente. Fiscal/InformacoesVenda também foi mapeado no provider por código da venda, com tipo, número, série, chave, data de emissão e URL de impressão; ele permanece como leitura interna nesta V1, sem criar uma sexta capability pública.
 
 O histórico de evidência, decisões e pendências fica em docs/specs/integracoes-erp-vendaerp-descobertas.md.
+
+## ERP → Atendimento/WhatsApp — entrega controlada de DANFE
+
+Destino arquitetural: **extensão/módulo oficial opcional**, consumindo capacidades core já
+existentes. Nenhum ponto novo de envio é criado no núcleo.
+
+O Inbox é a autoridade de associação cliente/conversa. A superfície contextual
+`ErpDanfeCard` vive no painel da conversa e só aparece para quem já tem a
+capacidade normal `inbox.reply` (papel `agent+`). Portanto:
+
+- viewer não ganha envio;
+- manager/admin herdam a mesma autoridade normal do Inbox;
+- o agente de IA continua apenas com as cinco tools ERP `read`; nenhuma tool
+  autônoma de envio de DANFE é criada;
+- o provider VendaERP termina sua responsabilidade ao fornecer a referência de
+  DANFE.
+
+A preparação do documento acontece em
+`POST /api/v1/conversations/[id]/erp`. A rota reconsulta a NFe/NFCe, nunca
+aceita uma URL de documento enviada pelo browser e nunca envia credenciais do
+VendaERP para a referência de DANFE. A URL normalizada é buscada com
+`fetchParaDestinoDaOrganizacao()`, que reaplica SSRF/DNS e não segue redirect.
+O corpo é limitado a 50 MB e precisa ser reconhecido pela allowlist documental
+já usada pelo upload outbound. Não se presume PDF: `application/octet-stream`
+só vira PDF quando os próprios bytes contêm assinatura `%PDF-`.
+
+Depois da validação, os bytes entram no bucket privado `whatsapp-media` no
+path canônico da organização/conversa. A UI recebe apenas o path interno, MIME,
+tamanho e uma signed URL temporária do próprio Storage; a `danfeUrl` externa
+não é devolvida ao browser.
+
+O clique **Enviar DANFE no WhatsApp** usa `useSendMessage` e, portanto, o mesmo
+`POST /api/v1/messages` / `sendMessageHandler` / `lib/channels` de qualquer
+documento enviado pelo atendente. A mensagem resultante usa a tabela
+`messages`, a auditoria `message.sent`, o `event_log`, status e histórico
+normais. Não existe segundo sender, segunda auditoria ou chamada de WhatsApp
+dentro do provider ERP.
+
+### Falha fechada e lacuna externa
+
+Ainda não há evidência contratual de que a `danfeUrl` observada devolva bytes
+sem autenticação adicional, qual MIME real ela usa ou se todos os ambientes do
+VendaERP entregam o mesmo formato. Enquanto não houver canário explicitamente
+autorizado, isso permanece **não provado**. Se a referência exigir credencial,
+redirecionar, exceder o teto ou devolver HTML/MIME não documental, a preparação
+falha sem enviar nada ao cliente.
+
+### Laço de retorno / Sistema Vivo
+
+- entrada real: conversa do Inbox + código de pedido/NFe;
+- saída real: documento outbound pelo sender core;
+- atividade/prova: `integracao_erp.danfe_preparada` na auditoria e
+  `message.sent`/mensagem no histórico quando o humano envia;
+- erro de preparação: fica na própria ação da UI e nada é enviado;
+- erro de transporte: segue o status/erro normal da mensagem, visível no thread;
+- continuidade IA↔humano: a IA pode localizar pedido/nota por tools read, mas a
+  ação de preparar/enviar fica fora do catálogo MCP do agente.
+\n
