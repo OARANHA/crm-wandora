@@ -229,4 +229,3 @@ materializar a referência com a guarda de egress da organização e aceita apen
 um documento que passe pela validação real de bytes/MIME. Um canário futuro,
 autorizado separadamente, ainda é necessário para afirmar compatibilidade real
 da `danfeUrl` com esse caminho.
-\n

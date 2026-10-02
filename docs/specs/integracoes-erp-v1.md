@@ -166,4 +166,3 @@ falha sem enviar nada ao cliente.
 - erro de transporte: segue o status/erro normal da mensagem, visível no thread;
 - continuidade IA↔humano: a IA pode localizar pedido/nota por tools read, mas a
   ação de preparar/enviar fica fora do catálogo MCP do agente.
-\n

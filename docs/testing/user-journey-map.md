@@ -3271,4 +3271,3 @@ funcional `3782d82acfcc04d81abb9a83305359b5735ffe71`.
   - Segurança negativa: viewer não aciona a capacidade; redirect, host privado, HTML e arquivo >50 MB não podem chegar ao sender.
   - Prova externa pendente: comportamento real da `danfeUrl` do VendaERP só pode ser marcado como compatível após canário explicitamente autorizado.
   - Evidência visual versionada: **pendente nesta branch até E2E em banco fresco**; não declarar PASS sem screenshot/trace em `evidence/`.
-\n

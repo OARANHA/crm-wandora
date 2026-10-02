@@ -2,7 +2,8 @@
 
 import { RoteirosDoContato } from "@/components/contacts/RoteirosDoContato";
 import { AcervoSearch } from "./AcervoSearch";
-import { LeadEnrichment } from "./LeadEnrichment";\nimport { ErpDanfeCard } from "./ErpDanfeCard";
+import { LeadEnrichment } from "./LeadEnrichment";
+import { ErpDanfeCard } from "./ErpDanfeCard";
 import type { ProspectEnrichment } from "@/lib/prospecting/schema";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
