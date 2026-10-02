@@ -93,7 +93,7 @@ jobs:
           --reporter=list
 
       - name: Upload visual evidence
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: erp-browser-visual-evidence
