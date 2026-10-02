@@ -533,6 +533,7 @@ export const NAV_CATALOG = [
   {
     href: "/app/ai/credentials",
     label: "Credenciais",
+    capacidade: "administracao_ia",
     description: "A chave do provedor de IA que os agentes usam para pensar.",
     icon: "Key",
     // VOLTOU para "ia"/"Montar o agente" na triagem, e a razão de quem tinha
@@ -551,6 +552,7 @@ export const NAV_CATALOG = [
     // havia onde responder "quem usa IA aqui, e com qual chave?".
     href: "/app/ai/providers",
     label: "Provedores",
+    capacidade: "administracao_ia",
     // O "Jev" vem cedo: o ⌘K mostra só o começo da descrição, e a versão
     // longa cortava antes do nome — quem procurava "jev" achava, mas não via por quê.
     description: "Ligue o Jev para decisões rápidas e escolha qual inteligência atende cada parte do sistema.",
