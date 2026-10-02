@@ -21,6 +21,7 @@ import { IDS_COM_CHAVE } from "@/lib/ai/pontos/provedores";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 export const dynamic = "force-dynamic";
 
@@ -50,9 +51,22 @@ export async function GET(): Promise<Response> {
   const requestId = randomUUID();
   const authz = await requireRole("manager", { requestId, resource: "ai_credentials" });
   if (!authz.ok) return authz.response;
-  const { org: activeOrg } = authz;
+  const { user: authUser, org: activeOrg } = authz;
+  const t = (texto: string) => traduzir(texto, authUser.idioma);
 
   const supabase = await createClient();
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(supabase, activeOrg.orgId, {
+    isPlatformAdmin: authUser.is_platform_admin,
+    support: Boolean(authUser.support),
+  });
+  if (!podeAdministrarIa) {
+    return fail(
+      "forbidden",
+      t("A administração técnica de IA não está disponível para esta organização."),
+      403,
+      { requestId },
+    );
+  }
   const { data, error } = await supabase
     .from("ai_provider_credentials_safe")
     .select(SAFE_COLUMNS)
@@ -74,6 +88,19 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
+
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(await createClient(), activeOrg.orgId, {
+    isPlatformAdmin: authUser.is_platform_admin,
+    support: Boolean(authUser.support),
+  });
+  if (!podeAdministrarIa) {
+    return fail(
+      "forbidden",
+      t("A administração técnica de IA não está disponível para esta organização."),
+      403,
+      { requestId },
+    );
+  }
 
   let rawBody: unknown;
   try {
