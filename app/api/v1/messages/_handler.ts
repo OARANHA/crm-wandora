@@ -27,6 +27,7 @@ import { decidirPreGoLiveDoCanalViaSupabase } from "@/lib/ai/elegibilidade/consu
 import type { Actor, HandlerCtx } from "@/lib/api/handlers/types";
 import { audit } from "@/lib/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { assertOrgOperante } from "@/lib/organizacao/operante";
 import {
   CHANNEL_SESSION_REF_COLUMNS,
   DEFAULT_CHANNEL_PROVIDER,
@@ -369,6 +370,10 @@ export async function sendMessageHandler(
   ctx: HandlerCtx,
   input: SendMessageInput,
 ): Promise<Message> {
+  // Organização parada (suspensa, redigida, arquivada) não envia nada. Esta é a
+  // porta de saída de TODOS os chamadores, e fecha a corrida de quem passou pelo
+  // gate antes da suspensão. O erro é terminal (`terminal: true`).
+  await assertOrgOperante(supabase, ctx.organization_id);
   if (ctx.prospectingDelivery) await assertProspectingDelivery(supabase, ctx.prospectingDelivery);
   if (ctx.meetingDelivery) await assertMeetingDeliverySupabase(supabase, ctx.meetingDelivery);
   if (ctx.approvedReply) await assertApprovedReplySupabase(supabase, ctx.approvedReply);

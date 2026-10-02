@@ -129,6 +129,7 @@ export const DICIONARIO: Traducoes = {
   "Envio pausado": { es: "Envío en pausa" },
   "A conta está conectada, mas o envio está desligado na aba Configuração.": { es: "La cuenta está conectada, pero el envío está desactivado en la pestaña Configuración." },
   "A conta está conectada e o envio está ligado.": { es: "La cuenta está conectada y el envío está activado." },
+  "A conta desta empresa está suspensa.": { es: "La cuenta de esta empresa está suspendida." },
   "Conversões chegando ao Google": { es: "Conversiones llegando a Google" },
   "Nenhuma conversão aceita ainda": { es: "Ninguna conversión aceptada todavía" },
   "Pode ser falta de negócios vindos de anúncio do Google, ou a captura do clique ainda não configurada no site.": { es: "Puede deberse a que no hay negocios que vengan de anuncios de Google o a que la captura del clic aún no está configurada en el sitio." },
@@ -4576,8 +4577,8 @@ export const DICIONARIO: Traducoes = {
   "Mínimo 10 caracteres": { es: "Mínimo 10 caracteres" },
   "Máximo 500 caracteres": { es: "Máximo 500 caracteres" },
   "Razão inválida": { es: "Motivo inválido" },
-  "A suspensão bloqueará o acesso dos usuários deste tenant à plataforma. Esta ação pode ser revertida.": {
-    es: "La suspensión bloqueará el acceso de los usuarios de este tenant a la plataforma. Esta acción se puede revertir.",
+  "A empresa perde o acesso, e a IA, os envios e as automações dela param. Mensagens na fila e tarefas agendadas são descartadas e não saem ao reativar; os follow-ups em andamento retomam de onde pararam. As mensagens que chegarem continuam gravadas.": {
+    es: "La empresa pierde el acceso, y su IA, sus envíos y sus automatizaciones se detienen. Los mensajes en cola y las tareas programadas se descartan y no salen al reactivar; los seguimientos en curso se reanudan donde se detuvieron. Los mensajes que lleguen siguen guardándose.",
   },
   "Motivo da suspensão": { es: "Motivo de la suspensión" },
   "Descreva o motivo da suspensão (mínimo 10 caracteres)...": {
@@ -7571,6 +7572,10 @@ export const DICIONARIO: Traducoes = {
   "Esperando a resposta do cliente": { es: "Esperando la respuesta del cliente" },
   "O cliente não respondeu dentro do prazo": { es: "El cliente no respondió dentro del plazo" },
   "Conferiu se a mensagem já tinha saído": { es: "Verificó si el mensaje ya había salido" },
+  "O envio deste passo foi descartado porque a conta foi suspensa": {
+    es: "El envío de este paso se descartó porque la cuenta fue suspendida",
+  },
+  "sai num envio novo quando a conta for reativada": { es: "sale en un envío nuevo cuando se reactive la cuenta" },
   "Mensagem enviada": { es: "Mensaje enviado" },
   "Segurou o fluxo por causa de um retorno agendado": {
     es: "Frenó el flujo por un regreso programado",
@@ -7861,6 +7866,12 @@ export const DICIONARIO: Traducoes = {
   "para mais informações.": { es: "para más información." },
   "Sua conta está suspensa. Fale com quem administra este sistema para saber o motivo e como reativá-la.": {
     es: "Tu cuenta está suspendida. Habla con quien administra este sistema para saber el motivo y cómo reactivarla.",
+  },
+  "Sua conta está suspensa. Avise o administrador da sua empresa.": {
+    es: "Tu cuenta está suspendida. Avisa a quien administra tu empresa.",
+  },
+  "Os pedidos de LGPD dos seus clientes continuam com prazo durante a suspensão.": {
+    es: "Las solicitudes LGPD de tus clientes siguen con plazo durante la suspensión.",
   },
 
   "Como esta instalação do": { es: "Cómo esta instalación de" },
@@ -10194,6 +10205,14 @@ export const DICIONARIO: Traducoes = {
     es: "Devuelve la llamada cuando puedas: nadie atendió a quien llamó.",
   },
   "Ligar de volta": { es: "Devolver la llamada" },
+  "A conta foi reativada — há conversas para revisar": {
+    es: "La cuenta fue reactivada — hay conversaciones para revisar",
+  },
+  "A IA não respondeu nem vai responder sozinha às conversas que chegaram durante a suspensão. Abra o Inbox e procure-as nas abas Fila e Automático.":
+    {
+      es: "La IA no respondió ni responderá sola a las conversaciones que llegaron durante la suspensión. Abre el Inbox y búscalas en las pestañas Cola y Automático.",
+    },
+  "Abrir o Inbox": { es: "Abrir el Inbox" },
   // Diálogo de exclusão de canal (`frasesDoImpacto`): singular e plural.
   "chamada de voz": { es: "llamada de voz" },
   "chamadas de voz": { es: "llamadas de voz" },
@@ -11552,6 +11571,21 @@ export const DICIONARIO: Traducoes = {
   "Erro ao suspender tenant": { es: "Error al suspender el tenant" },
   "Tenant reativado com sucesso": { es: "Tenant reactivado correctamente" },
   "Erro ao reativar tenant": { es: "Error al reactivar el tenant" },
+  "Nada mudou": { es: "Nada cambió" },
+  "Seu acesso à administração da plataforma é somente leitura.": {
+    es: "Su acceso a la administración de la plataforma es de solo lectura.",
+  },
+  "Confirme a verificação em duas etapas nesta sessão.": {
+    es: "Confirme la verificación en dos pasos en esta sesión.",
+  },
+  "Esta empresa já estava suspensa.": { es: "Esta empresa ya estaba suspendida." },
+  "Esta empresa foi encerrada ou anonimizada e já não opera.": {
+    es: "Esta empresa fue cerrada o anonimizada y ya no opera.",
+  },
+  "Esta empresa não estava suspensa.": { es: "Esta empresa no estaba suspendida." },
+  "Esta suspensão é por falta de pagamento. Use Dar prazo ou Tornar isenta.": {
+    es: "Esta suspensión es por falta de pago. Use Dar plazo o Eximir.",
+  },
   "Incidente resolvido com sucesso": { es: "Incidente resuelto correctamente" },
   "Erro ao resolver incidente": { es: "Error al resolver el incidente" },
   "Redes sociais": { es: "Redes sociales" },
