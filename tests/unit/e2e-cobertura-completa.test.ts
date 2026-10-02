@@ -39,14 +39,27 @@
  *    acrescenta o nome à variável, o gate fica verde, e a spec continua sem rodar
  *    — a mesma cobertura fantasma, com uma camada a mais de aparência.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 const RAIZ = process.cwd();
 const WORKFLOW = path.join(RAIZ, ".github", "workflows", "e2e.yml");
+const WORKFLOW_LOGIN_ELUS = path.join(
+  RAIZ,
+  ".github",
+  "workflows",
+  "elus-login-verification.yml",
+);
+const WORKFLOW_ERP_BROWSER = path.join(
+  RAIZ,
+  ".github",
+  "workflows",
+  "erp-browser-verification.yml",
+);
 const DIR_SPECS = path.join(RAIZ, "tests", "e2e");
+const TEM_WORKFLOW_MONOLITICO = existsSync(WORKFLOW);
 
 /**
  * Lê uma variável de bloco YAML (`CHAVE: >-`) e devolve os nomes.
@@ -66,7 +79,7 @@ function listaDoWorkflow(yml: string, chave: string): string[] {
     .filter((s) => s.endsWith(".spec.ts"));
 }
 
-const yml = readFileSync(WORKFLOW, "utf8");
+const yml = TEM_WORKFLOW_MONOLITICO ? readFileSync(WORKFLOW, "utf8") : "";
 // As partes são DESCOBERTAS no workflow, não enumeradas aqui: a lista à mão
 // envelheceu a cada parte nova (a 5 ficou fora da checagem de fantasmas).
 const chavesDasPartes = [...yml.matchAll(/^ {6}(SPECS_PARTE_\d+):/gm)].map((m) => m[1]!);
@@ -82,7 +95,9 @@ const noDisco = readdirSync(DIR_SPECS)
   .filter((f) => f.endsWith(".spec.ts"))
   .sort();
 
-describe("cobertura do e2e no CI", () => {
+const describeMonolitico = TEM_WORKFLOW_MONOLITICO ? describe : describe.skip;
+
+describeMonolitico("cobertura do e2e no CI", () => {
   it("o parser está vivo — controle positivo antes de qualquer conclusão", () => {
     // Sem isto, um regex que parou de casar devolveria listas vazias e a
     // asserção de vigência passaria por vacuidade, enquanto a de completude
@@ -276,5 +291,45 @@ describe("cobertura do e2e no CI", () => {
     // E FORA_DO_CI nunca é passada a um run — ela existe para NÃO rodar.
     expect(yml).not.toMatch(/playwright test[^\n]*\$FORA_DO_CI/);
     expect(yml).not.toMatch(/LISTA="\$FORA_DO_CI"/);
+  });
+});
+
+
+/**
+ * O fork Elus foi criado sem importar automaticamente o workflow monolítico
+ * `.github/workflows/e2e.yml`. Fazer o teste acima ler um arquivo inexistente
+ * derrubava `pnpm test:unit` antes de qualquer asserção; pior seria fabricar uma
+ * lista de 168 specs e fingir que este fork as executa.
+ *
+ * Quando o workflow monolítico não existe, esta régua menor NÃO afirma cobertura
+ * total. Ela prova somente a cobertura que o fork realmente distribui: os gates
+ * focados desta candidata e as specs que eles chamam de fato.
+ */
+const describeForkFocado = TEM_WORKFLOW_MONOLITICO ? describe.skip : describe;
+
+describeForkFocado("cobertura do e2e no CI — fork com gates focados", () => {
+  it("os workflows focados existem", () => {
+    expect(existsSync(WORKFLOW_LOGIN_ELUS), "gate Elus login ausente").toBe(true);
+    expect(existsSync(WORKFLOW_ERP_BROWSER), "gate ERP browser ausente").toBe(true);
+  });
+
+  it("as specs alteradas pela candidata são invocadas por um gate focado", () => {
+    const login = readFileSync(WORKFLOW_LOGIN_ELUS, "utf8");
+    const erp = readFileSync(WORKFLOW_ERP_BROWSER, "utf8");
+    const esperadas = [
+      "login-elus-candidate.spec.ts",
+      "icone-da-marca.spec.ts",
+      "integracoes-erp.spec.ts",
+    ];
+
+    for (const spec of esperadas)
+      expect(noDisco, `${spec} não existe em tests/e2e`).toContain(spec);
+
+    expect(login).toMatch(
+      /pnpm exec playwright test[\s\S]*tests\/e2e\/login-elus-candidate\.spec\.ts[\s\S]*tests\/e2e\/icone-da-marca\.spec\.ts[\s\S]*--workers=1/,
+    );
+    expect(erp).toMatch(
+      /pnpm exec playwright test[\s\S]*tests\/e2e\/integracoes-erp\.spec\.ts[\s\S]*--workers=1/,
+    );
   });
 });

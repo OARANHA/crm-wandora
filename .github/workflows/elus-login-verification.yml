@@ -10,6 +10,7 @@ on:
       - "lib/branding/**"
       - "public/brand/elus/**"
       - "tests/e2e/login-elus-candidate.spec.ts"
+      - "tests/e2e/icone-da-marca.spec.ts"
       - "tests/unit/login-elus-acesso-restrito.test.ts"
       - "tests/unit/branding-*.test.ts"
       - "tests/unit/nome-da-marca-nas-telas-vem-do-banco.test.ts"
@@ -54,7 +55,10 @@ jobs:
           tests/unit/nome-da-marca-nas-telas-vem-do-banco.test.ts
 
       - name: Check candidate E2E formatting
-        run: pnpm exec prettier --check "tests/e2e/login-elus-candidate.spec.ts"
+        run: >-
+          pnpm exec prettier --check
+          "tests/e2e/login-elus-candidate.spec.ts"
+          "tests/e2e/icone-da-marca.spec.ts"
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
@@ -110,6 +114,7 @@ jobs:
         run: >-
           pnpm exec playwright test
           tests/e2e/login-elus-candidate.spec.ts
+          tests/e2e/icone-da-marca.spec.ts
           --workers=1
           --reporter=list
 

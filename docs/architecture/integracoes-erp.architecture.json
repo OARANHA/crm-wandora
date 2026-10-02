@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "titulo": "Integrações ERP — módulo oficial opcional, leitura VendaERP V1",
+  "descricao": "A instalação habilita o módulo pela provisionadora da ADR-0002; a organização configura a conexão; UI e tools usam o mesmo service/provider. A V1 termina em leitura e devolve falha explícita. Configuração/teste e tools deixam trilha auditável.",
+  "lanes": [
+    {
+      "id": "instalacao",
+      "label": "Instalação"
+    },
+    {
+      "id": "organizacao",
+      "label": "Organização"
+    },
+    {
+      "id": "runtime",
+      "label": "Runtime compartilhado"
+    },
+    {
+      "id": "externo",
+      "label": "Provider externo"
+    },
+    {
+      "id": "prova",
+      "label": "Retorno e prova"
+    }
+  ],
+  "mainPath": [
+    "adminmodulos",
+    "provisionador",
+    "modulosinstalados",
+    "navcatalogo",
+    "telaerp",
+    "rotaconexoes",
+    "erpconnections",
+    "service",
+    "provider",
+    "vendaerp"
+  ],
+  "nodes": [
+    {
+      "id": "adminmodulos",
+      "lane": "instalacao",
+      "type": "ui",
+      "label": "/admin/modulos",
+      "sublabel": "o dono instala integracoes_erp; tabela do módulo não existe para quem não instala"
+    },
+    {
+      "id": "provisionador",
+      "lane": "instalacao",
+      "type": "database",
+      "label": "fn_integracoes_erp_provisionar()",
+      "sublabel": "provisionadora idempotente da ADR-0002"
+    },
+    {
+      "id": "modulosinstalados",
+      "lane": "instalacao",
+      "type": "database",
+      "label": "modulos_instalados",
+      "sublabel": "estado ativo é a autoridade para porta e tools do módulo"
+    },
+    {
+      "id": "navcatalogo",
+      "lane": "organizacao",
+      "type": "lib",
+      "label": "NAV_CATALOG → /app/integracoes-erp",
+      "sublabel": "porta declarada, condicionada a modulo: integracoes_erp"
+    },
+    {
+      "id": "telaerp",
+      "lane": "organizacao",
+      "type": "ui",
+      "label": "/app/integracoes-erp",
+      "sublabel": "VendaERP aparece como Somente leitura; admin configura, viewer pode consultar estado"
+    },
+    {
+      "id": "rotaconexoes",
+      "lane": "runtime",
+      "type": "api",
+      "label": "/api/v1/integracoes-erp/conexoes (+ /test)",
+      "sublabel": "RBAC + Zod + guarda de destino externo; teste usa leitura autenticada sem efeito de domínio"
+    },
+    {
+      "id": "erpconnections",
+      "lane": "runtime",
+      "type": "database",
+      "label": "erp_connections",
+      "sublabel": "por organização/provider; credenciais VendaERP cifradas; anon/authenticated sem acesso direto"
+    },
+    {
+      "id": "tools",
+      "lane": "runtime",
+      "type": "service",
+      "label": "crm_erp_*",
+      "sublabel": "cinco capabilities read; gate integracoes_erp; filtros redigidos antes da auditoria"
+    },
+    {
+      "id": "service",
+      "lane": "runtime",
+      "type": "service",
+      "label": "lib/integracoes-erp/service.ts",
+      "sublabel": "carrega conexão, normaliza respostas e transforma falhas do provider em motivos internos"
+    },
+    {
+      "id": "provider",
+      "lane": "externo",
+      "type": "service",
+      "label": "lib/integracoes-erp/vendaerp.ts",
+      "sublabel": "headers oficiais + SSRF/DNS/redirect guard; somente endpoints de leitura na V1"
+    },
+    {
+      "id": "vendaerp",
+      "lane": "externo",
+      "type": "external",
+      "label": "VendaERP API",
+      "sublabel": "Produtos, Depósitos/Estoque, Pessoas, Pedidos e consulta fiscal; nenhuma escrita exposta"
+    },
+    {
+      "id": "auditoria",
+      "lane": "prova",
+      "type": "database",
+      "label": "api_audit_log",
+      "sublabel": "configuração/teste e execução das tools deixam rastro; painel existente /admin/audit é o consumidor humano"
+    },
+    {
+      "id": "e2e",
+      "lane": "prova",
+      "type": "test",
+      "label": "tests/e2e/integracoes-erp.spec.ts",
+      "sublabel": "instala pela UI, abre VendaERP e prova SSRF com loopback antes de qualquer fetch"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "e2e",
+      "to": "adminmodulos",
+      "label": "instala pela mesma porta humana"
+    },
+    {
+      "id": "e2",
+      "from": "adminmodulos",
+      "to": "provisionador",
+      "label": "instalar módulo"
+    },
+    {
+      "id": "e3",
+      "from": "provisionador",
+      "to": "modulosinstalados",
+      "label": "registra o módulo ativo"
+    },
+    {
+      "id": "e4",
+      "from": "modulosinstalados",
+      "to": "navcatalogo",
+      "label": "habilita a porta da organização"
+    },
+    {
+      "id": "e5",
+      "from": "navcatalogo",
+      "to": "telaerp",
+      "label": "entrada navegável"
+    },
+    {
+      "id": "e6",
+      "from": "e2e",
+      "to": "telaerp",
+      "label": "prova a superfície depois da instalação"
+    },
+    {
+      "id": "e7",
+      "from": "telaerp",
+      "to": "rotaconexoes",
+      "label": "listar, salvar e testar conexão"
+    },
+    {
+      "id": "e8",
+      "from": "rotaconexoes",
+      "to": "erpconnections",
+      "label": "persistência por organização"
+    },
+    {
+      "id": "e9",
+      "from": "erpconnections",
+      "to": "service",
+      "label": "credenciais decifradas só no servidor"
+    },
+    {
+      "id": "e10",
+      "from": "modulosinstalados",
+      "to": "tools",
+      "label": "retira as capabilities quando desligado"
+    },
+    {
+      "id": "e11",
+      "from": "tools",
+      "to": "service",
+      "label": "mesmas leituras do módulo"
+    },
+    {
+      "id": "e12",
+      "from": "service",
+      "to": "provider",
+      "label": "chama provider read-only"
+    },
+    {
+      "id": "e13",
+      "from": "provider",
+      "to": "vendaerp",
+      "label": "request após guardas de destino"
+    },
+    {
+      "id": "e14",
+      "from": "vendaerp",
+      "to": "provider",
+      "label": "resposta do contrato externo"
+    },
+    {
+      "id": "e15",
+      "from": "provider",
+      "to": "service",
+      "label": "normalização sem payload bruto ao agente"
+    },
+    {
+      "id": "e16",
+      "from": "service",
+      "to": "tools",
+      "label": "dados ou falha explícita voltam à capability"
+    },
+    {
+      "id": "e17",
+      "from": "service",
+      "to": "rotaconexoes",
+      "label": "resultado do teste volta à API/UI"
+    },
+    {
+      "id": "e18",
+      "from": "rotaconexoes",
+      "to": "auditoria",
+      "label": "salvar/testar registra ação"
+    },
+    {
+      "id": "e19",
+      "from": "tools",
+      "to": "auditoria",
+      "label": "runtime audita com filtros redigidos"
+    }
+  ]
+}
