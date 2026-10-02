@@ -109,9 +109,7 @@ function usosDe(arquivo: string): { usos: Uso[]; naoResolvidos: string[] } {
  * "perdoa" módulo opcional nem exige que suas tabelas vazem para o baseline.
  */
 function provisionarTabelaOpcionalSeNecessario(tabela: string): void {
-  const existe = sql(
-    `select to_regclass('public.${tabela}') is not null;`,
-  );
+  const existe = sql(`select to_regclass('public.${tabela}') is not null;`);
   if (existe === "t") return;
 
   const candidatas = provisionadorasDoCatalogo().filter((p) =>
