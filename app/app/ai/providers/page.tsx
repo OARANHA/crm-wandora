@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { capacidadesDaOrganizacao } from "@/lib/organizacao/capacidades";
+import { createClient } from "@/lib/supabase/server";
 
 import { PainelDeProvedores } from "./_components/PainelDeProvedores";
 
@@ -25,6 +27,12 @@ export default async function ProvedoresPage() {
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
   if (ROLE_RANK[activeOrg.role] < ROLE_RANK.manager) redirect("/403");
+
+  const capacidades = await capacidadesDaOrganizacao(await createClient(), activeOrg.orgId, {
+    isPlatformAdmin: user.is_platform_admin,
+    support: Boolean(user.support),
+  });
+  if (!capacidades.includes("administracao_ia")) redirect("/403");
 
   return <PainelDeProvedores />;
 }
