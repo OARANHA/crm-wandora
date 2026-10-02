@@ -35,6 +35,7 @@ import { modeloDeTranscricaoEmVigor } from "@/lib/messaging/media/transcription"
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,17 @@ export async function GET(): Promise<Response> {
   const { org } = authz;
 
   const db = await createClient();
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(db, org.orgId, {
+    isPlatformAdmin: authz.user.is_platform_admin,
+    support: Boolean(authz.user.support),
+  });
+  if (!podeAdministrarIa) {
+    return fail(
+      "forbidden",
+      t("A administração técnica de IA não está disponível para esta organização."),
+      403,
+    );
+  }
 
   const [bindingsRes, credsRes, modelosRes, orgRes, agenteRes] = await Promise.all([
     db
@@ -249,6 +261,19 @@ export async function PUT(req: NextRequest): Promise<Response> {
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;
 
+  const db = await createClient();
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(db, org.orgId, {
+    isPlatformAdmin: user.is_platform_admin,
+    support: Boolean(user.support),
+  });
+  if (!podeAdministrarIa) {
+    return fail(
+      "forbidden",
+      t("A administração técnica de IA não está disponível para esta organização."),
+      403,
+    );
+  }
+
   const parsed = corpoDoPut.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return fail("invalid_body", t("corpo inválido"), 422, { details: parsed.error.issues });
@@ -257,8 +282,6 @@ export async function PUT(req: NextRequest): Promise<Response> {
 
   const ponto = PONTO_POR_ID.get(corpo.purpose);
   if (!ponto) return fail("ponto_desconhecido", `"${corpo.purpose}" não é um ponto do sistema`, 404);
-
-  const db = await createClient();
 
   // A capacidade vem do catálogo (o que o FABRICANTE declara), nunca de
   // heurística sobre o nome do modelo.
@@ -391,13 +414,24 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;
 
+  const db = await createClient();
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(db, org.orgId, {
+    isPlatformAdmin: user.is_platform_admin,
+    support: Boolean(user.support),
+  });
+  if (!podeAdministrarIa) {
+    return fail(
+      "forbidden",
+      t("A administração técnica de IA não está disponível para esta organização."),
+      403,
+    );
+  }
+
   const parsed = corpoDoPatch.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return fail("invalid_body", t("corpo inválido"), 422, { details: parsed.error.issues });
   }
   const corpo = parsed.data;
-
-  const db = await createClient();
 
   // O modelo tem de existir no catálogo DAQUELE provedor. Sem esta conferência,
   // um erro de digitação vira padrão da organização e derruba todo ponto
