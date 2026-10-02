@@ -1,9 +1,98 @@
 # HANDOFF — CRM-WANDORA / Elus
 
 > Documento vivo para continuidade entre conversas.  
-> Atualizado em: 2026-10-01  
+> Atualizado em: 2026-10-02  
 > Repositório: `OARANHA/crm-wandora`  
 > Regra: atualizar este arquivo ao fim de cada frente relevante para não depender do histórico do chat.
+
+## 0. Estado canônico de continuidade — 2026-10-02
+
+### Fonte de verdade e ordem de leitura
+
+Este handoff não substitui a doutrina. Ao retomar trabalho, leia e obedeça nesta ordem:
+
+1. `AGENTS.md`;
+2. `CLAUDE.md`;
+3. spec/ADR da frente;
+4. `UPSTREAM.md`;
+5. `docs/current-state.md`;
+6. este handoff;
+7. estado real de `main`, PRs, branches e CI.
+
+Nunca trate texto de chat como fonte de verdade quando o repositório puder ser medido.
+
+### Prioridade atual: sincronizar upstream antes de Planos e Pagamentos
+
+Em 2026-10-02 foi feita uma reconciliação somente-leitura entre o Elus e o DeskcommCRM.
+
+Estado medido:
+
+- `origin/main`: `35834ef00bc6610172b2acb4b22f7d779eae32fb`;
+- `upstream/main`: `efed1d5745f87dfeaf3adbe8bc6165bc684a7a75`;
+- o snapshot importado pelo Elus corresponde funcionalmente à release upstream **1.69.0**
+  (`e8e2912178031d321caf0912b270ee06bd2c36c7`), exceto pelos workflows GitHub não trazidos
+  pelo bootstrap;
+- depois da 1.69.0, o upstream mergeou #2058, #1978, #1987 e #2071;
+- #1987 é `feat/org-operante`: a fundação "suspensão que suspende" que a spec de cobrança exige
+  como PR 1;
+- portanto **não reimplementar PR 1 no Elus**. Trazer a implementação upstream pelo sync;
+- a branch Elus `feat/org-operante`, criada antes dessa descoberta, ficou obsoleta e não deve ser
+  continuada nem mergeada;
+- produção **não** recebeu esse sync ainda.
+
+### Colisão de migration já conhecida
+
+O upstream usa:
+
+`20260930180000_0501_org_operante_e_suspensao_tipada.sql`
+
+O PR #7 do Elus (VendaERP) também reserva `0501`.
+
+Depois do sync upstream, o VendaERP deve ser renumerado para o próximo número livre antes de merge,
+com atualização coerente de migration/baseline/MANIFEST/testes. Não alterar a migration upstream.
+
+### Overlay Elus que precisa sobreviver ao sync
+
+Na `main`, as customizações próprias pós-snapshot estão concentradas em:
+
+- `.changes/elus-worker-runtime-env.md`;
+- `UPSTREAM.md`;
+- `compose.portainer.yml`;
+- `docs/handoffs/HANDOFF-CRM-WANDORA.md`;
+- `scripts/wandora-sync-upstream.sh`;
+- remoção do workflow temporário de bootstrap.
+
+Além disso, existem trabalhos Elus ainda fora da `main` que devem ser reconciliados **depois**
+do sync, não apagados:
+
+- PR #6 / branch `feat/elus-login-branding`;
+- PR #7 / branch `feat/integracoes-erp-vendaerp`;
+- branch combinada `candidate/elus360-erp`;
+- trabalho de entitlement de administração técnica de IA/BYOK feito na candidate, ainda não
+  tratado como produção/main.
+
+### Ordem da frente a partir daqui
+
+1. criar/usar branch dedicada de sync upstream a partir da `main` real;
+2. trazer conscientemente o delta 1.69.0 → `upstream/main`, preservando o overlay Elus;
+3. não importar workflows upstream automaticamente sem revisão;
+4. executar gates relevantes e revisar migrations;
+5. abrir/validar PR de sync; não fazer deploy direto do upstream;
+6. após o sync, renumerar/reconciliar o PR #7 VendaERP e atualizar branches vivas com a nova main;
+7. reconciliar login/branding e entitlement de IA;
+8. então iniciar a **PR 2 da cobrança — Planos e Limites**, que deve criar a autoridade real de
+   planos/assinaturas e alimentar `/admin/cobranca` e `/app/settings/billing`;
+9. depois fechar a UX de **Plano e pagamentos**;
+10. em seguida voltar ao agente para respostas factuais ("que tipo de tinta tem?", "qual o preço
+    da resina?", estoque, nota etc.), sempre por ferramenta/dado estruturado e não por invenção
+    do modelo.
+
+### Regra comercial já decidida para IA
+
+Cliente comum de plano gerenciado não deve ver nem administrar OpenAI/Chutes/Google/OpenRouter,
+modelos ou chaves. Administração técnica de IA/BYOK é capacidade de plataforma/Enterprise/
+white-label. Menu escondido não basta: página e API também devem ser protegidas pela mesma
+autoridade de entitlement.
 
 ## 1. Objetivo do projeto
 
@@ -411,29 +500,27 @@ Nunca registrar neste documento:
 
 ## 15. Próxima sequência recomendada
 
-No próximo chat, começar diretamente por:
+A sequência antiga de branding foi superada pelo estado real de 02/10. O login/branding já teve
+trabalho posterior nas branches Elus; a prioridade de integração agora é:
 
-1. localizar a implementação de branding do Elus;
-2. reproduzir o bug de upload PNG -> erro de SVG;
-3. corrigir validação/upload;
-4. aplicar logo completo e ícone;
-5. corrigir cores e tela de login;
-6. revisar branding do app principal e Admin Plataforma;
-7. depois voltar ao agente:
-   - capacidades;
-   - modelo rápido;
-   - router Chutes;
-   - publicação;
-   - liberação do WhatsApp.
+1. reconciliar e sincronizar o upstream;
+2. atualizar as branches Elus vivas contra a nova `main`;
+3. resolver a colisão da migration VendaERP;
+4. Planos e Limites / Plano e pagamentos;
+5. respostas factuais do agente via ferramentas e VendaERP;
+6. Chutes nativo/embedding/router somente depois de a autoridade de plano/entitlement estar estável.
 
 ## 16. Regra de continuidade
 
-Ao abrir novo chat, pedir:
+Ao abrir novo chat, peça para **não confiar no prompt como fonte de verdade** e começar medindo o
+repositório:
 
-> Leia `docs/handoffs/HANDOFF-CRM-WANDORA.md` no repositório `OARANHA/crm-wandora` e continue da seção “Branding / customização — PRÓXIMA FRENTE”.
+> Leia `AGENTS.md`, `CLAUDE.md`, `UPSTREAM.md` e
+> `docs/handoffs/HANDOFF-CRM-WANDORA.md` no `OARANHA/crm-wandora`. Depois confira a `main`,
+> `upstream/main`, PRs abertas, branches e migrations reais antes de qualquer escrita. Continue
+> da seção “Estado canônico de continuidade — 2026-10-02”.
 
-Assim a conversa pode continuar sem depender do contexto anterior.
-
+Assim a conversa continua a partir do estado verificável do projeto, e não da memória do chat.
 
 ---
 

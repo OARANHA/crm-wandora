@@ -11,7 +11,8 @@ import { PACING_DEFAULTS } from "@/lib/agent-engine/pacing/defaults";
 import { janelaDeEnvioAberta } from "@/lib/agent-engine/pacing/engine";
 import { fusoDaJanela } from "@/lib/agent-engine/pacing/store";
 import { ok, fail } from "@/lib/api/wrappers";
-import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
+import { loadAuthUser } from "@/lib/auth/server";
+import { orgAtivaDaApi } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 
@@ -39,7 +40,9 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
 
   const authUser = await loadAuthUser();
   const t = (texto: string) => traduzir(texto, authUser?.idioma ?? "pt-BR");
-  const activeOrg = authUser ? await resolveActiveOrg(authUser) : null;
+  const ativa = await orgAtivaDaApi(authUser, requestId);
+  if (!ativa.ok) return ativa.response;
+  const activeOrg = ativa.org;
   if (!activeOrg) {
     return fail("no_active_org", t("No active organization."), 403, { requestId });
   }

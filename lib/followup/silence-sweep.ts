@@ -334,7 +334,7 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
       const { data, error } = await admin
         .from("conversations")
         .select(
-          "id, service_revision, current_demanda_id, demandas!conversations_current_demanda_id_fkey(revision,fechada_em), status, messages!messages_conversation_id_fkey(organization_id,contact_id,conversation_id,service_revision,demanda_id,demanda_revision,sent_at), contact_id, last_inbound_at, contacts:contact_id(tags, is_blocked, ai_authorized_at, phone_number), sessao:channel_session_id(metadata)",
+          "id, service_revision, current_demanda_id, demandas!conversations_current_demanda_id_fkey(revision,fechada_em), status, messages!messages_conversation_id_fkey(organization_id,contact_id,conversation_id,service_revision,demanda_id,demanda_revision,sent_at), contact_id, last_inbound_at, contacts:contact_id(tags, is_blocked, ai_authorized_at, phone_number), sessao:channel_session_id(metadata), organizations:organization_id(status)",
         )
         .eq("organization_id", orgId).eq("demandas.organization_id", orgId)
         .eq("contacts.organization_id", orgId).eq("sessao.organization_id", orgId)
@@ -353,6 +353,7 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
         last_inbound_at: string;
         contacts: ContactEmbed;
         sessao: { metadata: Record<string, unknown> | null } | null;
+        organizations: { status: string | null } | null;
       };
       const cutoff = new Date(cutoffIso).getTime();
       const agora = new Date();
@@ -376,6 +377,7 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
           const metadata = row.sessao?.metadata ?? {};
           const acesso = decidirElegibilidade(
             montarEstadoDeElegibilidade({
+              orgStatus: row.organizations?.status ?? null,
               aiGate: metadata.ai_gate,
               aiGateMode: metadata.ai_gate_mode,
               aiTestPhoneNumbers: metadata.ai_test_phone_numbers,
