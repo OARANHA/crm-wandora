@@ -16,7 +16,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { modulosLigados, type ModuloOpcional } from "@/lib/instalacao/modulos";
 import { logger } from "@/lib/logger";
 
-export const CAPACIDADES_DA_ORGANIZACAO = ["propostas"] as const;
+export const CAPACIDADES_DA_ORGANIZACAO = ["propostas", "administracao_ia"] as const;
 export type CapacidadeDaOrganizacao = (typeof CAPACIDADES_DA_ORGANIZACAO)[number];
 
 /**
@@ -25,9 +25,34 @@ export type CapacidadeDaOrganizacao = (typeof CAPACIDADES_DA_ORGANIZACAO)[number
  * e é aqui, e não em cada consumidor, que as duas se somam: tela, menu, rota,
  * ferramenta do agente e cron leem a mesma resposta.
  */
-const MODULO_DA_CAPACIDADE: Record<CapacidadeDaOrganizacao, ModuloOpcional> = {
+const MODULO_DA_CAPACIDADE: Partial<Record<CapacidadeDaOrganizacao, ModuloOpcional>> = {
   propostas: "propostas",
 };
+
+export interface ContextoDeCapacidades {
+  isPlatformAdmin?: boolean;
+  support?: boolean;
+}
+
+/**
+ * Administração técnica de IA (provedores, credenciais, modelos e embedding).
+ *
+ * - dono real da instalação (platform admin fora de suporte) sempre pode;
+ * - tenant comum só pode com grant comercial explícito;
+ * - ausente/malformado = desligado.
+ *
+ * O grant manual é a ponte até a cobrança do revendedor chegar. Quando
+ * `cobranca_planos` passar a conceder BYOK, ela alimentará esta MESMA
+ * capacidade; o rótulo legado `settings.plan` nunca vira autoridade.
+ */
+export function administracaoIaLigada(
+  settings: unknown,
+  contexto: ContextoDeCapacidades = {},
+): boolean {
+  if (contexto.isPlatformAdmin === true && contexto.support !== true) return true;
+  const comerciais = objeto(objeto(settings)?.commercial_entitlements);
+  return comerciais?.ai_provider_admin === true;
+}
 
 function objeto(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
@@ -40,16 +65,24 @@ function objeto(v: unknown): Record<string, unknown> | null {
 export function capacidadesLigadas(
   settings: unknown,
   modulos: readonly ModuloOpcional[],
+  contexto: ContextoDeCapacidades = {},
 ): CapacidadeDaOrganizacao[] {
   const propostas = objeto(objeto(settings)?.proposals);
-  const daEmpresa: CapacidadeDaOrganizacao[] = propostas?.enabled === true ? ["propostas"] : [];
-  return daEmpresa.filter((c) => modulos.includes(MODULO_DA_CAPACIDADE[c]));
+  const daEmpresa: CapacidadeDaOrganizacao[] = [
+    ...(propostas?.enabled === true ? (["propostas"] as const) : []),
+    ...(administracaoIaLigada(settings, contexto) ? (["administracao_ia"] as const) : []),
+  ];
+  return daEmpresa.filter((c) => {
+    const modulo = MODULO_DA_CAPACIDADE[c];
+    return !modulo || modulos.includes(modulo);
+  });
 }
 
 /** Lê a linha da organização. Nunca lança: erro = nenhuma capacidade. */
 export async function capacidadesDaOrganizacao(
   db: SupabaseClient,
   organizationId: string,
+  contexto: ContextoDeCapacidades = {},
 ): Promise<CapacidadeDaOrganizacao[]> {
   try {
     const [{ data, error }, modulos] = await Promise.all([
@@ -63,7 +96,11 @@ export async function capacidadesDaOrganizacao(
       });
       return [];
     }
-    return capacidadesLigadas((data as { settings?: unknown } | null)?.settings, modulos);
+    return capacidadesLigadas(
+      (data as { settings?: unknown } | null)?.settings,
+      modulos,
+      contexto,
+    );
   } catch (erro) {
     logger.warn("capacidades da organização: leitura falhou — tratando todas como desligadas", {
       organization_id: organizationId,
