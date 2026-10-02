@@ -7,6 +7,8 @@ import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { validateProviderKey } from "@/lib/ai/provider-validators";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +39,19 @@ export async function POST(req: NextRequest): Promise<Response> {
   const authz = await requireRole("admin", { requestId, resource: "ai_credentials" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
+  const { user: authUser, org: activeOrg } = authz;
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(await createClient(), activeOrg.orgId, {
+    isPlatformAdmin: authUser.is_platform_admin,
+    support: Boolean(authUser.support),
+  });
+  if (!podeAdministrarIa) {
+    return fail(
+      "forbidden",
+      t("A administração técnica de IA não está disponível para esta organização."),
+      403,
+      { requestId },
+    );
+  }
 
   let rawBody: unknown;
   try {
