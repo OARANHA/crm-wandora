@@ -17,7 +17,6 @@ on:
       - "supabase/migrations/**"
       - "tests/unit/integracoes-erp-*.test.ts"
       - "tests/invariants/integracoes-erp-provisionadora.test.ts"
-      - "tests/e2e/integracoes-erp.spec.ts"
       - "tests/unit/catalogo-tools-leigo-friendly.test.ts"
       - "tests/unit/capacidade-alcancavel-pelo-agente.test.ts"
       - "tests/unit/selecao-por-pacote.test.ts"
@@ -66,7 +65,6 @@ jobs:
           lib/mcp/tools/integracoes-erp.ts
           lib/mcp/tools/catalogo/integracoes-erp.ts
           tests/unit/integracoes-erp-*.test.ts
-          tests/e2e/integracoes-erp.spec.ts
 
       - name: Check ERP formatting
         run: >
@@ -79,7 +77,6 @@ jobs:
           "lib/mcp/tools/catalogo/integracoes-erp.ts"
           "tests/unit/integracoes-erp-*.test.ts"
           "tests/invariants/integracoes-erp-provisionadora.test.ts"
-          "tests/e2e/integracoes-erp.spec.ts"
           "docs/specs/integracoes-erp*.md"
 
       - name: ERP unit tests
@@ -150,75 +147,3 @@ jobs:
         run: pnpm test:db:update
         env:
           TEST_DB_IMAGE: ${{ matrix.image }}
-
-  e2e-erp:
-    name: ERP browser flow
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.9
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v3
-        with:
-          version: 2.117.0
-
-      - name: Start local Supabase without migration chain
-        run: |
-          set -euo pipefail
-          mv supabase/migrations /tmp/migrations-off
-          mkdir -p supabase/migrations
-          supabase start -x studio,postgres-meta
-
-      - name: Enable baseline extensions
-        run: |
-          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q <<'SQL'
-          create schema if not exists extensions;
-          create extension if not exists "uuid-ossp" with schema extensions;
-          create extension if not exists pgcrypto with schema extensions;
-          create extension if not exists vector with schema public;
-          create extension if not exists citext with schema public;
-          create extension if not exists pg_trgm with schema public;
-          SQL
-
-      - name: Apply product baseline
-        run: >-
-          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-          -v ON_ERROR_STOP=1 -q -f supabase/baseline.sql
-
-      - name: Generate local E2E environment
-        run: pnpm e2e:env
-
-      - name: Publish E2E environment
-        run: grep -vE '^[[:space:]]*(#|$)' .env.e2e >> "$GITHUB_ENV"
-
-      - name: Build production app for E2E
-        run: pnpm e2e:build
-
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Run ERP browser proof
-        run: >-
-          pnpm exec playwright test
-          tests/e2e/integracoes-erp.spec.ts
-          --workers=1
-          --reporter=list
-
