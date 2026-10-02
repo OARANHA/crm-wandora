@@ -102,7 +102,11 @@ export function ModelPicker({ provider, value, onChange, disabled, id, placehold
   );
 }
 
-export function useModelMeta(provider: Provider, modelId: string): ModelOption | null {
+export function useModelMeta(
+  provider: Provider,
+  modelId: string,
+  enabled = true,
+): ModelOption | null {
   const query = useQuery({
     queryKey: ["ai", "providers", provider, "models"],
     queryFn: async () => {
@@ -110,6 +114,7 @@ export function useModelMeta(provider: Provider, modelId: string): ModelOption |
       return res.data.models;
     },
     staleTime: 60_000,
+    enabled,
   });
   return (query.data ?? []).find((m) => m.model_id === modelId) ?? null;
 }
