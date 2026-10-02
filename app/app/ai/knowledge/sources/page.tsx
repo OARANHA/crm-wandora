@@ -4,7 +4,11 @@ import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { createClient } from "@/lib/supabase/server";
-import { montarEstadoDaChave } from "@/lib/ai/embeddings/estado";
+import {
+  montarEstadoDaChave,
+  projetarEstadoDaChaveGerenciado,
+} from "@/lib/ai/embeddings/estado";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 import type { SourceRow } from "@/hooks/ai/useKnowledgeSources";
 import { AcervoClient, type AgenteQueUsa } from "./_client";
 
@@ -42,7 +46,12 @@ export default async function AcervoPage() {
 
   const supabase = await createClient();
 
-  const [{ data: sourcesRaw }, { data: agentesRaw }, estadoDaChave] =
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(supabase, activeOrg.orgId, {
+    isPlatformAdmin: user.is_platform_admin,
+    support: Boolean(user.support),
+  });
+
+  const [{ data: sourcesRaw }, { data: agentesRaw }, estadoCompletoDaChave] =
     await Promise.all([
       supabase
         .from("ai_knowledge_sources")
@@ -59,6 +68,9 @@ export default async function AcervoPage() {
         .is("archived_at", null),
       montarEstadoDaChave(supabase, activeOrg.orgId),
     ]);
+  const estadoDaChave = podeAdministrarIa
+    ? estadoCompletoDaChave
+    : projetarEstadoDaChaveGerenciado(estadoCompletoDaChave);
 
   const initialSources = (sourcesRaw ?? []) as unknown as SourceRow[];
 
