@@ -5,7 +5,10 @@ on:
     paths:
       - ".github/workflows/erp-browser-verification.yml"
       - "app/api/v1/integracoes-erp/**"
+      - "app/api/v1/conversations/**/erp/**"
       - "app/app/integracoes-erp/**"
+      - "components/inbox/CRMSidePanel.tsx"
+      - "components/inbox/ErpDanfeCard.tsx"
       - "components/modulos/**"
       - "lib/integracoes-erp/**"
       - "lib/modulos/**"

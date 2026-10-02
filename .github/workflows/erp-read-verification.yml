@@ -5,7 +5,9 @@ on:
     paths:
       - ".github/workflows/erp-read-verification.yml"
       - "app/api/v1/integracoes-erp/**"
+      - "app/api/v1/conversations/**/erp/**"
       - "app/app/integracoes-erp/**"
+      - "components/inbox/ErpDanfeCard.tsx"
       - "components/integracoes-erp/**"
       - "lib/integracoes-erp/**"
       - "lib/mcp/tools/integracoes-erp.ts"
@@ -60,7 +62,9 @@ jobs:
         run: >
           pnpm exec eslint
           app/api/v1/integracoes-erp
+          "app/api/v1/conversations/[id]/erp/route.ts"
           app/app/integracoes-erp
+          components/inbox/ErpDanfeCard.tsx
           lib/integracoes-erp
           lib/mcp/tools/integracoes-erp.ts
           lib/mcp/tools/catalogo/integracoes-erp.ts
@@ -71,7 +75,9 @@ jobs:
           pnpm exec prettier --check
           ".github/workflows/erp-read-verification.yml"
           "app/api/v1/integracoes-erp/**/*.{ts,tsx}"
+          "app/api/v1/conversations/[id]/erp/route.ts"
           "app/app/integracoes-erp/**/*.{ts,tsx}"
+          "components/inbox/ErpDanfeCard.tsx"
           "lib/integracoes-erp/**/*.ts"
           "lib/mcp/tools/integracoes-erp.ts"
           "lib/mcp/tools/catalogo/integracoes-erp.ts"
@@ -88,6 +94,8 @@ jobs:
           tests/unit/integracoes-erp-normalizacao.test.ts
           tests/unit/integracoes-erp-tools.test.ts
           tests/unit/integracoes-erp-tools-comportamento.test.ts
+          tests/unit/integracoes-erp-danfe.test.ts
+          tests/unit/integracoes-erp-danfe-authority.test.ts
 
       - name: Catalog invariants touched by ERP tools
         run: >
