@@ -19,6 +19,8 @@ import { mensagemDoEscopo, validarEscopoDaVersao } from "@/lib/ai/agents/escopo"
 import { versionCreateSchema } from "@/lib/ai/agents/validation";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
+import { resolverInfraIaGerenciada } from "@/lib/ai/infra-gerenciada";
 
 export const dynamic = "force-dynamic";
 
@@ -32,16 +34,24 @@ type Ctx = { params: Promise<{ id: string }> };
 async function assertAgentInOrg(
   agentId: string,
   orgId: string,
-): Promise<{ ok: true; kind: string } | { ok: false }> {
+): Promise<
+  | { ok: true; kind: string; publishedVersionId: string | null }
+  | { ok: false }
+> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("ai_agents")
-    .select("id, kind, archived_at")
+    .select("id, kind, archived_at, published_version_id")
     .eq("id", agentId)
     .eq("organization_id", orgId)
     .maybeSingle();
   if (!data || data.archived_at) return { ok: false };
-  return { ok: true, kind: (data as { kind: string }).kind };
+  return {
+    ok: true,
+    kind: (data as { kind: string }).kind,
+    publishedVersionId:
+      (data as { published_version_id?: string | null }).published_version_id ?? null,
+  };
 }
 
 export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
@@ -92,7 +102,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
       details: parsed.error.flatten(),
     });
   }
-  const v = parsed.data;
+  let v = parsed.data;
 
   const agentCheck = await assertAgentInOrg(id, activeOrg.orgId);
   if (!agentCheck.ok) {
@@ -100,6 +110,65 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   }
 
   const admin = createAdminClient();
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(admin, activeOrg.orgId, {
+    isPlatformAdmin: authUser.is_platform_admin,
+    support: Boolean(authUser.support),
+  });
+  if (!podeAdministrarIa) {
+    let referencia: {
+      provider: string;
+      model: string;
+      credential_id: string | null;
+      operator_model: string | null;
+    } | null = null;
+
+    if (agentCheck.publishedVersionId) {
+      const { data } = await admin
+        .from("ai_agent_versions")
+        .select("provider, model, credential_id, operator_model")
+        .eq("id", agentCheck.publishedVersionId)
+        .eq("organization_id", activeOrg.orgId)
+        .maybeSingle();
+      referencia = data as typeof referencia;
+    } else {
+      const { data } = await admin
+        .from("ai_agent_versions")
+        .select("provider, model, credential_id, operator_model")
+        .eq("agent_id", id)
+        .eq("organization_id", activeOrg.orgId)
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      referencia = data as typeof referencia;
+    }
+
+    if (referencia?.provider && referencia.model) {
+      v = {
+        ...v,
+        provider: referencia.provider,
+        model: referencia.model,
+        credential_id: referencia.credential_id,
+        operator_model: referencia.operator_model,
+      };
+    } else {
+      const infra = await resolverInfraIaGerenciada(admin, activeOrg.orgId);
+      if (!infra) {
+        return fail(
+          "managed_ai_unavailable",
+          t("A IA gerenciada desta empresa ainda não está pronta. Fale com quem administra este sistema."),
+          503,
+          { requestId },
+        );
+      }
+      v = {
+        ...v,
+        provider: infra.provider,
+        model: infra.model,
+        credential_id: infra.credentialId,
+        operator_model: null,
+      };
+    }
+  }
 
   // Ordering: insert with retry on 23505 (race com unique(agent_id,version_number)).
   for (let attempt = 0; attempt < 3; attempt++) {
