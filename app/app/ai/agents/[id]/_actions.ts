@@ -34,6 +34,8 @@ import {
 import { publishAgentVersion } from "@/lib/ai/agents/publish";
 import { escolherVersoesDaTela } from "@/lib/ai/agents/versoes-da-tela";
 import { VALID_TOOL_IDS } from "@/lib/mcp/tools";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
+import { resolverInfraIaGerenciada } from "@/lib/ai/infra-gerenciada";
 
 const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -149,7 +151,7 @@ export async function saveAgentDraftAction(
     return { ok: false, error: "validation_failed", details: cadastroParsed.error.flatten() };
   }
 
-  const v = parsed.data;
+  let v = parsed.data;
   const requestId = randomUUID();
   const admin = createAdminClient();
 
@@ -199,12 +201,12 @@ export async function saveAgentDraftAction(
   //      `draft`.
   const { data: versoes } = await admin
     .from("ai_agent_versions")
-    .select("id, version_number, status")
+    .select("id, version_number, status, provider, model, credential_id, operator_model")
     .eq("organization_id", activeOrg.orgId)
     .eq("agent_id", agentId)
     .order("version_number", { ascending: false });
 
-  const { draft: existingDraft } = escolherVersoesDaTela(
+  const { draft: existingDraft, base: versaoBase } = escolherVersoesDaTela(
     versoes ?? [],
     // MEDIDA, não palpite. O ponteiro é o que o motor executa (`agent-config.ts`
     // faz `join … on v.id = a.published_version_id`); `status = 'published'` é
@@ -219,9 +221,50 @@ export async function saveAgentDraftAction(
     agent.published_version_id ?? null,
   );
 
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(admin, activeOrg.orgId, {
+    isPlatformAdmin: authUser.is_platform_admin,
+    support: Boolean(authUser.support),
+  });
+  if (!podeAdministrarIa) {
+    const referencia = versaoBase as
+      | {
+          provider?: string;
+          model?: string;
+          credential_id?: string | null;
+          operator_model?: string | null;
+        }
+      | null;
+    if (referencia?.provider && referencia.model) {
+      v = {
+        ...v,
+        provider: referencia.provider,
+        model: referencia.model,
+        credential_id: referencia.credential_id ?? null,
+        operator_model: referencia.operator_model ?? null,
+      };
+    } else {
+      const infra = await resolverInfraIaGerenciada(admin, activeOrg.orgId);
+      if (!infra) {
+        return {
+          ok: false,
+          error: "managed_ai_unavailable",
+          message:
+            "A IA gerenciada desta empresa ainda não está pronta. Fale com quem administra este sistema.",
+        };
+      }
+      v = {
+        ...v,
+        provider: infra.provider,
+        model: infra.model,
+        credential_id: infra.credentialId,
+        operator_model: null,
+      };
+    }
+  }
+
   if (existingDraft) {
     // PATCH na draft existente — não infla a sequência de versions.
-    const patchValidated = versionPatchSchema.safeParse(payload);
+    const patchValidated = versionPatchSchema.safeParse(v);
     if (!patchValidated.success) {
       return { ok: false, error: "validation_failed", details: patchValidated.error.flatten() };
     }
@@ -697,17 +740,44 @@ export async function createMcpAgentAction(
   const requestId = randomUUID();
   const admin = createAdminClient();
 
+  let input = parsed.data;
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(admin, activeOrg.orgId, {
+    isPlatformAdmin: authUser.is_platform_admin,
+    support: Boolean(authUser.support),
+  });
+  if (!podeAdministrarIa) {
+    const infra = await resolverInfraIaGerenciada(admin, activeOrg.orgId);
+    if (!infra) {
+      return {
+        ok: false,
+        error: "managed_ai_unavailable",
+        message:
+          "A IA gerenciada desta empresa ainda não está pronta. Fale com quem administra este sistema.",
+      };
+    }
+    input = {
+      ...input,
+      version: {
+        ...input.version,
+        provider: infra.provider,
+        model: infra.model,
+        credential_id: infra.credentialId,
+        operator_model: null,
+      },
+    };
+  }
+
   // Cria agent kind='mcp_agent' + v1 draft. Compensa rollback se versão falhar.
   const { data: agentRow, error: agentErr } = await admin
     .from("ai_agents")
     .insert({
       organization_id: activeOrg.orgId,
-      name: parsed.data.name,
-      description: parsed.data.description ?? null,
-      model: parsed.data.version.model,
-      system_prompt: parsed.data.version.system_prompt,
+      name: input.name,
+      description: input.description ?? null,
+      model: input.version.model,
+      system_prompt: input.version.system_prompt,
       kind: "mcp_agent",
-      priority: parsed.data.priority,
+      priority: input.priority,
       is_active: false,
       is_default: false,
       created_by: authUser.id,
@@ -719,7 +789,7 @@ export async function createMcpAgentAction(
     return { ok: false, error: "internal_error", message: agentErr?.message };
   }
 
-  const v = parsed.data.version;
+  const v = input.version;
   const { error: versionErr } = await admin.from("ai_agent_versions").insert({
     organization_id: activeOrg.orgId,
     agent_id: agentRow.id,
