@@ -422,6 +422,12 @@ const PARES: Array<{
     arquivo: "lib/schemas/team.ts",
     simbolo: "ROLES",
   },
+  {
+    tabela: "organizations",
+    coluna: "suspended_kind",
+    arquivo: "lib/organizacao/operante.ts",
+    simbolo: "TIPOS_DE_SUSPENSAO",
+  },
 ];
 
 /** Tira um nível de parênteses externos, se ele envolver a expressão inteira. */
