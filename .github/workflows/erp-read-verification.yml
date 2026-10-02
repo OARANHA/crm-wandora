@@ -94,3 +94,46 @@ jobs:
           tests/unit/selecao-por-pacote.test.ts
           tests/unit/pacote-reserva-vaga-da-critica.test.ts
           tests/unit/tool-read-nao-muta.test.ts
+
+
+  db-invariants:
+    name: Database invariants (Postgres ${{ matrix.pg }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pg: 15
+            image: pgvector/pgvector:pg15
+          - pg: 17
+            image: pgvector/pgvector:pg17
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Baseline install, reapply and invariants
+        run: pnpm test:db
+        env:
+          TEST_DB_IMAGE: ${{ matrix.image }}
+
+      - name: Baseline update with existing data
+        run: pnpm test:db:update
+        env:
+          TEST_DB_IMAGE: ${{ matrix.image }}
