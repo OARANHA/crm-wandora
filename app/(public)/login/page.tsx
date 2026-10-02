@@ -71,7 +71,7 @@ export default async function LoginPage({
             <img
               src="/brand/elus/login-hero.png"
               alt={t("Elus — Seu atendimento, vendas e rotina trabalhando no automático.")}
-              className="absolute inset-0 h-full w-full object-cover object-[35%_center]"
+              className="absolute inset-0 h-full w-full object-cover object-[10%_center]"
             />
             <div
               aria-hidden
