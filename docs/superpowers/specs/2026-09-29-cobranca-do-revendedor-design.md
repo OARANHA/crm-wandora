@@ -110,6 +110,7 @@ create table if not exists public.cobranca_planos (
   max_assentos integer check (max_assentos >= 1),                   -- null = sem limite
   max_canais integer check (max_canais >= 1),
   teto_ia_usd_cents integer check (teto_ia_usd_cents >= 100),       -- moeda de fn_gasto_de_ia_do_mes (baseline.sql:13111)
+  permite_byok_ia boolean not null default false,                    -- provider/model/chave próprios
   padrao_no_cadastro boolean not null default false,
   arquivado_em timestamptz,
   created_at timestamptz not null default now(),
@@ -126,6 +127,33 @@ grant select, insert, update, delete on public.cobranca_planos to service_role;
 - Limites em colunas, não jsonb (anti-pattern 6). Nome distinto de `account_plans` (`baseline.sql:33414`).
 - Preço e intervalo imutáveis enquanto houver assinatura apontando para o plano (nem como `plano_agendado_id`): 409 "arquive e crie outro".
 - Alargar a moeda depois é alargamento de CHECK puro.
+
+### 2.2.1 Administração técnica de IA por capacidade — decisão de 02/10/2026
+
+O cliente final de um plano gerenciado **não administra fornecedor, modelo nem chave de IA**.
+Para ele, a capacidade é "IA gerenciada pela instalação". As superfícies técnicas (Provedores,
+Credenciais, escolha de provider/model no agente e escolha do provedor de embedding) só ficam
+alcançáveis quando a capacidade efetiva `administracao_ia` estiver ligada.
+
+A fonte de autoridade é comercial, não o rótulo legado:
+
+1. platform admin real (fora de sessão de suporte) sempre possui a capacidade;
+2. enquanto `cobranca_planos` ainda não existir, o platform admin pode conceder/revogar o
+   override explícito `organizations.settings.commercial_entitlements.ai_provider_admin`;
+3. quando a cobrança desta spec entrar, assinatura efetiva cujo plano tenha
+   `permite_byok_ia = true` concede a **mesma** capacidade;
+4. `settings.plan` (`standard/pro/enterprise`) continua sendo apenas "Rótulo antigo" (D-2) e
+   **nunca** entra na decisão.
+
+O override manual não é um segundo sistema de plano: é uma exceção operacional auditável para
+white-label/Enterprise antes da PR 2 e para suporte comercial depois dela. A projeção efetiva deve
+continuar centralizada em `lib/organizacao/capacidades.ts`; menu, páginas e APIs consultam a mesma
+catraca. Ausência, valor malformado ou falha de leitura = sem administração técnica.
+
+Trocar entre IA gerenciada e BYOK **não** troca silenciosamente o modelo de uma versão já publicada
+do agente. Versões existentes preservam provider/model/credencial; agente novo usa o padrão
+`organizations.settings.llm`. O provedor de embedding segue a regra própria de reindexação total:
+mudar a família refaz a base antes de consultar com o modelo novo.
 
 ### 2.3 `public.cobranca_assinaturas` (tenant-aware, uma linha por org)
 
