@@ -78,7 +78,9 @@ export function ErpDanfeCard({ conversationId }: Props) {
       return;
     }
     void apiClient
-      .get<{ data: Array<{ provider: string; enabled: boolean }> }>("/api/v1/integracoes-erp/conexoes")
+      .get<{ data: Array<{ provider: string; enabled: boolean }> }>(
+        "/api/v1/integracoes-erp/conexoes",
+      )
       .then((r) => {
         if (!cancelado) {
           setDisponivel(r.data.some((c) => c.provider === "vendaerp" && c.enabled));
@@ -180,7 +182,9 @@ export function ErpDanfeCard({ conversationId }: Props) {
         <h3 className="text-xs font-semibold text-text">{t("VendaERP")}</h3>
         <Card className="mt-2 space-y-3 p-3 text-xs">
           <p className="text-muted-foreground">
-            {t("A conversa atual define o cliente e o destino. O ERP apenas fornece pedido e documento.")}
+            {t(
+              "A conversa atual define o cliente e o destino. O ERP apenas fornece pedido e documento.",
+            )}
           </p>
 
           <div className="space-y-1">
@@ -196,7 +200,12 @@ export function ErpDanfeCard({ conversationId }: Props) {
                 onChange={(e) => setPedido(e.target.value)}
                 placeholder={t("Número do pedido")}
               />
-              <Button size="sm" variant="outline" disabled={buscando} onClick={() => void buscarPedido()}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={buscando}
+                onClick={() => void buscarPedido()}
+              >
                 <MagnifyingGlass size={14} aria-hidden />
                 <span className="sr-only">{t("Buscar pedido")}</span>
               </Button>
@@ -208,13 +217,19 @@ export function ErpDanfeCard({ conversationId }: Props) {
               {pedidos.map((p, index) => {
                 const codigoNfe = nfeNumerica(p.numeroNFe);
                 return (
-                  <li key={p.id ?? `${p.codigo ?? "pedido"}-${index}`} className="rounded-md border border-border p-2">
+                  <li
+                    key={p.id ?? `${p.codigo ?? "pedido"}-${index}`}
+                    className="rounded-md border border-border p-2"
+                  >
                     <div className="font-medium">{t("Pedido")} #{p.codigo ?? "—"}</div>
                     <div className="text-muted-foreground">
-                      {[p.status, p.statusSistema].filter(Boolean).join(" · ") || t("Status não informado")}
+                      {[p.status, p.statusSistema].filter(Boolean).join(" · ") ||
+                        t("Status não informado")}
                     </div>
                     <div className="mt-1">
-                      {p.numeroNFe ? `${t("NFe/NFCe")} #${p.numeroNFe}` : t("Sem NFe/NFCe informada")}
+                      {p.numeroNFe
+                        ? `${t("NFe/NFCe")} #${p.numeroNFe}`
+                        : t("Sem NFe/NFCe informada")}
                     </div>
                     {codigoNfe && (
                       <Button
@@ -247,7 +262,12 @@ export function ErpDanfeCard({ conversationId }: Props) {
                 onChange={(e) => setNfe(e.target.value)}
                 placeholder={t("Número da nota")}
               />
-              <Button size="sm" variant="outline" disabled={preparando} onClick={() => void prepararDigitada()}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={preparando}
+                onClick={() => void prepararDigitada()}
+              >
                 <FileText size={14} aria-hidden />
                 <span className="sr-only">{t("Consultar DANFE")}</span>
               </Button>
@@ -255,7 +275,10 @@ export function ErpDanfeCard({ conversationId }: Props) {
           </div>
 
           {preparado && (
-            <div className="space-y-2 rounded-md border border-border p-2" data-testid="erp-danfe-preparado">
+            <div
+              className="space-y-2 rounded-md border border-border p-2"
+              data-testid="erp-danfe-preparado"
+            >
               <div>
                 <div className="font-medium">
                   {t("Nota fiscal")} #{preparado.nota.numero ?? nfe}

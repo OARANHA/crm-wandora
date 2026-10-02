@@ -290,9 +290,7 @@ test.describe("Integrações ERP: instalar e usar VendaERP sem chamada externa",
 
     await expect(painel.getByText(`Nota fiscal #${nfe}`, { exact: true })).toBeVisible();
     await expect(painel.getByRole("link", { name: "Visualizar DANFE" })).toBeVisible();
-    await expect(
-      painel.getByRole("button", { name: "Enviar DANFE no WhatsApp" }),
-    ).toBeVisible();
+    await expect(painel.getByRole("button", { name: "Enviar DANFE no WhatsApp" })).toBeVisible();
 
     expect(preparoCapturado).toEqual({ codigo_nfe: nfe });
 
