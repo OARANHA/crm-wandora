@@ -10,6 +10,7 @@ import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 /**
  * PUT /api/v1/ai/knowledge/provedor — OpenAI ou Google prepara a base (#1130, @vgamkt).
@@ -28,6 +29,9 @@ vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({})) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
+vi.mock("@/lib/organizacao/capacidades", () => ({
+  podeAdministrarIaDaOrganizacao: vi.fn(),
+}));
 vi.mock("@/lib/ai/knowledge/reprepara-tudo", () => ({ enfileirarTodosOsMateriais: vi.fn() }));
 vi.mock("@/lib/ai/embeddings/chave", () => ({
   resolverChaveDeEmbedding: vi.fn(),
@@ -77,6 +81,7 @@ beforeEach(() => {
   linhasGravadas = 1;
 
   vi.mocked(requireSupportWrite).mockResolvedValue(null as never);
+  vi.mocked(podeAdministrarIaDaOrganizacao).mockResolvedValue(true);
   vi.mocked(requireRole).mockResolvedValue({
     ok: true,
     user: { id: USER_ID, idioma: "pt-BR" },
@@ -133,6 +138,14 @@ describe("PUT /api/v1/ai/knowledge/provedor", () => {
       "admin",
       expect.objectContaining({ resource: "ai_knowledge" }),
     );
+    expect(updates).toHaveLength(0);
+    expect(enfileirarTodosOsMateriais).not.toHaveBeenCalled();
+  });
+
+  it("sem entitlement técnico devolve 403 sem trocar o provedor", async () => {
+    vi.mocked(podeAdministrarIaDaOrganizacao).mockResolvedValueOnce(false);
+    const r = await chamar({ provedor: "google" });
+    expect(r.status).toBe(403);
     expect(updates).toHaveLength(0);
     expect(enfileirarTodosOsMateriais).not.toHaveBeenCalled();
   });
