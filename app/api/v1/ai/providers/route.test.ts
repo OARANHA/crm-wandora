@@ -6,6 +6,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AuthUser } from "@/lib/auth/types";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 /**
  * PATCH /api/v1/ai/providers — o padrão da organização ganha superfície.
@@ -40,6 +41,9 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: vi.fn(async () => null) }));
+vi.mock("@/lib/organizacao/capacidades", () => ({
+  podeAdministrarIaDaOrganizacao: vi.fn(),
+}));
 
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
 
@@ -157,6 +161,7 @@ describe("PATCH /api/v1/ai/providers — padrão da organização", () => {
     estado = { atualizacao: null, catalogo: CATALOGO_SEMEADO };
     estadoDeSessao = { atualizacao: null, catalogo: CATALOGO_SEMEADO };
     vi.mocked(requireSupportWrite).mockResolvedValue(null);
+    vi.mocked(podeAdministrarIaDaOrganizacao).mockResolvedValue(true);
     vi.mocked(createClient).mockResolvedValue(
       stubDoBanco(estadoDeSessao) as unknown as Awaited<ReturnType<typeof createClient>>,
     );
@@ -252,6 +257,18 @@ describe("PATCH /api/v1/ai/providers — padrão da organização", () => {
     expect(res.status).toBe(200);
     const json = (await res.json()) as { data: { avisos: string[] } };
     expect(json.data.avisos).toEqual([]);
+  });
+
+  it("sem entitlement técnico devolve 403 e não grava", async () => {
+    vi.mocked(podeAdministrarIaDaOrganizacao).mockResolvedValueOnce(false);
+
+    const { PATCH } = await import("./route");
+    const res = await PATCH(
+      requisicao({ provider: "openai", default_model: "gpt-5.4-mini" }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(estado.atualizacao).toBeNull();
   });
 
   it("exige papel admin — a troca do padrão muda todo ponto herdado", async () => {
