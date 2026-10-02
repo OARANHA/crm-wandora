@@ -46,6 +46,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,19 @@ export async function PUT(req: NextRequest): Promise<Response> {
   if (!authz.ok) return authz.response;
   const { org, user } = authz;
   const t = (texto: string) => traduzir(texto, user.idioma);
+
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(await createClient(), org.orgId, {
+    isPlatformAdmin: user.is_platform_admin,
+    support: Boolean(user.support),
+  });
+  if (!podeAdministrarIa) {
+    return fail(
+      "forbidden",
+      t("A administração técnica de IA não está disponível para esta organização."),
+      403,
+      { requestId },
+    );
+  }
 
   let raw: unknown;
   try {
