@@ -7,8 +7,15 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
+import {
+  provarPedidoDoContato,
+  type ProvaPedidoDoContato,
+} from "@/lib/integracoes-erp/autoridade-documento";
 import { ErroDanfeExterno, materializarDanfeExterno } from "@/lib/integracoes-erp/danfe";
-import { buscarPedidosErp, obterNotaErp } from "@/lib/integracoes-erp/service";
+import {
+  buscarPedidosErpComIdentidadeInterna,
+  obterNotaErp,
+} from "@/lib/integracoes-erp/service";
 import type { NotaErp, PedidoErp } from "@/lib/integracoes-erp/tipos";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -69,6 +76,37 @@ function falhaDaConsulta(motivo: string, requestId: string): Response {
   return fail("erp_read_failed", "Não foi possível consultar o VendaERP.", 422, { requestId });
 }
 
+function falhaDaAutoridade(
+  prova: Exclude<ProvaPedidoDoContato, { ok: true }>,
+  requestId: string,
+): Response {
+  if (prova.motivo === "erp_read_failed") {
+    return falhaDaConsulta(prova.motivoProvider ?? "provider_error", requestId);
+  }
+  if (prova.motivo === "banco") {
+    return fail("internal_error", "Não foi possível confirmar o cliente da conversa.", 500, {
+      requestId,
+    });
+  }
+  if (prova.motivo === "contato_nao_encontrado") {
+    return fail("not_found", "Contato da conversa não encontrado.", 404, { requestId });
+  }
+  if (prova.motivo === "cliente_erp_ambiguo") {
+    return fail(
+      "erp_customer_ambiguous",
+      "Há mais de um cadastro do VendaERP compatível com este pedido. Selecione o cliente correto antes de preparar o documento.",
+      409,
+      { requestId },
+    );
+  }
+  return fail(
+    "erp_customer_unverified",
+    "Não foi possível confirmar que este pedido ou documento pertence ao contato desta conversa.",
+    409,
+    { requestId },
+  );
+}
+
 function falhaDoDanfe(erro: ErroDanfeExterno, requestId: string): Response {
   if (erro.codigo === "arquivo_grande") {
     return fail("payload_too_large", "O documento do DANFE excede 50 MB.", 413, { requestId });
@@ -120,7 +158,8 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   if (!authz.ok) return authz.response;
 
   const { id: conversationId } = await ctx.params;
-  if (!(await conversaDaOrganizacao(authz.org.orgId, conversationId))) {
+  const conversa = await conversaDaOrganizacao(authz.org.orgId, conversationId);
+  if (!conversa) {
     return fail("not_found", "Conversa não encontrada.", 404, { requestId });
   }
 
@@ -131,16 +170,38 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     return fail("validation_failed", "Informe um código de pedido válido.", 422, { requestId });
   }
 
-  const resultado = await buscarPedidosErp(createAdminClient(), authz.org.orgId, {
+  const admin = createAdminClient();
+  const resultado = await buscarPedidosErpComIdentidadeInterna(admin, authz.org.orgId, {
     codigo: parsed.data.pedido,
     pageSize: 20,
     skip: 0,
   });
   if (!resultado.ok) return falhaDaConsulta(resultado.motivo, requestId);
 
+  const exatos = resultado.dados.filter(({ pedido }) => pedido.codigo === parsed.data.pedido);
+  if (exatos.length === 0) {
+    return ok({ pedidos: [], conversation_id: conversationId }, { requestId });
+  }
+  if (exatos.length > 1) {
+    return fail(
+      "erp_order_ambiguous",
+      "O VendaERP devolveu mais de um pedido com esse código. Não foi feita escolha automática.",
+      409,
+      { requestId },
+    );
+  }
+
+  const prova = await provarPedidoDoContato(
+    admin,
+    authz.org.orgId,
+    conversa.contact_id,
+    exatos[0]!,
+  );
+  if (!prova.ok) return falhaDaAutoridade(prova, requestId);
+
   return ok(
     {
-      pedidos: resultado.dados.map(pedidoParaAtendimento),
+      pedidos: [pedidoParaAtendimento(exatos[0]!.pedido)],
       conversation_id: conversationId,
     },
     { requestId },
@@ -168,12 +229,52 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   }
 
   const { id: conversationId } = await ctx.params;
-  if (!(await conversaDaOrganizacao(authz.org.orgId, conversationId))) {
+  const conversa = await conversaDaOrganizacao(authz.org.orgId, conversationId);
+  if (!conversa) {
     return fail("not_found", "Conversa não encontrada.", 404, { requestId });
   }
 
+  const admin = createAdminClient();
+  const pedidosResultado = await buscarPedidosErpComIdentidadeInterna(admin, authz.org.orgId, {
+    numeroNFe: String(parsed.data.codigo_nfe),
+    possuiNotaFiscal: true,
+    pageSize: 20,
+    skip: 0,
+  });
+  if (!pedidosResultado.ok) return falhaDaConsulta(pedidosResultado.motivo, requestId);
+
+  const pedidosDaNota = pedidosResultado.dados.filter(({ pedido }) => {
+    const numero = pedido.numeroNFe?.trim();
+    return Boolean(numero && /^\d+$/.test(numero) && Number(numero) === parsed.data.codigo_nfe);
+  });
+  if (pedidosDaNota.length === 0) {
+    return fail(
+      "erp_invoice_not_linked",
+      "Não foi localizado um pedido desta conversa vinculado a essa NFe/NFCe.",
+      404,
+      { requestId },
+    );
+  }
+  if (pedidosDaNota.length > 1) {
+    return fail(
+      "erp_invoice_ambiguous",
+      "Há mais de um pedido vinculado a essa NFe/NFCe. Não foi feita escolha automática.",
+      409,
+      { requestId },
+    );
+  }
+
+  const pedidoDaNota = pedidosDaNota[0]!;
+  const prova = await provarPedidoDoContato(
+    admin,
+    authz.org.orgId,
+    conversa.contact_id,
+    pedidoDaNota,
+  );
+  if (!prova.ok) return falhaDaAutoridade(prova, requestId);
+
   const notaResultado = await obterNotaErp(
-    createAdminClient(),
+    admin,
     authz.org.orgId,
     parsed.data.codigo_nfe,
   );
@@ -199,7 +300,6 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
 
   const nome = `danfe-nfe-${parsed.data.codigo_nfe}-${randomUUID()}.${documento.extensao}`;
   const storagePath = `${authz.org.orgId}/${conversationId}/${nome}`;
-  const admin = createAdminClient();
   const bucket = admin.storage.from("whatsapp-media");
 
   const { error: uploadError } = await bucket.upload(storagePath, documento.buffer, {
@@ -234,6 +334,8 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     metadata: {
       provider: "vendaerp",
       codigo_nfe: parsed.data.codigo_nfe,
+      pedido_codigo: pedidoDaNota.pedido.codigo,
+      identity_evidence: prova.evidencias,
       media_mime: documento.mime,
       media_size_bytes: documento.sizeBytes,
     },

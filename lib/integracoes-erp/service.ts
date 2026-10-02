@@ -314,8 +314,8 @@ export function normalizarInformacaoFiscalVendaVendaErp(valor: unknown): Informa
   };
 }
 
-export function normalizarPedidosVendaErp(valor: unknown): PedidoErp[] {
-  return listaDeObjetos(valor).map((p) => ({
+function normalizarPedidoVendaErp(p: Record<string, unknown>): PedidoErp {
+  return {
     id: texto(p.id),
     codigo: numero(p.codigo),
     cliente: texto(p.cliente),
@@ -329,6 +329,41 @@ export function normalizarPedidosVendaErp(valor: unknown): PedidoErp[] {
     chaveAcessoNFe: texto(p.chaveAcessoNFe),
     danfeUrl: texto(p.danfeURL),
     urlSefaz: texto(p.urlSefaz),
+  };
+}
+
+export function normalizarPedidosVendaErp(valor: unknown): PedidoErp[] {
+  return listaDeObjetos(valor).map(normalizarPedidoVendaErp);
+}
+
+/**
+ * Identidade do cliente que existe no schema Pedido do VendaERP, mas NÃO faz
+ * parte da projeção pública PedidoErp. Estes campos servem apenas para provar,
+ * no backend, que um documento fiscal pertence ao contato da conversa.
+ *
+ * Nunca devolver este envelope ao browser ou ao contexto do agente.
+ */
+export interface PedidoErpComIdentidadeInterna {
+  pedido: PedidoErp;
+  identidadeCliente: {
+    clienteId: string | null;
+    pessoaId: string | null;
+    cpfCnpj: string | null;
+    email: string | null;
+  };
+}
+
+export function normalizarPedidosVendaErpComIdentidadeInterna(
+  valor: unknown,
+): PedidoErpComIdentidadeInterna[] {
+  return listaDeObjetos(valor).map((p) => ({
+    pedido: normalizarPedidoVendaErp(p),
+    identidadeCliente: {
+      clienteId: texto(p.clienteID),
+      pessoaId: texto(p.pessoaID),
+      cpfCnpj: texto(p.clienteCNPJ),
+      email: texto(p.clienteEmail),
+    },
   }));
 }
 
@@ -444,6 +479,23 @@ export async function buscarPedidosErp(
 ): Promise<ConsultaErpResultado<PedidoErp[]>> {
   return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
     normalizarPedidosVendaErp(await pesquisarPedidosVendaErp(credenciais, filtros)),
+  );
+}
+
+/**
+ * Mesma leitura de Pedidos/Pesquisar, porém com a identidade mínima necessária
+ * para o gate documento -> cliente. A capability pública continua chamando
+ * buscarPedidosErp(), que não contém estes campos sensíveis.
+ */
+export async function buscarPedidosErpComIdentidadeInterna(
+  admin: SupabaseClient,
+  organizationId: string,
+  filtros: FiltrosPedidosVendaErp,
+): Promise<ConsultaErpResultado<PedidoErpComIdentidadeInterna[]>> {
+  return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
+    normalizarPedidosVendaErpComIdentidadeInterna(
+      await pesquisarPedidosVendaErp(credenciais, filtros),
+    ),
   );
 }
 

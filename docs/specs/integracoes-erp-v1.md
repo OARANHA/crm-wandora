@@ -127,8 +127,16 @@ capacidade normal `inbox.reply` (papel `agent+`). Portanto:
   DANFE.
 
 A preparação do documento acontece em
-`POST /api/v1/conversations/[id]/erp`. A rota reconsulta a NFe/NFCe, nunca
-aceita uma URL de documento enviada pelo browser e nunca envia credenciais do
+`POST /api/v1/conversations/[id]/erp`. Antes de reconsultar a NFe/NFCe, a rota
+localiza o pedido da nota e prova no backend que o cliente do pedido é o mesmo
+contato da conversa. A prova usa somente identificadores determinísticos que já
+existem nos contratos: `pessoaID`, CPF/CNPJ e e-mail do `Pedido`; `id`,
+CPF/CNPJ, e-mail, telefone e celular da `Pessoa`; e CPF hash/e-mail/telefone do
+contato canônico do Elus. Nome nunca autoriza documento. Ambiguidade, ausência
+de identidade comparável ou conflito falham fechado e nenhum DANFE é
+materializado.
+
+A rota nunca aceita uma URL de documento enviada pelo browser e nunca envia credenciais do
 VendaERP para a referência de DANFE. A URL normalizada é buscada com
 `fetchParaDestinoDaOrganizacao()`, que reaplica SSRF/DNS e não segue redirect.
 O corpo é limitado a 50 MB e precisa ser reconhecido pela allowlist documental

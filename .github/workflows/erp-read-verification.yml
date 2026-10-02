@@ -96,6 +96,7 @@ jobs:
           tests/unit/integracoes-erp-tools-comportamento.test.ts
           tests/unit/integracoes-erp-danfe.test.ts
           tests/unit/integracoes-erp-danfe-authority.test.ts
+          tests/unit/integracoes-erp-documento-cliente.test.ts
 
       - name: Catalog invariants touched by ERP tools
         run: >
