@@ -78,6 +78,32 @@ export function capacidadesLigadas(
   });
 }
 
+/**
+ * A catraca de administração técnica de IA, lida direto da organização.
+ *
+ * Não consulta módulos opcionais: BYOK não depende deles, e uma indisponibilidade
+ * na configuração de módulos não pode conceder nem retirar acesso a segredos.
+ * Falha de leitura fecha o acesso; platform admin real não depende da linha.
+ */
+export async function podeAdministrarIaDaOrganizacao(
+  db: SupabaseClient,
+  organizationId: string,
+  contexto: ContextoDeCapacidades = {},
+): Promise<boolean> {
+  if (contexto.isPlatformAdmin === true && contexto.support !== true) return true;
+  try {
+    const { data, error } = await db
+      .from("organizations")
+      .select("settings")
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (error || !data) return false;
+    return administracaoIaLigada((data as { settings?: unknown }).settings, contexto);
+  } catch {
+    return false;
+  }
+}
+
 /** Lê a linha da organização. Nunca lança: erro = nenhuma capacidade. */
 export async function capacidadesDaOrganizacao(
   db: SupabaseClient,
