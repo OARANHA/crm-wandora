@@ -15,12 +15,14 @@ export function LegacyRecovery({
   credentials,
   hasVersion,
   readOnly,
+  podeAdministrarIa = true,
 }: {
   agent: AgentRow;
   channels: ChannelSessionLite[];
   credentials: CredentialRow[];
   hasVersion: boolean;
   readOnly?: boolean;
+  podeAdministrarIa?: boolean;
 }) {
   const t = useT(),
     router = useRouter(),
@@ -62,6 +64,12 @@ export function LegacyRecovery({
       {hasVersion ? (
         <p className="text-sm">
           {t("Já existe uma versão preservada. Revise, teste e publique pelo editor abaixo.")}
+        </p>
+      ) : !podeAdministrarIa ? (
+        <p className="text-sm text-muted-foreground">
+          {t(
+            "A infraestrutura de IA deste agente precisa ser concluída por quem administra este sistema.",
+          )}
         </p>
       ) : (
         <>
