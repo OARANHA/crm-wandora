@@ -317,8 +317,8 @@ test.describe("Integrações ERP: instalar e usar VendaERP sem chamada externa",
       },
     });
 
-    await expect(
-      page.getByText(`DANFE da nota fiscal nº ${nfe}`, { exact: true }),
-    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(`DANFE da nota fiscal nº ${nfe}`, { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
   });
 });

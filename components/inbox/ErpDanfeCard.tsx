@@ -221,7 +221,9 @@ export function ErpDanfeCard({ conversationId }: Props) {
                     key={p.id ?? `${p.codigo ?? "pedido"}-${index}`}
                     className="rounded-md border border-border p-2"
                   >
-                    <div className="font-medium">{t("Pedido")} #{p.codigo ?? "—"}</div>
+                    <div className="font-medium">
+                      {t("Pedido")} #{p.codigo ?? "—"}
+                    </div>
                     <div className="text-muted-foreground">
                       {[p.status, p.statusSistema].filter(Boolean).join(" · ") ||
                         t("Status não informado")}
