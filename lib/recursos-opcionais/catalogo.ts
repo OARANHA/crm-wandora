@@ -113,6 +113,10 @@ const TEXTO_DO_MODULO: Record<ModuloOpcional, { nome: string; oQueFaz: string }>
     nome: "Empresas e pessoas (venda para empresas)",
     oQueFaz: "Cadastro de empresas por CNPJ, das pessoas que decidem nelas e importação de planilha.",
   },
+  integracoes_erp: {
+    nome: "Integrações ERP",
+    oQueFaz: "Conecta o ERP da empresa ao CRM por provedores oficiais, começando pelo VendaERP em modo somente leitura.",
+  },
   honorarios: {
     nome: "Honorários",
     oQueFaz: "Contratos de honorários com parcelas e o controle do que já foi pago.",
