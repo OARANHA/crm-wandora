@@ -73,6 +73,16 @@ jobs:
           psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
           -v ON_ERROR_STOP=1 -q -f supabase/baseline.sql
 
+      - name: Seed Elus installation brand
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 <<'SQL'
+          insert into public.platform_branding (id, app_name, seeded_from_env)
+          values (1, 'Elus', false)
+          on conflict (id) do update
+          set app_name = excluded.app_name,
+              seeded_from_env = false;
+          SQL
+
       - name: Generate local E2E environment
         run: pnpm e2e:env
 
