@@ -10,7 +10,7 @@ test.describe("Integrações ERP: instalar e abrir VendaERP sem chamada externa"
 
   test("instala o módulo, abre a tela e bloqueia destino interno antes de salvar", async ({
     page,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(180_000);
     await loginComoDono(page, lerCreds());
 
@@ -31,6 +31,11 @@ test.describe("Integrações ERP: instalar e abrir VendaERP sem chamada externa"
     await expect(page.getByRole("heading", { name: "Integrações ERP" })).toBeVisible();
     await expect(page.getByText("VendaERP", { exact: true })).toBeVisible();
     await expect(page.getByText("Somente leitura", { exact: true })).toBeVisible();
+
+    await testInfo.attach("integracoes-erp-vendaerp", {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: "image/png",
+    });
 
     // A prova usa endereço literal de loopback para a guarda textual recusar
     // ANTES de DNS/fetch. Assim o E2E não consome chamada nem envia segredo
