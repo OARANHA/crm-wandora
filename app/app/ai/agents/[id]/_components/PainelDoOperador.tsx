@@ -41,6 +41,8 @@ interface Props {
   /** O agente desta página. A medida do papel é DELE — ver `ComoOPapelEstaIndo`. */
   agentId: string | null;
   disabled?: boolean;
+  /** false = provider/model são gerenciados pela instalação e não aparecem. */
+  podeAdministrarIa?: boolean;
 }
 
 /**
@@ -167,6 +169,7 @@ export function PainelDoOperador(props: Props) {
 
       {props.enabled ? (
         <>
+          {props.podeAdministrarIa !== false ? (
           <Card className="space-y-2 p-4">
             <h3 className="text-sm font-medium">{t("A inteligência que ele usa para organizar")}</h3>
             <p className="text-xs text-muted-foreground">
@@ -205,6 +208,14 @@ export function PainelDoOperador(props: Props) {
               </button>
             ) : null}
           </Card>
+          ) : (
+            <Card className="p-4">
+              <p className="text-sm font-medium">{t("IA gerenciada pela instalação")}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t("O modelo usado para organizar é definido por quem administra este sistema.")}
+              </p>
+            </Card>
+          )}
 
           <Card className="space-y-2 p-4">
             <h3 className="text-sm font-medium">{t("O que ele pode mexer no sistema")}</h3>
