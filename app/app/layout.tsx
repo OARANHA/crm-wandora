@@ -125,7 +125,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       cliente_pela_agenda: clientePelaAgendaLigado(orgRow?.settings),
       modulos_ligados: modulos,
       // Mesma linha de `settings` já lida acima — nenhuma consulta a mais.
-      capacidades_ligadas: capacidadesLigadas(orgRow?.settings, modulos),
+      capacidades_ligadas: capacidadesLigadas(orgRow?.settings, modulos, {
+        isPlatformAdmin: user.is_platform_admin,
+        support: Boolean(user.support),
+      }),
     };
 
     // `marcaDaInstalacao()` é memoizada por TTL no PROCESSO (`lib/branding/
