@@ -8,6 +8,7 @@ import type { CredentialRow } from "@/hooks/ai/useCredentials";
 
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { fusoUtilizavel } from "@/lib/tempo/fusos";
+import { administracaoIaLigada } from "@/lib/organizacao/capacidades";
 
 import { AgentForm } from "../[id]/_components/AgentForm";
 
@@ -53,9 +54,14 @@ export default async function NewAgentPage() {
   ]);
 
   const credentials = (credentialsRes.data ?? []) as CredentialRow[];
+  const settingsDaOrg = orgRes.data?.settings;
   const llmDaOrg = (
-    orgRes.data?.settings as { llm?: { provider?: string } } | null
+    settingsDaOrg as { llm?: { provider?: string; default_model?: string } } | null
   )?.llm;
+  const podeAdministrarIa = administracaoIaLigada(settingsDaOrg, {
+    isPlatformAdmin: user.is_platform_admin,
+    support: Boolean(user.support),
+  });
 
   return (
     <div className="flex h-full flex-col gap-6 p-6">
@@ -64,6 +70,8 @@ export default async function NewAgentPage() {
         credentials={credentials}
         provedoresDaInstalacao={provedoresDaInstalacao()}
         provedorPadrao={llmDaOrg?.provider}
+        modeloPadrao={llmDaOrg?.default_model}
+        podeAdministrarIa={podeAdministrarIa}
         channelSessions={channelSessions}
         organizationTimezone={fusoUtilizavel(activeOrg.timezone)}
       />
