@@ -88,6 +88,25 @@ describe("administracaoIaLigada — entitlement comercial", () => {
   });
 });
 
+describe("podeAdministrarIaDaOrganizacao — catraca server", () => {
+  it("platform admin real entra sem depender da leitura da organização", async () => {
+    const db = { from: vi.fn(() => { throw new Error("não deveria ler"); }) } as never;
+    const { podeAdministrarIaDaOrganizacao } = await import("./capacidades");
+    await expect(
+      podeAdministrarIaDaOrganizacao(db, "org-1", {
+        isPlatformAdmin: true,
+        support: false,
+      }),
+    ).resolves.toBe(true);
+  });
+
+  it("tenant comum falha fechado quando a leitura quebra", async () => {
+    const db = { from: vi.fn(() => { throw new Error("rede"); }) } as never;
+    const { podeAdministrarIaDaOrganizacao } = await import("./capacidades");
+    await expect(podeAdministrarIaDaOrganizacao(db, "org-1")).resolves.toBe(false);
+  });
+});
+
 describe("capacidadesDaOrganizacao — falha fechada", () => {
   it("lê a linha da própria organização", async () => {
     const { db, from, eq } = dbQueDevolve({ data: { settings: { proposals: { enabled: true } } }, error: null });
