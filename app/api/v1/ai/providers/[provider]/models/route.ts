@@ -11,6 +11,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { ehProvedorSuportado } from "@/lib/ai/pontos/provedores";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,19 @@ export async function GET(
   }
 
   const supabase = await createClient();
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(supabase, activeOrg.orgId, {
+    isPlatformAdmin: authUser.is_platform_admin,
+    support: Boolean(authUser.support),
+  });
+  if (!podeAdministrarIa) {
+    return fail(
+      "forbidden",
+      "A administração técnica de IA não está disponível para esta organização.",
+      403,
+      { requestId },
+    );
+  }
+
   const { data, error } = await supabase
     .from("ai_models")
     .select(MODEL_COLUMNS)
