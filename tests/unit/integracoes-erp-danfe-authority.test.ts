@@ -9,10 +9,7 @@ describe("ERP -> Inbox -> WhatsApp reutiliza autoridades existentes", () => {
     path.join(raiz, "app/api/v1/conversations/[id]/erp/route.ts"),
     "utf8",
   );
-  const card = fs.readFileSync(
-    path.join(raiz, "components/inbox/ErpDanfeCard.tsx"),
-    "utf8",
-  );
+  const card = fs.readFileSync(path.join(raiz, "components/inbox/ErpDanfeCard.tsx"), "utf8");
 
   it("a ponte ERP não importa provider de canal nem cria sender próprio", () => {
     expect(rota).not.toMatch(/lib\/waha|WahaClient|sendFile|sendText/);
