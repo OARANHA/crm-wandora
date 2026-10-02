@@ -7,6 +7,7 @@ import {
   normalizarInformacaoFiscalVendaVendaErp,
   normalizarNotaVendaErp,
   normalizarPedidosVendaErp,
+  normalizarPedidosVendaErpComIdentidadeInterna,
   normalizarProdutosVendaErp,
   resolverDepositoEstoque,
 } from "@/lib/integracoes-erp/service";
@@ -187,6 +188,9 @@ describe("adapter seguro do VendaERP", () => {
           id: "v1",
           codigo: 42,
           cliente: "Cliente",
+          pessoaID: "pessoa-erp-1",
+          clienteCNPJ: "12345678909",
+          clienteEmail: "cliente@example.test",
           status: "Faturado",
           statusSistema: "Finalizado",
           valorFinal: 100,
@@ -217,5 +221,37 @@ describe("adapter seguro do VendaERP", () => {
         urlSefaz: "https://exemplo.test/sefaz",
       },
     ]);
+
+    const [publico] = normalizarPedidosVendaErp([
+      {
+        id: "v2",
+        codigo: 43,
+        cliente: "Cliente",
+        pessoaID: "pessoa-erp-2",
+        clienteCNPJ: "98765432100",
+        clienteEmail: "outro@example.test",
+      },
+    ]);
+    expect(publico).not.toHaveProperty("pessoaID");
+    expect(publico).not.toHaveProperty("pessoaId");
+    expect(publico).not.toHaveProperty("clienteCNPJ");
+    expect(publico).not.toHaveProperty("clienteEmail");
+    expect(publico).not.toHaveProperty("identidadeCliente");
+
+    const [interno] = normalizarPedidosVendaErpComIdentidadeInterna([
+      {
+        id: "v2",
+        codigo: 43,
+        cliente: "Cliente",
+        pessoaID: "pessoa-erp-2",
+        clienteCNPJ: "98765432100",
+        clienteEmail: "outro@example.test",
+      },
+    ]);
+    expect(interno?.identidadeCliente).toEqual({
+      pessoaId: "pessoa-erp-2",
+      cpfCnpj: "98765432100",
+      email: "outro@example.test",
+    });
   });
 });

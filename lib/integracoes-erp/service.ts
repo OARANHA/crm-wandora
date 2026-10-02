@@ -346,7 +346,6 @@ export function normalizarPedidosVendaErp(valor: unknown): PedidoErp[] {
 export interface PedidoErpComIdentidadeInterna {
   pedido: PedidoErp;
   identidadeCliente: {
-    clienteId: string | null;
     pessoaId: string | null;
     cpfCnpj: string | null;
     email: string | null;
@@ -359,7 +358,6 @@ export function normalizarPedidosVendaErpComIdentidadeInterna(
   return listaDeObjetos(valor).map((p) => ({
     pedido: normalizarPedidoVendaErp(p),
     identidadeCliente: {
-      clienteId: texto(p.clienteID),
       pessoaId: texto(p.pessoaID),
       cpfCnpj: texto(p.clienteCNPJ),
       email: texto(p.clienteEmail),

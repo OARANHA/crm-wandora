@@ -30,7 +30,6 @@ function pedido(
       urlSefaz: null,
     },
     identidadeCliente: {
-      clienteId: "cliente-erp-1",
       pessoaId: "pessoa-erp-1",
       cpfCnpj: "123.456.789-09",
       email: "cliente@example.test",

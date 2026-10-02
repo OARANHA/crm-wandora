@@ -32,8 +32,11 @@ describe("ERP -> Inbox -> WhatsApp reutiliza autoridades existentes", () => {
   it("prova pedido -> contato antes de materializar o DANFE", () => {
     expect(rota).toContain("buscarPedidosErpComIdentidadeInterna");
     expect(rota).toContain("provarPedidoDoContato");
-    expect(rota.indexOf("provarPedidoDoContato(", rota.indexOf("export async function POST"))).toBeLessThan(
-      rota.indexOf("materializarDanfeExterno(", rota.indexOf("export async function POST")),
-    );
+
+    const inicioPost = rota.indexOf("export async function POST");
+    const prova = rota.indexOf("provarPedidoDoContato(", inicioPost);
+    const materializacao = rota.indexOf("materializarDanfeExterno(", inicioPost);
+    expect(prova).toBeGreaterThan(inicioPost);
+    expect(prova).toBeLessThan(materializacao);
   });
 });
