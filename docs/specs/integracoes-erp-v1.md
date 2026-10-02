@@ -47,7 +47,7 @@ As últimas quatro operações não são expostas na V1.
 
 ## Instalação e dados
 
-A migration `0501_integracoes_erp_modulo_oficial` cria somente a função
+A migration `0502_integracoes_erp_modulo_oficial` cria somente a função
 `fn_integracoes_erp_provisionar()`.
 
 A tabela `erp_connections` nasce apenas quando o administrador da instalação instala
