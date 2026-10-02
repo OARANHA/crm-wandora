@@ -224,20 +224,17 @@ test.describe("Integrações ERP: instalar e usar VendaERP sem chamada externa",
       await route.abort();
     });
 
-    await page.route(
-      `**/api/v1/conversations/${conversaDanfeId}/messages**`,
-      async (route) => {
-        if (mensagemDoSender) leiturasHistoricoAposEnvio += 1;
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            data: mensagemDoSender ? [mensagemDoSender] : [],
-            meta: { cursor: null, has_more: false },
-          }),
-        });
-      },
-    );
+    await page.route(`**/api/v1/conversations/${conversaDanfeId}/messages**`, async (route) => {
+      if (mensagemDoSender) leiturasHistoricoAposEnvio += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: mensagemDoSender ? [mensagemDoSender] : [],
+          meta: { cursor: null, has_more: false },
+        }),
+      });
+    });
 
     await page.route("**/api/v1/messages**", async (route) => {
       const req = route.request();
