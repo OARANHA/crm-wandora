@@ -130,6 +130,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Fetch upstream kit tags used by DB gate
+        run: >-
+          git fetch --no-tags https://github.com/melgarafael/DeskcommCRM.git
+          refs/tags/v1.69.0:refs/tags/v1.69.0
+          refs/tags/v1.63.0:refs/tags/v1.63.0
+
       - name: Baseline install, reapply and invariants
         run: pnpm test:db
         env:
