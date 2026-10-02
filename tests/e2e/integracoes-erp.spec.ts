@@ -145,6 +145,8 @@ test.describe("Integrações ERP: instalar e usar VendaERP sem chamada externa",
     const storagePath = `${creds.org_id}/${conversaDanfeId}/danfe-e2e.pdf`;
     let envioCapturado: Record<string, unknown> | null = null;
     let preparoCapturado: Record<string, unknown> | null = null;
+    let mensagemDoSender: Record<string, unknown> | null = null;
+    let leiturasHistoricoAposEnvio = 0;
 
     // Somente doubles do browser: nenhum request deste caso chega ao VendaERP,
     // ao Storage externo ou a um provider de WhatsApp.
@@ -222,6 +224,21 @@ test.describe("Integrações ERP: instalar e usar VendaERP sem chamada externa",
       await route.abort();
     });
 
+    await page.route(
+      `**/api/v1/conversations/${conversaDanfeId}/messages**`,
+      async (route) => {
+        if (mensagemDoSender) leiturasHistoricoAposEnvio += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            data: mensagemDoSender ? [mensagemDoSender] : [],
+            meta: { cursor: null, has_more: false },
+          }),
+        });
+      },
+    );
+
     await page.route("**/api/v1/messages**", async (route) => {
       const req = route.request();
       if (req.method() !== "POST") {
@@ -232,45 +249,45 @@ test.describe("Integrações ERP: instalar e usar VendaERP sem chamada externa",
       envioCapturado = req.postDataJSON() as Record<string, unknown>;
       const agora = new Date().toISOString();
 
+      mensagemDoSender = {
+        id: randomUUID(),
+        organization_id: creds.org_id,
+        conversation_id: conversaDanfeId,
+        channel_session_id: canalDanfeId,
+        contact_id: contatoDanfeId,
+        external_id: "e2e-danfe-nao-real",
+        type: "document",
+        direction: "outbound",
+        status: "sent",
+        ack: 1,
+        error_code: null,
+        error_message: null,
+        body: `DANFE da nota fiscal nº ${nfe}`,
+        media_url: null,
+        media_mime: "application/pdf",
+        media_size_bytes: 4096,
+        media_storage_path: storagePath,
+        sent_via: "user",
+        sent_by_user_id: creds.users.agent!.id,
+        sent_at: agora,
+        delivered_at: null,
+        read_at: null,
+        metadata: {
+          source: "integracoes_erp",
+          provider: "vendaerp",
+          document: "danfe",
+          invoice_number: nfe,
+        },
+        edited_at: null,
+        revoked_at: null,
+        reply_to_message_id: null,
+        created_at: agora,
+      };
+
       await route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify({
-          data: {
-            id: randomUUID(),
-            organization_id: creds.org_id,
-            conversation_id: conversaDanfeId,
-            channel_session_id: canalDanfeId,
-            contact_id: contatoDanfeId,
-            external_id: "e2e-danfe-nao-real",
-            type: "document",
-            direction: "outbound",
-            status: "sent",
-            ack: 1,
-            error_code: null,
-            error_message: null,
-            body: `DANFE da nota fiscal nº ${nfe}`,
-            media_url: null,
-            media_mime: "application/pdf",
-            media_size_bytes: 4096,
-            media_storage_path: storagePath,
-            sent_via: "user",
-            sent_by_user_id: creds.users.agent!.id,
-            sent_at: agora,
-            delivered_at: null,
-            read_at: null,
-            metadata: {
-              source: "integracoes_erp",
-              provider: "vendaerp",
-              document: "danfe",
-              invoice_number: nfe,
-            },
-            edited_at: null,
-            revoked_at: null,
-            reply_to_message_id: null,
-            created_at: agora,
-          },
-        }),
+        body: JSON.stringify({ data: mensagemDoSender }),
       });
     });
 
@@ -320,5 +337,6 @@ test.describe("Integrações ERP: instalar e usar VendaERP sem chamada externa",
     await expect(page.getByText(`DANFE da nota fiscal nº ${nfe}`, { exact: true })).toBeVisible({
       timeout: 30_000,
     });
+    expect(leiturasHistoricoAposEnvio).toBeGreaterThan(0);
   });
 });
