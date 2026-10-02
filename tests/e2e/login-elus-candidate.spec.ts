@@ -6,6 +6,8 @@ test.describe("candidato Elus — login premium preservado", () => {
     await page.goto("/login");
 
     await expect(page.locator("[data-elus-login]")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bem-vindo ao Elus" })).toBeVisible();
+    await expect(page.getByText("DeskcommCRM", { exact: true })).toHaveCount(0);
 
     const hero = page.locator('img[src="/brand/elus/login-hero.png"]');
     const logo = page.locator('img[src="/brand/elus/logo-horizontal.png"]');
@@ -60,6 +62,8 @@ test.describe("candidato Elus — login premium preservado", () => {
     await page.goto("/login");
 
     await expect(page.locator("[data-elus-login]")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bem-vindo ao Elus" })).toBeVisible();
+    await expect(page.getByText("DeskcommCRM", { exact: true })).toHaveCount(0);
 
     const hero = page.locator('img[src="/brand/elus/login-hero.png"]');
     const logo = page.locator('img[src="/brand/elus/logo-horizontal.png"]');
