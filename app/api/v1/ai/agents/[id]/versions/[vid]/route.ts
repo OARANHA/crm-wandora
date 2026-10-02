@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { versionPatchSchema } from "@/lib/ai/agents/validation";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { podeAdministrarIaDaOrganizacao } from "@/lib/organizacao/capacidades";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from("ai_agent_versions")
-    .select("id, status, agent_id, organization_id, followup")
+    .select("id, status, agent_id, organization_id, followup, provider, model, credential_id, operator_model")
     .eq("id", vid)
     .eq("organization_id", activeOrg.orgId)
     .eq("agent_id", id)
@@ -101,11 +102,17 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     });
   }
 
+  const podeAdministrarIa = await podeAdministrarIaDaOrganizacao(admin, activeOrg.orgId, {
+    isPlatformAdmin: authUser.is_platform_admin,
+    support: Boolean(authUser.support),
+  });
+
   const update: Record<string, unknown> = {};
   if (patch.system_prompt !== undefined) update.system_prompt = patch.system_prompt;
-  if (patch.provider !== undefined) update.provider = patch.provider;
-  if (patch.model !== undefined) update.model = patch.model;
-  if (patch.credential_id !== undefined) update.credential_id = patch.credential_id;
+  if (podeAdministrarIa && patch.provider !== undefined) update.provider = patch.provider;
+  if (podeAdministrarIa && patch.model !== undefined) update.model = patch.model;
+  if (podeAdministrarIa && patch.credential_id !== undefined)
+    update.credential_id = patch.credential_id;
   if (patch.tool_ids !== undefined) update.tool_ids = patch.tool_ids;
   if (patch.trigger_config !== undefined) update.trigger_config = patch.trigger_config;
   if (patch.channel_session_id !== undefined) update.channel_session_id = patch.channel_session_id;
@@ -133,6 +140,17 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
         ? existing.followup
         : {};
     update.followup = { ...existingFollowup, ...patch.followup };
+  }
+
+  if (Object.keys(update).length === 0) {
+    return fail(
+      podeAdministrarIa ? "invalid_request" : "forbidden",
+      podeAdministrarIa
+        ? t("Nenhuma alteração aplicável.")
+        : t("O provedor, o modelo e a chave são gerenciados por quem administra este sistema."),
+      podeAdministrarIa ? 400 : 403,
+      { requestId },
+    );
   }
 
   const { data, error } = await admin
