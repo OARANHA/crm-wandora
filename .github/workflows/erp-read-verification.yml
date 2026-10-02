@@ -135,6 +135,7 @@ jobs:
         env:
           TEST_DB_IMAGE: ${{ matrix.image }}
           GH_TOKEN: ${{ github.token }}
+          CONFERENCIA_KIT_RELEASE: v1.69.0
 
       - name: Baseline update with existing data
         run: pnpm test:db:update
