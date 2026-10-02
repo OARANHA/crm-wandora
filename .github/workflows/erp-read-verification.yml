@@ -16,6 +16,7 @@ on:
       - "lib/audit/actions.ts"
       - "supabase/migrations/**"
       - "tests/unit/integracoes-erp-*.test.ts"
+      - "tests/invariants/integracoes-erp-provisionadora.test.ts"
       - "tests/unit/catalogo-tools-leigo-friendly.test.ts"
       - "tests/unit/capacidade-alcancavel-pelo-agente.test.ts"
       - "tests/unit/selecao-por-pacote.test.ts"
@@ -75,6 +76,7 @@ jobs:
           "lib/mcp/tools/integracoes-erp.ts"
           "lib/mcp/tools/catalogo/integracoes-erp.ts"
           "tests/unit/integracoes-erp-*.test.ts"
+          "tests/invariants/integracoes-erp-provisionadora.test.ts"
           "docs/specs/integracoes-erp*.md"
 
       - name: ERP unit tests
@@ -95,7 +97,6 @@ jobs:
           tests/unit/selecao-por-pacote.test.ts
           tests/unit/pacote-reserva-vaga-da-critica.test.ts
           tests/unit/tool-read-nao-muta.test.ts
-
 
   db-invariants:
     name: Database invariants (Postgres ${{ matrix.pg }})
@@ -133,6 +134,7 @@ jobs:
         run: pnpm test:db
         env:
           TEST_DB_IMAGE: ${{ matrix.image }}
+          GH_TOKEN: ${{ github.token }}
 
       - name: Baseline update with existing data
         run: pnpm test:db:update
