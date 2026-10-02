@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { capacidadesDaOrganizacao, capacidadesLigadas } from "./capacidades";
+import {
+  administracaoIaLigada,
+  capacidadesDaOrganizacao,
+  capacidadesLigadas,
+} from "./capacidades";
 
 describe("capacidadesLigadas — só o booleano true liga", () => {
   it("proposals.enabled === true liga propostas, com o módulo da instalação ligado", () => {
@@ -43,6 +47,46 @@ function dbQueDevolve(
   const from = vi.fn(() => ({ select }));
   return { db: { from } as never, from, select, eq };
 }
+
+
+describe("administracaoIaLigada — entitlement comercial", () => {
+  it("platform admin real sempre pode", () => {
+    expect(administracaoIaLigada(null, { isPlatformAdmin: true, support: false })).toBe(true);
+  });
+
+  it("sessão de suporte não herda o privilégio de platform admin", () => {
+    expect(
+      administracaoIaLigada(
+        { commercial_entitlements: { ai_provider_admin: false } },
+        { isPlatformAdmin: true, support: true },
+      ),
+    ).toBe(false);
+  });
+
+  it("tenant comum só entra com grant explícito true", () => {
+    expect(
+      administracaoIaLigada({ commercial_entitlements: { ai_provider_admin: true } }),
+    ).toBe(true);
+    for (const settings of [
+      {},
+      null,
+      { commercial_entitlements: {} },
+      { commercial_entitlements: { ai_provider_admin: false } },
+      { commercial_entitlements: { ai_provider_admin: "true" } },
+    ]) {
+      expect(administracaoIaLigada(settings), JSON.stringify(settings)).toBe(false);
+    }
+  });
+
+  it("a capacidade aparece sem depender de módulo opcional", () => {
+    expect(
+      capacidadesLigadas(
+        { commercial_entitlements: { ai_provider_admin: true } },
+        [],
+      ),
+    ).toContain("administracao_ia");
+  });
+});
 
 describe("capacidadesDaOrganizacao — falha fechada", () => {
   it("lê a linha da própria organização", async () => {
