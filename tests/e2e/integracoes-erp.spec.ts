@@ -32,9 +32,9 @@ test.describe("Integrações ERP: instalar e abrir VendaERP sem chamada externa"
     await expect(page.getByText("VendaERP", { exact: true })).toBeVisible();
     await expect(page.getByText("Somente leitura", { exact: true })).toBeVisible();
 
-    await testInfo.attach("integracoes-erp-vendaerp", {
-      body: await page.screenshot({ fullPage: true }),
-      contentType: "image/png",
+    await page.screenshot({
+      path: testInfo.outputPath("integracoes-erp-vendaerp.png"),
+      fullPage: true,
     });
 
     // A prova usa endereço literal de loopback para a guarda textual recusar
