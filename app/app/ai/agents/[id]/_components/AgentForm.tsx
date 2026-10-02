@@ -114,6 +114,10 @@ interface BaseProps {
    * página server component, do mesmo jeito que as credenciais.
    */
   provedorPadrao?: string;
+  /** Modelo gerenciado da organização para agente novo. */
+  modeloPadrao?: string;
+  /** false = provider/model/chave são infraestrutura da instalação, não do cliente. */
+  podeAdministrarIa?: boolean;
   channelSessions: ChannelSessionLite[];
   routerMembership?: { routerId: string; routerName: string } | null;
   readOnly?: boolean;
@@ -251,17 +255,45 @@ export function buildState(args: {
    * continua sendo o último degrau, para instalação que ainda não escolheu nada.
    */
   provedorPadrao?: string;
+  modeloPadrao?: string;
+  podeAdministrarIa?: boolean;
+  provedoresDaInstalacao?: string[];
+  credentials?: CredentialRow[];
 }): FormState {
-  const { agent, version, t, provedorPadrao } = args;
+  const {
+    agent,
+    version,
+    t,
+    provedorPadrao,
+    modeloPadrao,
+    podeAdministrarIa,
+    provedoresDaInstalacao = [],
+    credentials = [],
+  } = args;
+  const provider = (version?.provider as Provider) ?? provedorInicial(provedorPadrao);
+  const gerenciado = !version && podeAdministrarIa === false;
+  const credencialGerenciada =
+    credentials.find(
+      (credencial) =>
+        credencial.provider === provider &&
+        credencial.is_active &&
+        Boolean(credencial.validated_at),
+    )?.id ?? "";
   return {
     name: agent?.name ?? "",
     description: agent?.description ?? "",
     priority: agent?.priority ?? 0,
-    provider: (version?.provider as Provider) ?? provedorInicial(provedorPadrao),
-    model: version?.model ?? "",
-    // `null` gravado = a versão usa a chave da instalação. Sem esta tradução,
-    // reabrir o agente mostraria o campo em branco e pediria para escolher de novo.
-    credential_id: version ? (version.credential_id ?? CHAVE_DA_INSTALACAO) : "",
+    provider,
+    model: version?.model ?? (gerenciado ? (modeloPadrao ?? "") : ""),
+    // `null` gravado = a versão usa a chave da instalação. Em modo gerenciado,
+    // agente novo recebe a infraestrutura já escolhida pelo administrador.
+    credential_id: version
+      ? (version.credential_id ?? CHAVE_DA_INSTALACAO)
+      : gerenciado
+        ? provedoresDaInstalacao.includes(provider)
+          ? CHAVE_DA_INSTALACAO
+          : credencialGerenciada
+        : "",
     channel_session_id: version?.channel_session_id ?? "",
     // O DEFAULT vira o prompt real do agente se ninguém editar — por isso é
     // traduzido de verdade (não só a interface): em espanhol ele instrui a IA
@@ -378,7 +410,15 @@ export function AgentForm(props: Props) {
       const ref = props.base ?? props.draft ?? props.published;
       return buildState({ agent: props.agent, version: ref, t });
     }
-    return buildState({ version: null, t, provedorPadrao: props.provedorPadrao });
+    return buildState({
+      version: null,
+      t,
+      provedorPadrao: props.provedorPadrao,
+      modeloPadrao: props.modeloPadrao,
+      podeAdministrarIa: props.podeAdministrarIa,
+      provedoresDaInstalacao: props.provedoresDaInstalacao,
+      credentials: props.credentials,
+    });
   }, [isEdit, props, t]);
 
   const [form, setForm] = React.useState<FormState>(baseline);
@@ -418,7 +458,11 @@ export function AgentForm(props: Props) {
   const cred = findCredential(props.credentials, form.credential_id);
   const credSt = cred ? credentialStatus(cred) : null;
   const channelSession = props.channelSessions.find((c) => c.id === form.channel_session_id);
-  const modelMeta = useModelMeta(form.provider, form.model);
+  const modelMeta = useModelMeta(
+    form.provider,
+    form.model,
+    props.podeAdministrarIa !== false,
+  );
 
   // ---------------------------------------------------------------------
   // Validação (espelha versionCreateSchema, no client; server revalida).
@@ -446,17 +490,29 @@ export function AgentForm(props: Props) {
       errors.system_prompt =
         `${t("As instruções têm")} ${tamanhoDoPrompt.toLocaleString("pt-BR")} ${t("caracteres, e o máximo é 20.000. Corte")} ` +
         `${(tamanhoDoPrompt - 20000).toLocaleString("pt-BR")} ${t("para conseguir salvar.")}`;
-    if (!form.model) errors.model = t("Escolha o modelo de inteligência artificial.");
-    if (!form.credential_id)
-      errors.credential_id = t("Escolha a chave de acesso da empresa de inteligência artificial.");
-    // Escolher "a chave desta instalação" para um provedor que a instalação NÃO
-    // tem seria publicar um agente que morre em toda mensagem. A mesma recusa
-    // existe no servidor (rota de versões); aqui ela chega antes do clique.
-    if (
-      form.credential_id === CHAVE_DA_INSTALACAO &&
-      !(props.provedoresDaInstalacao ?? []).includes(form.provider)
-    )
-      errors.credential_id = `${t("Esta instalação não tem chave de")} ${form.provider}. ${t("Escolha outra empresa de IA ou cadastre uma chave.")}`;
+    if (props.podeAdministrarIa === false) {
+      const chaveGerenciadaUtilizavel =
+        form.credential_id === CHAVE_DA_INSTALACAO
+          ? (props.provedoresDaInstalacao ?? []).includes(form.provider)
+          : credSt === "validated";
+      if (!form.model || !form.credential_id || !chaveGerenciadaUtilizavel) {
+        errors.ia_gerenciada = t(
+          "A IA gerenciada desta empresa ainda não está pronta. Fale com quem administra este sistema.",
+        );
+      }
+    } else {
+      if (!form.model) errors.model = t("Escolha o modelo de inteligência artificial.");
+      if (!form.credential_id)
+        errors.credential_id = t("Escolha a chave de acesso da empresa de inteligência artificial.");
+      // Escolher "a chave desta instalação" para um provedor que a instalação NÃO
+      // tem seria publicar um agente que morre em toda mensagem. A mesma recusa
+      // existe no servidor (rota de versões); aqui ela chega antes do clique.
+      if (
+        form.credential_id === CHAVE_DA_INSTALACAO &&
+        !(props.provedoresDaInstalacao ?? []).includes(form.provider)
+      )
+        errors.credential_id = `${t("Esta instalação não tem chave de")} ${form.provider}. ${t("Escolha outra empresa de IA ou cadastre uma chave.")}`;
+    }
     // ⚠️ O NÚMERO NÃO ENTRA AQUI — de propósito, e não por esquecimento.
     //
     // Esta lista é o que impede de SALVAR. Exigir o número aqui travava o
@@ -481,7 +537,7 @@ export function AgentForm(props: Props) {
       }
     }
     return errors;
-  }, [form, t]);
+  }, [form, t, props.podeAdministrarIa, props.provedoresDaInstalacao, credSt]);
 
   const isValid = Object.keys(validation).length === 0;
 
@@ -520,11 +576,17 @@ export function AgentForm(props: Props) {
       case "alteracoes_nao_salvas":
         return t("Salve o rascunho antes de publicar.");
       case "instalacao_sem_chave_do_provedor":
-        return `${t("Esta instalação não tem chave de")} ${motivo.provedor}. ${t("Escolha outra empresa de IA ou cadastre uma chave.")}`;
+        return props.podeAdministrarIa === false
+          ? t("A IA gerenciada desta empresa ainda não está pronta. Fale com quem administra este sistema.")
+          : `${t("Esta instalação não tem chave de")} ${motivo.provedor}. ${t("Escolha outra empresa de IA ou cadastre uma chave.")}`;
       case "sem_chave":
-        return t("Escolha a chave de acesso da empresa de inteligência artificial.");
+        return props.podeAdministrarIa === false
+          ? t("A IA gerenciada desta empresa ainda não está pronta. Fale com quem administra este sistema.")
+          : t("Escolha a chave de acesso da empresa de inteligência artificial.");
       case "chave_nao_utilizavel":
-        return `${t("Credencial")} ${motivo.provedor} ${motivo.estado === "invalid" ? t("inválida") : t("ainda não validada")}.`;
+        return props.podeAdministrarIa === false
+          ? t("A IA gerenciada desta empresa ainda não está pronta. Fale com quem administra este sistema.")
+          : `${t("Credencial")} ${motivo.provedor} ${motivo.estado === "invalid" ? t("inválida") : t("ainda não validada")}.`;
       case "sem_numero":
         return t(
           "Escolha por qual número de WhatsApp ele atende. O rascunho está salvo; conecte um número em Conexões e volte aqui para publicar.",
@@ -783,6 +845,7 @@ export function AgentForm(props: Props) {
           modeloDoConversador={form.model}
           agentId={props.mode === "edit" ? props.agent.id : null}
           disabled={disabled}
+          podeAdministrarIa={props.podeAdministrarIa}
         />
       ) : null}
 
@@ -856,66 +919,80 @@ export function AgentForm(props: Props) {
           </Card>
 
           {/* Provider + credential + model */}
-          <Card className="space-y-3 p-4">
-            <h3 className="text-sm font-medium">{t("A inteligência que ele usa")}</h3>
-            <div className="space-y-1">
-              <Label htmlFor="provider">{t("Empresa de inteligência artificial")}</Label>
-              <Select
-                value={form.provider}
-                onValueChange={(v) => changeProvider(v as Provider)}
+          {props.podeAdministrarIa !== false ? (
+            <Card className="space-y-3 p-4">
+              <h3 className="text-sm font-medium">{t("A inteligência que ele usa")}</h3>
+              <div className="space-y-1">
+                <Label htmlFor="provider">{t("Empresa de inteligência artificial")}</Label>
+                <Select
+                  value={form.provider}
+                  onValueChange={(v) => changeProvider(v as Provider)}
+                  disabled={disabled}
+                >
+                  <SelectTrigger id="provider">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/*
+                      Derivado de PROVEDORES, nunca escrito à mão: esta lista tinha
+                      três itens fixos enquanto o sistema executava quatro, e a
+                      OpenRouter — a opção [1] do instalador — não aparecia. Um
+                      agente publicado nela abria com o campo em BRANCO, porque
+                      nenhum item casava com o valor, e o primeiro save silencioso
+                      trocava o provedor do dono por outro.
+                    */}
+                    {PROVEDORES.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.rotulo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+  
+              <ModelPicker
+                provider={form.provider}
+                value={form.model}
+                onChange={(modelId) => patch({ model: modelId })}
                 disabled={disabled}
-              >
-                <SelectTrigger id="provider">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {/*
-                    Derivado de PROVEDORES, nunca escrito à mão: esta lista tinha
-                    três itens fixos enquanto o sistema executava quatro, e a
-                    OpenRouter — a opção [1] do instalador — não aparecia. Um
-                    agente publicado nela abria com o campo em BRANCO, porque
-                    nenhum item casava com o valor, e o primeiro save silencioso
-                    trocava o provedor do dono por outro.
-                  */}
-                  {PROVEDORES.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.rotulo}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <ModelPicker
-              provider={form.provider}
-              value={form.model}
-              onChange={(modelId) => patch({ model: modelId })}
-              disabled={disabled}
-              id="model"
-            />
-            {validation.model ? (
-              <p className="text-xs text-destructive">{validation.model}</p>
-            ) : null}
-
-            <CredentialPicker
-              provider={form.provider}
-              credentials={props.credentials}
-              value={form.credential_id}
-              onChange={(id) => patch({ credential_id: id })}
-              disabled={disabled}
-              id="credential_id"
-              instalacaoTemChave={(props.provedoresDaInstalacao ?? []).includes(form.provider)}
-            />
-            {validation.credential_id ? (
-              <p className="text-xs text-destructive">{validation.credential_id}</p>
-            ) : null}
-            {cred && credSt && credSt !== "validated" ? (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                {t("Credencial selecionada está com status")} {t(STATUS_LABEL[credSt])}
-                {t(". Publish bloqueado até validar.")}
+                id="model"
+              />
+              {validation.model ? (
+                <p className="text-xs text-destructive">{validation.model}</p>
+              ) : null}
+  
+              <CredentialPicker
+                provider={form.provider}
+                credentials={props.credentials}
+                value={form.credential_id}
+                onChange={(id) => patch({ credential_id: id })}
+                disabled={disabled}
+                id="credential_id"
+                instalacaoTemChave={(props.provedoresDaInstalacao ?? []).includes(form.provider)}
+              />
+              {validation.credential_id ? (
+                <p className="text-xs text-destructive">{validation.credential_id}</p>
+              ) : null}
+              {cred && credSt && credSt !== "validated" ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {t("Credencial selecionada está com status")} {t(STATUS_LABEL[credSt])}
+                  {t(". Publish bloqueado até validar.")}
+                </p>
+              ) : null}
+            </Card>
+          ) : (
+            <Card className="space-y-2 p-4" data-testid="ia-gerenciada">
+              <h3 className="text-sm font-medium">{t("A inteligência que ele usa")}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t("IA gerenciada pela instalação. O provedor, o modelo e a chave são definidos por quem administra este sistema.")}
               </p>
-            ) : null}
-          </Card>
+              {validation.ia_gerenciada ? (
+                <p className="text-xs text-warning-fg">{validation.ia_gerenciada}</p>
+              ) : (
+                <p className="text-xs text-success-fg">{t("Pronta para uso.")}</p>
+              )}
+            </Card>
+          )}
 
           {/* WhatsApp session */}
           <Card className="space-y-3 p-4">
