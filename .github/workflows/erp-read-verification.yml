@@ -80,6 +80,7 @@ jobs:
       - name: ERP unit tests
         run: >
           pnpm vitest run
+          tests/unit/integracoes-erp-modulo.test.ts
           tests/unit/integracoes-erp-provedor.test.ts
           tests/unit/integracoes-erp-vendaerp-url.test.ts
           tests/unit/integracoes-erp-normalizacao.test.ts
