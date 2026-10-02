@@ -18,6 +18,8 @@ import {
 } from "@/lib/ai/embeddings/chave";
 
 export interface EstadoDaChave {
+  /** true = o tenant usa IA gerenciada e não recebe detalhes de fornecedor/chave. */
+  modo_gerenciado: boolean;
   pode_indexar: boolean;
   origem: string | null;
   explicacao: string | null;
@@ -83,6 +85,7 @@ export async function montarEstadoDaChave(
       : null;
 
   return {
+    modo_gerenciado: false,
     pode_indexar: chave !== null,
     origem: chave?.origem ?? null,
     explicacao: chave ? EXPLICACAO_DA_ORIGEM[chave.origem] : null,
@@ -95,5 +98,28 @@ export async function montarEstadoDaChave(
     familia_sem_chave: familia !== null && chave === null ? familia : null,
     pode_trocar_para: podeTrocarPara,
     credenciais_embedding: credenciais,
+  };
+}
+
+
+/**
+ * Projeção segura para organizações com IA gerenciada.
+ *
+ * Mantém apenas a resposta operacional que a tela precisa ("dá para preparar
+ * material agora?"). Provider, origem, rótulos e inventário de credenciais são
+ * administração da instalação/Enterprise e não atravessam a fronteira HTTP.
+ */
+export function projetarEstadoDaChaveGerenciado(estado: EstadoDaChave): EstadoDaChave {
+  return {
+    modo_gerenciado: true,
+    pode_indexar: estado.pode_indexar,
+    origem: null,
+    explicacao: null,
+    chave_em_uso: null,
+    avisos: [],
+    provedor: null,
+    familia_sem_chave: null,
+    pode_trocar_para: null,
+    credenciais_embedding: [],
   };
 }
