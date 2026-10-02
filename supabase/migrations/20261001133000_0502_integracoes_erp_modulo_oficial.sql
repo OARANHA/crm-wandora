@@ -1,4 +1,4 @@
--- 0501 — Integrações ERP: módulo oficial opcional, com VendaERP como primeiro provedor.
+-- 0502 — Integrações ERP: módulo oficial opcional, com VendaERP como primeiro provedor.
 --
 -- Lei: ADR-0002. A migration cria somente a FUNÇÃO provisionadora. A tabela nasce
 -- quando o administrador da instalação instala o módulo em /admin/modulos.
