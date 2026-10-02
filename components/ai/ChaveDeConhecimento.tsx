@@ -77,6 +77,37 @@ interface Props {
 
 export function ChaveDeConhecimento({ estado, onChaveCadastrada }: Props) {
   const t = useT();
+
+  if (estado.modo_gerenciado) {
+    return estado.pode_indexar ? (
+      <div
+        data-testid="conhecimento-gerenciado-ok"
+        className="flex items-center gap-2 text-xs text-text-muted"
+      >
+        <CheckCircle2 className="h-3.5 w-3.5 text-success-fg" aria-hidden />
+        <span>{t("Base de conhecimento pronta para preparar material.")}</span>
+      </div>
+    ) : (
+      <Card
+        data-testid="conhecimento-gerenciado-indisponivel"
+        className="border-warning-bg bg-warning-bg/20 p-4"
+      >
+        <div className="flex items-start gap-2">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden />
+          <div className="space-y-1">
+            <h3 className="text-sm font-medium">
+              {t("A preparação da base está indisponível no momento")}
+            </h3>
+            <p className="text-xs text-text-muted">
+              {t(
+                "Você pode cadastrar o material e ele ficará aguardando. Fale com quem administra este sistema para liberar a preparação.",
+              )}
+            </p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
   const [abrindo, setAbrindo] = useState(false);
   // A base já tem família e a chave dela sumiu: o cadastro começa nela.
   const semChave = estado.familia_sem_chave;
