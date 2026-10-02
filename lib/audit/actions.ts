@@ -176,6 +176,8 @@ export const AUDIT_ACTIONS = [
   "platform_admin.tenant_viewed",
   "tenant.created_by_platform_admin",
   "platform_admin.tenant_health_viewed",
+  /** Grant/revogação comercial da administração técnica de IA do tenant. */
+  "platform_admin.ai_provider_admin_changed",
   "platform_admin.impersonate_started",
   "platform_admin.impersonate_ended",
   "platform_admin.impersonate_misconfigured",
