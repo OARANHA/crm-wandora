@@ -24,6 +24,9 @@ export async function GET(request: Request) {
     loginUrl.searchParams.set("next", next)
     return NextResponse.redirect(loginUrl)
   }
+  if (currentUser.support) {
+    return NextResponse.json({ error: "forbidden_support_session" }, { status: 403 })
+  }
 
   const authz = await requireRole("admin", { requestId, resource: "vigia_integration" })
   if (!authz.ok) return authz.response
