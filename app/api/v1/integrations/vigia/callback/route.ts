@@ -15,6 +15,7 @@ const callbackSchema = z.object({
 })
 
 const exchangeSchema = z.object({
+  organizationId: z.string().min(1),
   projectId: z.string().min(1),
   projectSlug: z.string().min(1).max(256),
   ingestUrl: z.string().url(),
@@ -81,6 +82,7 @@ export async function GET(request: Request) {
     resourceId: null,
     requestId,
     metadata: {
+      vigia_organization_id: config.data.organizationId,
       vigia_project_id: config.data.projectId,
       vigia_project_slug: config.data.projectSlug,
     },
