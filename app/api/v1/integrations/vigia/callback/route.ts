@@ -26,6 +26,9 @@ export async function GET(request: Request) {
   const requestId = request.headers.get("x-request-id") ?? undefined
   const authz = await requireRole("admin", { requestId, resource: "vigia_integration" })
   if (!authz.ok) return authz.response
+  if (authz.user.support) {
+    return NextResponse.json({ error: "forbidden_support_session" }, { status: 403 })
+  }
 
   const url = new URL(request.url)
   const parsed = callbackSchema.safeParse({
