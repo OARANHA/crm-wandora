@@ -71,17 +71,14 @@ describe("autoridade do documento ERP", () => {
     expect(selecao).toEqual({ ok: true, cliente: esperado });
   });
 
-  it(
-    "recusa ambiguidade quando o pedido não traz pessoaID e duas Pessoas têm a mesma identidade",
-    () => {
-      const semPessoaId = pedido({ pessoaId: null });
-      const selecao = selecionarClienteDoPedido(semPessoaId, [
-        cliente({ id: "pessoa-a" }),
-        cliente({ id: "pessoa-b" }),
-      ]);
-      expect(selecao).toEqual({ ok: false, motivo: "cliente_erp_ambiguo" });
-    },
-  );
+  it("recusa ambiguidade quando o pedido não traz pessoaID e duas Pessoas têm a mesma identidade", () => {
+    const semPessoaId = pedido({ pessoaId: null });
+    const selecao = selecionarClienteDoPedido(semPessoaId, [
+      cliente({ id: "pessoa-a" }),
+      cliente({ id: "pessoa-b" }),
+    ]);
+    expect(selecao).toEqual({ ok: false, motivo: "cliente_erp_ambiguo" });
+  });
 
   it("compara celular local do VendaERP com telefone brasileiro canônico do CRM", () => {
     expect(telefoneVendaErpConfere("+55 (51) 99999-9999", "(51) 99999-9999")).toBe(true);

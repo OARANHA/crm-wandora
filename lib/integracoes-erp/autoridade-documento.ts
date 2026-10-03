@@ -113,7 +113,10 @@ export function conferirContatoComClienteErp(
   contato: IdentidadeContatoParaDocumento,
   cliente: ClienteErp,
 ): ProvaPedidoDoContato {
-  const verificacoes: Array<{ evidencia: EvidenciaIdentidadeDocumento; confere: boolean }> = [];
+  const verificacoes: Array<{
+    evidencia: EvidenciaIdentidadeDocumento;
+    confere: boolean;
+  }> = [];
 
   const documentoCliente = documentoNormalizado(cliente.cpfCnpj);
   // contacts.cpf_hash é CPF de pessoa física. CNPJ (14 dígitos) nunca entra
