@@ -19,7 +19,10 @@ export async function GET(request: Request) {
   const currentUser = await loadAuthUser()
   if (!currentUser) {
     const next = `${url.pathname}${url.search}`
-    const loginUrl = new URL("/login", url.origin)
+    // Acesso dinâmico evita o inlining de NEXT_PUBLIC_* pelo Next.js no build.
+    // Em produção esta variável é fornecida pelo Portainer no runtime.
+    const runtimeAppUrl = Reflect.get(process.env, "NEXT_PUBLIC_APP_URL") as string | undefined
+    const loginUrl = new URL("/login", runtimeAppUrl || url.origin)
     loginUrl.searchParams.set("next", next)
     return NextResponse.redirect(loginUrl)
   }
