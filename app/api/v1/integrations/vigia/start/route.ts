@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 
 import { requireRole } from "@/lib/auth/require-role"
+import { loadAuthUser } from "@/lib/auth/server"
 import { authenticatedSessionId } from "@/lib/impersonate/support"
 import { issueState } from "@/lib/nuvemshop/state"
 import { gerarPkce, VIGIA_PKCE_COOKIE, VIGIA_PKCE_TTL_SECONDS } from "@/lib/vigia/pkce"
@@ -13,10 +14,18 @@ const querySchema = z.object({
 
 export async function GET(request: Request) {
   const requestId = request.headers.get("x-request-id") ?? undefined
+  const url = new URL(request.url)
+
+  const currentUser = await loadAuthUser()
+  if (!currentUser) {
+    const next = `${url.pathname}${url.search}`
+    const loginUrl = new URL("/login", url.origin)
+    loginUrl.searchParams.set("next", next)
+    return NextResponse.redirect(loginUrl)
+  }
+
   const authz = await requireRole("admin", { requestId, resource: "vigia_integration" })
   if (!authz.ok) return authz.response
-
-  const url = new URL(request.url)
   const parsed = querySchema.safeParse({ vigia_project: url.searchParams.get("vigia_project") })
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid_project" }, { status: 400 })
