@@ -3,8 +3,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 
 import { audit } from "@/lib/audit"
-import { requireRole } from "@/lib/auth/require-role"
-import { authenticatedSessionId } from "@/lib/impersonate/support"
+import { supportCallbackWriteAllowed } from "@/lib/impersonate/support"
 import { verifyState } from "@/lib/nuvemshop/state"
 import { salvarIntegracaoVigia } from "@/lib/vigia/config"
 import { VIGIA_PKCE_COOKIE } from "@/lib/vigia/pkce"
@@ -25,12 +24,6 @@ const exchangeSchema = z.object({
 
 export async function GET(request: Request) {
   const requestId = request.headers.get("x-request-id") ?? undefined
-  const authz = await requireRole("admin", { requestId, resource: "vigia_integration" })
-  if (!authz.ok) return authz.response
-  if (authz.user.support) {
-    return NextResponse.json({ error: "forbidden_support_session" }, { status: 403 })
-  }
-
   const url = new URL(request.url)
   const parsed = callbackSchema.safeParse({
     code: url.searchParams.get("code"),
@@ -41,10 +34,10 @@ export async function GET(request: Request) {
   }
 
   const state = verifyState(parsed.data.state)
-  if (!state || state.orgId !== authz.org.orgId || state.userId !== authz.user.id) {
+  if (!state?.userId || !state.authSessionId) {
     return NextResponse.json({ error: "invalid_state" }, { status: 400 })
   }
-  if (!state.authSessionId || state.authSessionId !== (await authenticatedSessionId())) {
+  if (!(await supportCallbackWriteAllowed(state.orgId, state.userId, state.authSessionId))) {
     return NextResponse.json({ error: "invalid_session" }, { status: 400 })
   }
 
@@ -71,13 +64,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "invalid_vigia_response" }, { status: 502 })
   }
 
-  await salvarIntegracaoVigia(authz.org.orgId, config.data)
+  await salvarIntegracaoVigia(state.orgId, config.data)
   store.delete(VIGIA_PKCE_COOKIE)
 
   await audit({
     action: "vigia.integration.connected",
-    actorUserId: authz.user.id,
-    organizationId: authz.org.orgId,
+    actorUserId: state.userId,
+    actorAuthSessionId: state.authSessionId,
+    organizationId: state.orgId,
     resourceType: "vigia_integration",
     resourceId: null,
     requestId,
