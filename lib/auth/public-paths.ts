@@ -72,6 +72,12 @@ export const PUBLIC_PATHS: RegExp[] = [
   // volta do Google não tem, e não pode ter, o cookie.
   /^\/api\/v1\/plataformas-de-anuncio\/google\/callback$/,
   /^\/api\/v1\/integrations\/nuvemshop\/callback$/,
+  // Handshake nativo Vigia: o proxy não decide auth nestas duas navegações.
+  // /start precisa chegar à rota para redirecionar ao login e preservar ?next=;
+  // /callback volta de outro site, então o cookie de sessão SameSite=Strict não viaja.
+  // A autorização mora nas rotas: admin na ida; state HMAC + PKCE + vínculo de sessão na volta.
+  /^\/api\/v1\/integrations\/vigia\/start$/,
+  /^\/api\/v1\/integrations\/vigia\/callback$/,
   /^\/api\/internal\//,
   /^\/api\/mcp(\/.*)?$/,
   // GET /api/v1/contacts aceita SESSÃO ou Bearer `dsk_...` (api_tokens) — a
