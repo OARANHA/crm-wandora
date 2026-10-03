@@ -135,8 +135,8 @@ export function conferirContatoComClienteErp(
   }
 
   if (contato.phone_number) {
-    const telefones = [cliente.celular, cliente.telefone].filter(
-      (valor): valor is string => Boolean(valor?.trim()),
+    const telefones = [cliente.celular, cliente.telefone].filter((valor): valor is string =>
+      Boolean(valor?.trim()),
     );
     if (telefones.length > 0) {
       verificacoes.push({

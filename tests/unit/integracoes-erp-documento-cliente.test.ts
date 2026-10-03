@@ -99,12 +99,9 @@ describe("autoridade do documento ERP", () => {
       evidencias: ["cpf", "email", "telefone"],
     });
 
-    expect(
-      conferirContatoComClienteErp(
-        contato,
-        cliente({ email: "outra@example.test" }),
-      ),
-    ).toEqual({ ok: false, motivo: "identidade_nao_confere" });
+    expect(conferirContatoComClienteErp(contato, cliente({ email: "outra@example.test" }))).toEqual(
+      { ok: false, motivo: "identidade_nao_confere" },
+    );
   });
 
   it("falha fechado quando não existe identificador comparável", () => {
