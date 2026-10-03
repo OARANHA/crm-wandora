@@ -1,5 +1,5 @@
+import { decryptKey, encryptKey } from "@/lib/crypto/aes_gcm"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { decryptWebhookSecret, encryptWebhookSecret } from "@/lib/webhooks/secrets"
 
 export interface VigiaIntegrationConfig {
   readonly organizationId: string
@@ -16,7 +16,10 @@ interface StoredVigiaIntegration {
   project_slug: string
   ingest_url: string
   api_url: string
-  api_key_encrypted: string
+  credential_cipher: "aes-256-gcm-ai-cred-v1"
+  api_key_ciphertext: string
+  api_key_iv: string
+  api_key_tag: string
   connected_at: string
 }
 
@@ -25,14 +28,18 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {}
 
+const hex = (value: Buffer): string => value.toString("hex")
+
 export async function salvarIntegracaoVigia(
   organizationId: string,
   config: VigiaIntegrationConfig,
 ): Promise<void> {
-  const admin = createAdminClient()
-  const encrypted = await encryptWebhookSecret(admin, config.apiKey)
-  if (!encrypted) throw new Error("vigia_secret_encryption_unavailable")
+  // A mesma chave server-side que protege credenciais de provedores LLM.
+  // Nunca persiste plaintext e funciona no app e no worker, que já recebem
+  // AI_CRED_AES_KEY em produção.
+  const encrypted = encryptKey(config.apiKey)
 
+  const admin = createAdminClient()
   const { data: org, error: readError } = await admin
     .from("organizations")
     .select("settings")
@@ -48,7 +55,10 @@ export async function salvarIntegracaoVigia(
     project_slug: config.projectSlug,
     ingest_url: config.ingestUrl.replace(/\/+$/, ""),
     api_url: config.apiUrl.replace(/\/+$/, ""),
-    api_key_encrypted: encrypted.replace(/^\\x/, ""),
+    credential_cipher: "aes-256-gcm-ai-cred-v1",
+    api_key_ciphertext: hex(encrypted.ciphertext),
+    api_key_iv: hex(encrypted.iv),
+    api_key_tag: hex(encrypted.tag),
     connected_at: new Date().toISOString(),
   }
 
@@ -76,19 +86,41 @@ export async function carregarIntegracaoVigia(
   const projectSlug = raw.project_slug
   const ingestUrl = raw.ingest_url
   const apiUrl = raw.api_url
-  const encrypted = raw.api_key_encrypted
+  const credentialCipher = raw.credential_cipher
+  const ciphertext = raw.api_key_ciphertext
+  const iv = raw.api_key_iv
+  const tag = raw.api_key_tag
   if (
     typeof vigiaOrganizationId !== "string" ||
     typeof projectId !== "string" ||
     typeof projectSlug !== "string" ||
     typeof ingestUrl !== "string" ||
     typeof apiUrl !== "string" ||
-    typeof encrypted !== "string"
+    credentialCipher !== "aes-256-gcm-ai-cred-v1" ||
+    typeof ciphertext !== "string" ||
+    typeof iv !== "string" ||
+    typeof tag !== "string"
   ) {
     return null
   }
 
-  const apiKey = await decryptWebhookSecret(admin, encrypted)
-  if (!apiKey) return null
-  return { organizationId: vigiaOrganizationId, projectId, projectSlug, ingestUrl, apiUrl, apiKey }
+  let apiKey: string
+  try {
+    apiKey = decryptKey({
+      ciphertext: Buffer.from(ciphertext, "hex"),
+      iv: Buffer.from(iv, "hex"),
+      tag: Buffer.from(tag, "hex"),
+    })
+  } catch {
+    return null
+  }
+
+  return {
+    organizationId: vigiaOrganizationId,
+    projectId,
+    projectSlug,
+    ingestUrl,
+    apiUrl,
+    apiKey,
+  }
 }
