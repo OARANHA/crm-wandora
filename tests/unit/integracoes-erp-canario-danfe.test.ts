@@ -110,11 +110,7 @@ describe("canário VendaERP → DANFE read-only", () => {
       ok: true,
       pedido_codigo: 123,
       nfe_numero: 456,
-      provider_calls: [
-        "GET Pedidos/Pesquisar",
-        "GET Pessoas/Pesquisar",
-        "GET Fiscal/ConsultarNFE",
-      ],
+      provider_calls: ["GET Pedidos/Pesquisar", "GET Pessoas/Pesquisar", "GET Fiscal/ConsultarNFE"],
       preview: { ready: true, http_status: 200, expires_seconds: 600 },
       whatsapp_sent: false,
       vendaerp_writes: 0,
