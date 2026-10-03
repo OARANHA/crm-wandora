@@ -594,6 +594,14 @@ export async function startWorker(
         // vale saber que isto aconteceu.
         Sentry.captureException(failErr);
       }
+      if (!terminal && ["inbound_turn", "followup_turn", "case_reply_turn", "operator_turn"].includes(job.kind)) {
+        void emitirExecucaoAoVigia({
+          organizationId: job.organization_id,
+          kind: job.kind,
+          startedAt: vigiaStartedAt,
+          success: false,
+        });
+      }
     }
   };
 
