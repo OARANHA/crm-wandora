@@ -23,6 +23,11 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/api/v1/system/agent/qualquer")).toBe(false);
   });
 
+  it("libera somente o inicio da conexao nativa Vigia", () => {
+    expect(isPublicPath("/api/v1/integrations/vigia/start")).toBe(true);
+    expect(isPublicPath("/api/v1/integrations/vigia/callback")).toBe(false);
+    expect(isPublicPath("/api/v1/integrations/vigia/start/extra")).toBe(false);
+  });
   it("não libera a rota de pedido de atualização (exige sessão do dono)", () => {
     expect(isPublicPath("/api/v1/system/update")).toBe(false);
   });
