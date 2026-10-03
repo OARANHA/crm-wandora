@@ -1,5 +1,3 @@
-import "server-only"
-
 import { createAdminClient } from "@/lib/supabase/admin"
 import { decryptWebhookSecret, encryptWebhookSecret } from "@/lib/webhooks/secrets"
 
