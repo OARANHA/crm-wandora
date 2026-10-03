@@ -73,6 +73,9 @@ export const PUBLIC_PATHS: RegExp[] = [
   /^\/api\/v1\/plataformas-de-anuncio\/google\/callback$/,
   /^\/api\/v1\/integrations\/nuvemshop\/callback$/,
   /^\/api\/v1\/integrations\/vigia\/start$/,
+  // Volta do Vigia: navegação cross-site não leva o cookie SameSite=Strict.
+  // A rota valida state HMAC + sessão vinculada + PKCE antes de qualquer escrita.
+  /^\/api\/v1\/integrations\/vigia\/callback$/,
   /^\/api\/internal\//,
   /^\/api\/mcp(\/.*)?$/,
   // GET /api/v1/contacts aceita SESSÃO ou Bearer `dsk_...` (api_tokens) — a
