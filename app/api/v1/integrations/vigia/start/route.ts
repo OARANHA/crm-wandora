@@ -19,8 +19,9 @@ export async function GET(request: Request) {
   const currentUser = await loadAuthUser()
   if (!currentUser) {
     const next = `${url.pathname}${url.search}`
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || url.origin
-    const loginUrl = new URL("/login", appUrl)
+    // NEXT_PUBLIC_* is inlined by Next.js at build time. This redirect is
+    // server-side and must follow the host that actually received the request.
+    const loginUrl = new URL("/login", url.origin)
     loginUrl.searchParams.set("next", next)
     return NextResponse.redirect(loginUrl)
   }
