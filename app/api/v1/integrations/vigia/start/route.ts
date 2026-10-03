@@ -19,8 +19,7 @@ export async function GET(request: Request) {
   const currentUser = await loadAuthUser()
   if (!currentUser) {
     const next = `${url.pathname}${url.search}`
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || url.origin
-    const loginUrl = new URL("/login", appUrl)
+    const loginUrl = new URL("/login", url.origin)
     loginUrl.searchParams.set("next", next)
     return NextResponse.redirect(loginUrl)
   }
