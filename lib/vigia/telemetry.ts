@@ -45,8 +45,8 @@ export function criarPayloadOtlpVigia(input: VigiaTraceInput): VigiaTracePayload
               scope: { name: "elus.vigia.native", version: "1" },
               spans: [
                 {
-                  traceId: traceBytes.toString("base64"),
-                  spanId: spanBytes.toString("base64"),
+                  traceId: traceIdHex,
+                  spanId: spanBytes.toString("hex"),
                   name: `elus.${input.kind}`,
                   kind: 1,
                   startTimeUnixNano,
