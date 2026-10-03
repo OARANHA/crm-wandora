@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { decryptWebhookSecret, encryptWebhookSecret } from "@/lib/webhooks/secrets"
 
 export interface VigiaIntegrationConfig {
+  readonly organizationId: string
   readonly projectId: string
   readonly projectSlug: string
   readonly ingestUrl: string
@@ -10,6 +11,7 @@ export interface VigiaIntegrationConfig {
 }
 
 interface StoredVigiaIntegration {
+  organization_id: string
   project_id: string
   project_slug: string
   ingest_url: string
@@ -41,6 +43,7 @@ export async function salvarIntegracaoVigia(
 
   const settings = asRecord(org.settings)
   const stored: StoredVigiaIntegration = {
+    organization_id: config.organizationId,
     project_id: config.projectId,
     project_slug: config.projectSlug,
     ingest_url: config.ingestUrl.replace(/\/+$/, ""),
@@ -68,12 +71,14 @@ export async function carregarIntegracaoVigia(
   if (error || !org) return null
 
   const raw = asRecord(asRecord(org.settings).vigia_integration)
+  const organizationId = raw.organization_id
   const projectId = raw.project_id
   const projectSlug = raw.project_slug
   const ingestUrl = raw.ingest_url
   const apiUrl = raw.api_url
   const encrypted = raw.api_key_encrypted
   if (
+    typeof organizationId !== "string" ||
     typeof projectId !== "string" ||
     typeof projectSlug !== "string" ||
     typeof ingestUrl !== "string" ||
@@ -85,5 +90,5 @@ export async function carregarIntegracaoVigia(
 
   const apiKey = await decryptWebhookSecret(admin, encrypted)
   if (!apiKey) return null
-  return { projectId, projectSlug, ingestUrl, apiUrl, apiKey }
+  return { organizationId, projectId, projectSlug, ingestUrl, apiUrl, apiKey }
 }
