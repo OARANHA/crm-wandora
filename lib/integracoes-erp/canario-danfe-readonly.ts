@@ -176,8 +176,7 @@ export async function executarCanarioDanfeReadonly(
     return falha("danfe_invalid", "not_pdf");
   }
 
-  const storagePath =
-    `${row.organization_id}/${row.id}/canary-danfe-${nfeNumero}-${deps.uuid()}.pdf`;
+  const storagePath = `${row.organization_id}/${row.id}/canary-danfe-${nfeNumero}-${deps.uuid()}.pdf`;
   const bucket = admin.storage.from(BUCKET);
   const upload = await bucket.upload(storagePath, documento.buffer, {
     contentType: documento.mime,
