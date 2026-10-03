@@ -1,0 +1,51 @@
+name: Elus DANFE canary image
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/elus-danfe-canary-image.yml"
+      - "Dockerfile.danfe-canary"
+      - "scripts/elus-vendaerp-danfe-canary.ts"
+      - "lib/integracoes-erp/**"
+      - "lib/contacts/cpf.ts"
+      - "lib/channels/phone-variants.ts"
+      - "lib/automation/**"
+      - "lib/supabase/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-candidate:
+    name: Build sealed-env canary candidate
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish exact-head candidate
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.danfe-canary
+          push: true
+          tags: ghcr.io/oaranha/crm-wandora-app:danfe-canary-${{ github.event.pull_request.head.sha }}
+          build-args: |
+            SOURCE_REVISION=${{ github.event.pull_request.head.sha }}
+          provenance: false
