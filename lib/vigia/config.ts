@@ -71,14 +71,14 @@ export async function carregarIntegracaoVigia(
   if (error || !org) return null
 
   const raw = asRecord(asRecord(org.settings).vigia_integration)
-  const organizationId = raw.organization_id
+  const vigiaOrganizationId = raw.organization_id
   const projectId = raw.project_id
   const projectSlug = raw.project_slug
   const ingestUrl = raw.ingest_url
   const apiUrl = raw.api_url
   const encrypted = raw.api_key_encrypted
   if (
-    typeof organizationId !== "string" ||
+    typeof vigiaOrganizationId !== "string" ||
     typeof projectId !== "string" ||
     typeof projectSlug !== "string" ||
     typeof ingestUrl !== "string" ||
@@ -90,5 +90,5 @@ export async function carregarIntegracaoVigia(
 
   const apiKey = await decryptWebhookSecret(admin, encrypted)
   if (!apiKey) return null
-  return { organizationId, projectId, projectSlug, ingestUrl, apiUrl, apiKey }
+  return { organizationId: vigiaOrganizationId, projectId, projectSlug, ingestUrl, apiUrl, apiKey }
 }
