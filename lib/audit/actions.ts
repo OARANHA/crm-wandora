@@ -999,6 +999,8 @@ export const AUDIT_ACTIONS = [
   "company_people.updated",
   "contacts.person_linked",
   "imports.companies_people",
+  // Integração nativa com o Vigia: registra o vínculo sem armazenar credenciais no audit.
+  "vigia.integration.connected",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */

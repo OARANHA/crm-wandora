@@ -107,6 +107,7 @@ import {
   recordRunMetrics,
   type CacheAlertKnobs,
 } from "@/lib/agent-engine/obs/metrics";
+import { emitirExecucaoAoVigia } from "@/lib/vigia/telemetry";
 import { rodarLoopDaFila } from "@/lib/agent-engine/queue/loop";
 import {
   adiarAteORecarregar,
@@ -452,6 +453,7 @@ export async function startWorker(
   };
 
   const runJob = async (job: JobRow): Promise<void> => {
+    const vigiaStartedAt = Date.now();
     try {
       const handler = handlers.get(job.kind);
       if (!handler) {
@@ -476,6 +478,14 @@ export async function startWorker(
       await withServiceJob(pool, job, () => handler(job, pool, { workerId }));
       await completeJob(pool, job.id, workerId, undefined, claimOfJob(job)?.acquired_at);
       log.info("job concluído", { job_id: job.id, kind: job.kind });
+      if (["inbound_turn", "followup_turn", "case_reply_turn", "operator_turn"].includes(job.kind)) {
+        void emitirExecucaoAoVigia({
+          organizationId: job.organization_id,
+          kind: job.kind,
+          startedAt: vigiaStartedAt,
+          success: true,
+        });
+      }
       if (esperouPorSaldo(job)) {
         try {
           await encerrarAvisoDeFaltaDeSaldo(pool, job.organization_id);
