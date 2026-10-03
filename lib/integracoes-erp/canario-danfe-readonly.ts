@@ -47,11 +47,7 @@ export type ResultadoCanarioDanfeReadonly =
       pedido_codigo: number;
       nfe_numero: number;
       identity_evidence: string[];
-      provider_calls: [
-        "GET Pedidos/Pesquisar",
-        "GET Pessoas/Pesquisar",
-        "GET Fiscal/ConsultarNFE",
-      ];
+      provider_calls: ["GET Pedidos/Pesquisar", "GET Pessoas/Pesquisar", "GET Fiscal/ConsultarNFE"];
       danfe: {
         mime: "application/pdf";
         size_bytes: number;
@@ -96,9 +92,7 @@ function numeroNfeDoPedido(pedido: PedidoErpComIdentidadeInterna): number | null
   return Number.isSafeInteger(numero) && numero > 0 ? numero : null;
 }
 
-function detalheSeguroDaAutoridade(
-  prova: Exclude<ProvaPedidoDoContato, { ok: true }>,
-): string {
+function detalheSeguroDaAutoridade(prova: Exclude<ProvaPedidoDoContato, { ok: true }>): string {
   return prova.motivo;
 }
 
@@ -214,11 +208,7 @@ export async function executarCanarioDanfeReadonly(
     pedido_codigo: input.pedidoCodigo,
     nfe_numero: nfeNumero,
     identity_evidence: prova.evidencias,
-    provider_calls: [
-      "GET Pedidos/Pesquisar",
-      "GET Pessoas/Pesquisar",
-      "GET Fiscal/ConsultarNFE",
-    ],
+    provider_calls: ["GET Pedidos/Pesquisar", "GET Pessoas/Pesquisar", "GET Fiscal/ConsultarNFE"],
     danfe: {
       mime: "application/pdf",
       size_bytes: documento.sizeBytes,
