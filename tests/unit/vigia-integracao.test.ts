@@ -13,6 +13,7 @@ describe("Vigia native integration PKCE", () => {
     expect(second.verifier).not.toBe(first.verifier)
     expect(second.challenge).not.toBe(first.challenge)
   })
+})
 
 describe("Vigia OTLP payload", () => {
   it("uses the hexadecimal ids expected by the Vigia JSON ingest", () => {
@@ -31,5 +32,4 @@ describe("Vigia OTLP payload", () => {
     expect(span?.traceId).toBe(payload.traceIdHex)
     expect(span?.spanId).toMatch(/^[0-9a-f]{16}$/)
   })
-})
 })
