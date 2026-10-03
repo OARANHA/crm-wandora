@@ -28,6 +28,8 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://elus.wandora.com.br}
       NEXT_PUBLIC_ADMIN_URL: ${NEXT_PUBLIC_ADMIN_URL:-https://elus.wandora.com.br}
       INTERNAL_SECRET: ${INTERNAL_SECRET}
+      VIGIA_WEB_URL: ${VIGIA_WEB_URL:-https://app-vigia.wandora.com.br}
+      VIGIA_API_URL: ${VIGIA_API_URL:-https://vigia.wandora.com.br}
       CPF_ENCRYPTION_KEY: ${CPF_ENCRYPTION_KEY}
       AI_CRED_AES_KEY: ${AI_CRED_AES_KEY}
       WAHA_BYO_ENCRYPTION_KEY: ${WAHA_BYO_ENCRYPTION_KEY}
