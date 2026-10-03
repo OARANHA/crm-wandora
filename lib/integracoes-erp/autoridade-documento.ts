@@ -3,10 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { samePhone } from "@/lib/channels/phone-variants";
 import { hashCpf, normalizeCpf } from "@/lib/contacts/cpf";
 
-import {
-  buscarClientesErp,
-  type PedidoErpComIdentidadeInterna,
-} from "./service";
+import { buscarClientesErp, type PedidoErpComIdentidadeInterna } from "./service";
 import type { ClienteErp } from "./tipos";
 
 export type EvidenciaIdentidadeDocumento = "cpf" | "email" | "telefone";

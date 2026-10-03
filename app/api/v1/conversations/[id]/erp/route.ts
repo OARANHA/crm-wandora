@@ -12,10 +12,7 @@ import {
   type ProvaPedidoDoContato,
 } from "@/lib/integracoes-erp/autoridade-documento";
 import { ErroDanfeExterno, materializarDanfeExterno } from "@/lib/integracoes-erp/danfe";
-import {
-  buscarPedidosErpComIdentidadeInterna,
-  obterNotaErp,
-} from "@/lib/integracoes-erp/service";
+import { buscarPedidosErpComIdentidadeInterna, obterNotaErp } from "@/lib/integracoes-erp/service";
 import type { NotaErp, PedidoErp } from "@/lib/integracoes-erp/tipos";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -273,11 +270,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   );
   if (!prova.ok) return falhaDaAutoridade(prova, requestId);
 
-  const notaResultado = await obterNotaErp(
-    admin,
-    authz.org.orgId,
-    parsed.data.codigo_nfe,
-  );
+  const notaResultado = await obterNotaErp(admin, authz.org.orgId, parsed.data.codigo_nfe);
   if (!notaResultado.ok) return falhaDaConsulta(notaResultado.motivo, requestId);
 
   const nota = notaResultado.dados;
