@@ -44,7 +44,6 @@ type FalhaCanario = {
 export type ResultadoCanarioDanfeReadonly =
   | {
       ok: true;
-      conversation_id: string;
       pedido_codigo: number;
       nfe_numero: number;
       identity_evidence: string[];
@@ -60,7 +59,6 @@ export type ResultadoCanarioDanfeReadonly =
       };
       preview: {
         ready: true;
-        storage_path: string;
         http_status: number;
         expires_seconds: number;
       };
@@ -87,10 +85,7 @@ const dependenciasPadrao: DependenciasCanarioDanfe = {
   uuid: randomUUID,
 };
 
-function falha(
-  code: FalhaCanario["code"],
-  detail?: string,
-): FalhaCanario {
+function falha(code: FalhaCanario["code"], detail?: string): FalhaCanario {
   return detail ? { ok: false, code, detail } : { ok: false, code };
 }
 
@@ -155,12 +150,7 @@ export async function executarCanarioDanfeReadonly(
   if (exatos.length !== 1) return falha("order_ambiguous");
 
   const pedido = exatos[0]!;
-  const prova = await deps.provarPedido(
-    admin,
-    row.organization_id,
-    row.contact_id,
-    pedido,
-  );
+  const prova = await deps.provarPedido(admin, row.organization_id, row.contact_id, pedido);
   if (!prova.ok) {
     return falha("identity_unverified", detalheSeguroDaAutoridade(prova));
   }
@@ -221,7 +211,6 @@ export async function executarCanarioDanfeReadonly(
 
   return {
     ok: true,
-    conversation_id: row.id,
     pedido_codigo: input.pedidoCodigo,
     nfe_numero: nfeNumero,
     identity_evidence: prova.evidencias,
@@ -237,7 +226,6 @@ export async function executarCanarioDanfeReadonly(
     },
     preview: {
       ready: true,
-      storage_path: storagePath,
       http_status: preview.status,
       expires_seconds: PREVIEW_TTL_SECONDS,
     },

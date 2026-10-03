@@ -83,7 +83,6 @@ jobs:
           "components/inbox/ErpDanfeCard.tsx"
           "lib/integracoes-erp/**/*.ts"
           "scripts/elus-vendaerp-danfe-canary.ts"
-          "Dockerfile.danfe-canary"
           "lib/mcp/tools/integracoes-erp.ts"
           "lib/mcp/tools/catalogo/integracoes-erp.ts"
           "tests/unit/integracoes-erp-*.test.ts"

@@ -45,7 +45,7 @@ jobs:
           context: .
           file: Dockerfile.danfe-canary
           push: true
-          tags: ghcr.io/oaranha/crm-wandora-app:danfe-canary-${{ github.event.pull_request.head.sha }}
+          tags: ghcr.io/oaranha/elus-danfe-canary:${{ github.event.pull_request.head.sha }}
           build-args: |
             SOURCE_REVISION=${{ github.event.pull_request.head.sha }}
-          provenance: false
+          provenance: true
