@@ -152,7 +152,7 @@ export function PainelIntegracoesErp({
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle>VendaERP</CardTitle>
-            <Badge variant="secondary">{t("Somente leitura")}</Badge>
+            <Badge variant="secondary">{t("Leitura administrativa")}</Badge>
             {venda?.last_test_ok === true ? (
               <Badge variant="success">{t("Conectado")}</Badge>
             ) : null}

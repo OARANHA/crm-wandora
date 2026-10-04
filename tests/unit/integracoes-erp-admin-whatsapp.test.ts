@@ -41,7 +41,12 @@ const binding = {
   capability: CAPACIDADE_ERP_ADMIN_READ,
   enabled: true,
 };
-const membership = {
+const membership: {
+  user_id: string;
+  organization_id: string;
+  role: string;
+  revoked_at: string | null;
+} = {
   user_id: user,
   organization_id: org,
   role: "admin",
