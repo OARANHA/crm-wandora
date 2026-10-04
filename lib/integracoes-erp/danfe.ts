@@ -67,7 +67,11 @@ export function ehUrlDanfePublicoVendaErp(urlBruta: string): boolean {
     const trib = url.searchParams.get("trib");
 
     if (!/^[a-f0-9]{24}$/i.test(cod)) return false;
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(geren)) {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        geren,
+      )
+    ) {
       return false;
     }
     if (token !== null && !/^[a-f0-9]{16,128}$/i.test(token)) return false;
@@ -81,12 +85,15 @@ export function ehUrlDanfePublicoVendaErp(urlBruta: string): boolean {
 
 function executarChromium(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const binario = process.env.CHROMIUM_PATH?.trim() || "/usr/bin/chromium-browser";
+    const binario =
+      process.env.CHROMIUM_PATH?.trim() || "/usr/bin/chromium-browser";
     const filho = spawn(binario, args, {
       stdio: "ignore",
       env: {
         NODE_ENV: process.env.NODE_ENV ?? "production",
-        PATH: process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        PATH:
+          process.env.PATH ??
+          "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         HOME: "/tmp",
       },
     });
@@ -102,7 +109,9 @@ function executarChromium(args: string[]): Promise<void> {
       filho.kill("SIGKILL");
       concluir(new ErroDanfeExterno("timeout"));
     }, DANFE_RENDER_TIMEOUT_MS);
-    filho.once("error", () => concluir(new ErroDanfeExterno("download_falhou")));
+    filho.once("error", () =>
+      concluir(new ErroDanfeExterno("download_falhou")),
+    );
     filho.once("exit", (codigo) => {
       if (codigo === 0) concluir();
       else concluir(new ErroDanfeExterno("download_falhou"));
@@ -110,7 +119,9 @@ function executarChromium(args: string[]): Promise<void> {
   });
 }
 
-export const renderizarDanfePublicoVendaErp: RenderizadorDanfeVendaErp = async (url) => {
+export const renderizarDanfePublicoVendaErp: RenderizadorDanfeVendaErp = async (
+  url,
+) => {
   if (!ehUrlDanfePublicoVendaErp(url)) {
     throw new ErroDanfeExterno("destino_inseguro");
   }
@@ -140,8 +151,12 @@ export const renderizarDanfePublicoVendaErp: RenderizadorDanfeVendaErp = async (
 
     const buffer = await readFile(saida);
     if (!buffer.length) throw new ErroDanfeExterno("download_falhou");
-    if (buffer.length > MAX_MEDIA_BYTES) throw new ErroDanfeExterno("arquivo_grande");
-    if (!parecePdf(buffer)) throw new ErroDanfeExterno("tipo_nao_documento");
+    if (buffer.length > MAX_MEDIA_BYTES) {
+      throw new ErroDanfeExterno("arquivo_grande");
+    }
+    if (!parecePdf(buffer)) {
+      throw new ErroDanfeExterno("tipo_nao_documento");
+    }
     return buffer;
   } catch (erro) {
     if (erro instanceof ErroDanfeExterno) throw erro;
@@ -267,10 +282,7 @@ export async function materializarDanfeExterno(
       throw new ErroDanfeExterno("tipo_nao_documento");
     }
 
-    if (
-      mime === "text/html" &&
-      ehUrlDanfePublicoVendaErp(url)
-    ) {
+    if (mime === "text/html" && ehUrlDanfePublicoVendaErp(url)) {
       const renderizador = options?.renderizadorVendaErp ?? renderizarDanfePublicoVendaErp;
       const pdf = await renderizador(url);
       const validacaoPdf = validateOutboundMedia("application/pdf", pdf.length);
