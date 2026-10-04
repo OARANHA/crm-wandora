@@ -75,9 +75,13 @@ describe("materialização segura do DANFE", () => {
           headers: { "content-type": "text/html" },
         }),
     ) as unknown as typeof fetch;
-    const renderizadorVendaErp = vi.fn(async () => Buffer.from("%PDF-1.7\nrenderizado"));
+    const renderizadorVendaErp = vi.fn(async () =>
+      Buffer.from("%PDF-1.7\nrenderizado"),
+    );
 
-    const r = await materializarDanfeExterno(url, fetcher, { renderizadorVendaErp });
+    const r = await materializarDanfeExterno(url, fetcher, {
+      renderizadorVendaErp,
+    });
 
     expect(renderizadorVendaErp).toHaveBeenCalledWith(url);
     expect(r.mime).toBe("application/pdf");
