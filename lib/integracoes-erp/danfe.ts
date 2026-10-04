@@ -172,7 +172,9 @@ function mimeBase(valor: string | null): string | null {
 }
 
 function parecePdf(buffer: Buffer): boolean {
-  return buffer.subarray(0, Math.min(buffer.length, 1024)).includes(Buffer.from("%PDF-"));
+  return buffer
+    .subarray(0, Math.min(buffer.length, 1024))
+    .includes(Buffer.from("%PDF-"));
 }
 
 async function lerCorpoComLimite(
@@ -260,7 +262,9 @@ export async function materializarDanfeExterno(
 
     if (!resposta.ok) {
       throw new ErroDanfeExterno(
-        resposta.status >= 300 && resposta.status < 400 ? "destino_inseguro" : "http_invalido",
+        resposta.status >= 300 && resposta.status < 400
+          ? "destino_inseguro"
+          : "http_invalido",
         resposta.status,
       );
     }
@@ -283,12 +287,15 @@ export async function materializarDanfeExterno(
     }
 
     if (mime === "text/html" && ehUrlDanfePublicoVendaErp(url)) {
-      const renderizador = options?.renderizadorVendaErp ?? renderizarDanfePublicoVendaErp;
+      const renderizador =
+        options?.renderizadorVendaErp ?? renderizarDanfePublicoVendaErp;
       const pdf = await renderizador(url);
       const validacaoPdf = validateOutboundMedia("application/pdf", pdf.length);
       if (!validacaoPdf.ok) {
         throw new ErroDanfeExterno(
-          validacaoPdf.code === "payload_too_large" ? "arquivo_grande" : "tipo_nao_documento",
+          validacaoPdf.code === "payload_too_large"
+            ? "arquivo_grande"
+            : "tipo_nao_documento",
         );
       }
       if (!parecePdf(pdf) || validacaoPdf.kind !== "document") {
@@ -305,7 +312,9 @@ export async function materializarDanfeExterno(
     const validacao = validateOutboundMedia(mime, buffer.length);
     if (!validacao.ok) {
       throw new ErroDanfeExterno(
-        validacao.code === "payload_too_large" ? "arquivo_grande" : "tipo_nao_documento",
+        validacao.code === "payload_too_large"
+          ? "arquivo_grande"
+          : "tipo_nao_documento",
       );
     }
     if (validacao.kind !== "document") {
