@@ -178,10 +178,7 @@ describe("Admin WhatsApp Read-Only V1", () => {
   });
 
   it("pedido/NFe apresentados ao modelo não expõem a URL externa do DANFE", () => {
-    const tools = readFileSync(
-      join(process.cwd(), "lib/mcp/tools/integracoes-erp.ts"),
-      "utf8",
-    );
+    const tools = readFileSync(join(process.cwd(), "lib/mcp/tools/integracoes-erp.ts"), "utf8");
     expect(tools).toContain("danfeDisponivel: Boolean(pedido.danfeUrl)");
     expect(tools).toContain("danfeDisponivel: Boolean(nota.danfeUrl)");
     expect(tools).not.toContain("return saida.erro ? saida : { nota: saida.dados }");

@@ -59,11 +59,7 @@ export type SalvarVinculoAdminWhatsappResultado =
   | { ok: true; vinculo: VinculoAdminWhatsappSeguro }
   | {
       ok: false;
-      motivo:
-        | "telefone_invalido"
-        | "membership_invalido"
-        | "telefone_ja_vinculado"
-        | "banco";
+      motivo: "telefone_invalido" | "membership_invalido" | "telefone_ja_vinculado" | "banco";
     };
 
 export function normalizarTelefoneAdminWhatsapp(raw: string): string | null {
@@ -295,7 +291,6 @@ export async function auditarConsultaAdminWhatsapp(input: {
     },
   });
 }
-
 
 export type PrepararDanfeAdminWhatsappResultado =
   | {

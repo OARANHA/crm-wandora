@@ -42,7 +42,6 @@ describe("credenciais de ERP ficam fechadas aos papéis de sessão", () => {
   });
 });
 
-
 describe("autoridade administrativa de WhatsApp fica fechada aos papéis de sessão", () => {
   it("erp_admin_whatsapp_bindings nasce server-only, com RLS e sem policy de sessão", () => {
     sql(`select public.fn_integracoes_erp_provisionar();`);

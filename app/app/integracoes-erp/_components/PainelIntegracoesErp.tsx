@@ -40,8 +40,9 @@ export function PainelIntegracoesErp({
   const [app, setApp] = useState("");
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [vinculoAdminWhatsapp, setVinculoAdminWhatsapp] =
-    useState<VinculoAdminWhatsapp | null>(vinculoInicial);
+  const [vinculoAdminWhatsapp, setVinculoAdminWhatsapp] = useState<VinculoAdminWhatsapp | null>(
+    vinculoInicial,
+  );
   const [telefoneAdmin, setTelefoneAdmin] = useState(vinculoInicial?.phone_number ?? "");
   const [mensagemAdmin, setMensagemAdmin] = useState<string | null>(null);
   const [erroAdmin, setErroAdmin] = useState<string | null>(null);
@@ -152,7 +153,7 @@ export function PainelIntegracoesErp({
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle>VendaERP</CardTitle>
-            <Badge variant="secondary">{t("Leitura administrativa")}</Badge>
+            <Badge variant="secondary">{t("Somente leitura")}</Badge>
             {venda?.last_test_ok === true ? (
               <Badge variant="success">{t("Conectado")}</Badge>
             ) : null}
@@ -258,10 +259,8 @@ export function PainelIntegracoesErp({
           <CardHeader>
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle>{t("WhatsApp administrativo")}</CardTitle>
-              <Badge variant="secondary">{t("Somente leitura")}</Badge>
-              {vinculoAdminWhatsapp?.enabled ? (
-                <Badge variant="success">{t("Ativo")}</Badge>
-              ) : null}
+              <Badge variant="secondary">{t("Leitura administrativa")}</Badge>
+              {vinculoAdminWhatsapp?.enabled ? <Badge variant="success">{t("Ativo")}</Badge> : null}
             </div>
             <CardDescription>
               {t(
@@ -276,7 +275,7 @@ export function PainelIntegracoesErp({
               )}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="erp-admin-whatsapp-phone">{t("Meu WhatsApp")}</Label>
+              <Label htmlFor="erp-admin-whatsapp-phone">{t("Meu número administrativo")}</Label>
               <Input
                 id="erp-admin-whatsapp-phone"
                 inputMode="tel"
