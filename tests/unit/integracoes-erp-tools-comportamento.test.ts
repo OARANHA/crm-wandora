@@ -150,7 +150,7 @@ describe("tools ERP READ — comportamento do agente", () => {
     expect(resultado.detalhes.depositos).toHaveLength(2);
   });
 
-  it("consulta NFe entrega status/chave/DANFE e nunca XML", async () => {
+  it("consulta NFe entrega status/chave e disponibilidade de DANFE sem expor URL/XML", async () => {
     vi.mocked(service.obterNotaErp).mockResolvedValue({
       ok: true,
       dados: {
@@ -172,8 +172,9 @@ describe("tools ERP READ — comportamento do agente", () => {
       codigoStatus: 100,
       mensagemStatus: "Autorizado o uso da NF-e",
       lote: 89,
-      danfeUrl: "https://app.vendaerp.com.br/danfe",
+      danfeDisponivel: true,
     });
+    expect(resultado.nota).not.toHaveProperty("danfeUrl");
     expect(resultado.nota).not.toHaveProperty("Xml");
     expect(resultado.nota).not.toHaveProperty("xml");
     expect(service.obterNotaErp).toHaveBeenCalledWith(ctx.supabase, ctx.organizationId, 64996396);
