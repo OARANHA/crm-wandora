@@ -114,9 +114,9 @@ ENV NODE_ENV=production \
 # event-log-drain executa o media_derive handler, que chama `ffmpeg` via spawn
 # pra extrair áudio+frames. Sem o binário, todo vídeo recebido falha a derivação.
 #
-# chromium: fallback estritamente allowlisted para o DANFE público do VendaERP.
-# A URL oficial é uma SPA HTML (não um PDF); o Chromium apenas imprime essa
-# página pública em PDF. font-liberation fornece métricas compatíveis com Arial.
+# chromium: renderer interno de documentos usado somente por capabilities com
+# allowlist explícita. O primeiro consumidor é o DANFE público do VendaERP.
+# font-liberation fornece métricas compatíveis com Arial.
 RUN apk add --no-cache ffmpeg chromium font-liberation && \
     CHROMIUM_BIN="$(command -v chromium || command -v chromium-browser)" && \
     test -n "$CHROMIUM_BIN" && \
