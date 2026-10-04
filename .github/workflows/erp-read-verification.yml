@@ -1,0 +1,158 @@
+name: ERP read verification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/erp-read-verification.yml"
+      - "app/api/v1/integracoes-erp/**"
+      - "app/api/v1/conversations/**/erp/**"
+      - "app/app/integracoes-erp/**"
+      - "components/inbox/ErpDanfeCard.tsx"
+      - "components/integracoes-erp/**"
+      - "lib/integracoes-erp/**"
+      - "lib/mcp/tools/integracoes-erp.ts"
+      - "lib/mcp/tools/catalogo/integracoes-erp.ts"
+      - "lib/mcp/tools/index.ts"
+      - "lib/mcp/tools/catalogo/index.ts"
+      - "lib/instalacao/modulos.ts"
+      - "lib/audit/actions.ts"
+      - "supabase/migrations/**"
+      - "tests/unit/integracoes-erp-*.test.ts"
+      - "tests/invariants/integracoes-erp-provisionadora.test.ts"
+      - "tests/unit/catalogo-tools-leigo-friendly.test.ts"
+      - "tests/unit/capacidade-alcancavel-pelo-agente.test.ts"
+      - "tests/unit/selecao-por-pacote.test.ts"
+      - "tests/unit/pacote-reserva-vaga-da-critica.test.ts"
+      - "tests/unit/tool-read-nao-muta.test.ts"
+      - "docs/specs/integracoes-erp*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-erp-read:
+    name: Typecheck and ERP read tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint ERP changes
+        run: >
+          pnpm exec eslint
+          app/api/v1/integracoes-erp
+          "app/api/v1/conversations/[id]/erp/route.ts"
+          app/app/integracoes-erp
+          components/inbox/ErpDanfeCard.tsx
+          lib/integracoes-erp
+          lib/mcp/tools/integracoes-erp.ts
+          lib/mcp/tools/catalogo/integracoes-erp.ts
+          tests/unit/integracoes-erp-*.test.ts
+
+      - name: Check ERP formatting
+        run: >
+          pnpm exec prettier --check
+          ".github/workflows/erp-read-verification.yml"
+          "app/api/v1/integracoes-erp/**/*.{ts,tsx}"
+          "app/api/v1/conversations/[id]/erp/route.ts"
+          "app/app/integracoes-erp/**/*.{ts,tsx}"
+          "components/inbox/ErpDanfeCard.tsx"
+          "lib/integracoes-erp/**/*.ts"
+          "lib/mcp/tools/integracoes-erp.ts"
+          "lib/mcp/tools/catalogo/integracoes-erp.ts"
+          "tests/unit/integracoes-erp-*.test.ts"
+          "tests/invariants/integracoes-erp-provisionadora.test.ts"
+          "docs/specs/integracoes-erp*.md"
+
+      - name: ERP unit tests
+        run: >
+          pnpm vitest run
+          tests/unit/integracoes-erp-modulo.test.ts
+          tests/unit/integracoes-erp-provedor.test.ts
+          tests/unit/integracoes-erp-vendaerp-url.test.ts
+          tests/unit/integracoes-erp-normalizacao.test.ts
+          tests/unit/integracoes-erp-tools.test.ts
+          tests/unit/integracoes-erp-tools-comportamento.test.ts
+          tests/unit/integracoes-erp-danfe.test.ts
+          tests/unit/integracoes-erp-danfe-authority.test.ts
+          tests/unit/integracoes-erp-documento-cliente.test.ts
+
+      - name: Catalog invariants touched by ERP tools
+        run: >
+          pnpm vitest run
+          tests/unit/catalogo-tools-leigo-friendly.test.ts
+          tests/unit/capacidade-alcancavel-pelo-agente.test.ts
+          tests/unit/selecao-por-pacote.test.ts
+          tests/unit/pacote-reserva-vaga-da-critica.test.ts
+          tests/unit/tool-read-nao-muta.test.ts
+
+  db-invariants:
+    name: Database invariants (Postgres ${{ matrix.pg }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pg: 15
+            image: pgvector/pgvector:pg15
+          - pg: 17
+            image: pgvector/pgvector:pg17
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch upstream kit tags used by DB gate
+        run: >-
+          git fetch --no-tags https://github.com/melgarafael/DeskcommCRM.git
+          refs/tags/v1.69.0:refs/tags/v1.69.0
+          refs/tags/v1.63.0:refs/tags/v1.63.0
+
+      - name: Baseline install, reapply and invariants
+        run: pnpm test:db
+        env:
+          TEST_DB_IMAGE: ${{ matrix.image }}
+          GH_TOKEN: ${{ github.token }}
+          CONFERENCIA_KIT_RELEASE: v1.69.0
+
+      - name: Baseline update with existing data
+        run: pnpm test:db:update
+        env:
+          TEST_DB_IMAGE: ${{ matrix.image }}

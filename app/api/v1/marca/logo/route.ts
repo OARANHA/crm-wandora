@@ -457,17 +457,20 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const bytes = new Uint8Array(await file.arrayBuffer());
 
-  if (pareceSvg(bytes)) {
-    return fail(
-      "logo_svg_recusado",
-      "SVG não é aceito como logo: ele pode executar código quando aberto direto do endereço da imagem. Exporte o mesmo arquivo em PNG (fundo transparente) ou JPG.",
-      415,
-      { requestId },
-    );
-  }
-
+  // A assinatura binária decide primeiro. PNG/JPEG legítimos podem conter XMP
+  // ou outros metadados XML nos primeiros bytes; procurar "<?xml" antes de
+  // reconhecer a assinatura fazia PNG transparente cair no erro de SVG.
   const tipo = farejarTipo(bytes);
   if (!tipo) {
+    if (pareceSvg(bytes)) {
+      return fail(
+        "logo_svg_recusado",
+        "SVG não é aceito como logo: ele pode executar código quando aberto direto do endereço da imagem. Exporte o mesmo arquivo em PNG (fundo transparente) ou JPG.",
+        415,
+        { requestId },
+      );
+    }
+
     return fail("unsupported_media_type", "O logo precisa ser PNG ou JPG.", 415, {
       requestId,
       // O que o cliente DISSE que mandou entra aqui e em lugar nenhum da decisão:

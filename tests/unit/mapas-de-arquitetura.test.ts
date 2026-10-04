@@ -121,6 +121,7 @@ describe("mapas de arquitetura — coerência interna", () => {
       "saida",
       "layout",
       "iconroute",
+      "loginelus",
       "marcaemails",
       "pdf",
     ]) {
@@ -323,4 +324,28 @@ describe("o mapa do turno conhece todos os turnos", () => {
       expect(porque.length, `${kind} sem motivo escrito`).toBeGreaterThan(25);
     }
   });
+
+  it("Integrações ERP está no mapa, com entrada, saída, auditoria e retorno", () => {
+    const m = JSON.parse(
+      fs.readFileSync(path.join(DIR, "integracoes-erp.architecture.json"), "utf8"),
+    ) as Mapa;
+    const arestas = m.edges ?? [];
+    const grau = (id: string) =>
+      arestas.filter((e) => e.from === id || e.to === id).length;
+    const liga = (de: string, para: string) =>
+      arestas.some((e) => e.from === de && e.to === para);
+
+    for (const n of m.nodes!)
+      expect(grau(n.id), `${n.id} com menos de 2 arestas — é ilha pelo invariante 1`).toBeGreaterThanOrEqual(2);
+
+    expect(liga("adminmodulos", "provisionador"), "a instalação não chega à provisionadora").toBe(true);
+    expect(liga("modulosinstalados", "navcatalogo"), "módulo ativo não habilita a porta humana").toBe(true);
+    expect(liga("tools", "service"), "tools criaram caminho paralelo ao service do módulo").toBe(true);
+    expect(liga("provider", "vendaerp"), "provider não chega ao sistema externo").toBe(true);
+    expect(liga("vendaerp", "provider"), "resposta externa não volta ao provider").toBe(true);
+    expect(liga("rotaconexoes", "auditoria"), "configuração/teste não deixa rastro").toBe(true);
+    expect(liga("tools", "auditoria"), "consulta do agente não deixa rastro redigido").toBe(true);
+  });
+
+
 });

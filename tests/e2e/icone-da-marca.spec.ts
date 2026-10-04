@@ -88,11 +88,10 @@ test.describe("o ícone e o título carregam a marca da instalação", () => {
     const marcaNoTitulo = casou?.[1] ?? "";
     expect(marcaNoTitulo.length).toBeGreaterThan(0);
 
-    // Cruza DUAS resoluções independentes: o título vem de `generateMetadata`
-    // (que lê `platform_branding` no banco) e o texto sob o "Entrar" vem de
-    // `branding()` (que lê o `.env`). Divergirem é defeito de verdade — foi
-    // por não cruzar isso que "trocar o nome pela tela e a aba não acompanhar"
-    // passou despercebido antes.
+    // O título e a fachada precisam mostrar a MESMA marca resolvida. O login
+    // também lê `marcaDaSaida(null)`: banco acima do `.env`, sem organização.
+    // Se a tela voltar a `branding()`, trocar o nome em Administração › Marca
+    // volta a deixar a aba com um nome e o formulário com outro.
     await expect(page.getByText(marcaNoTitulo, { exact: true }).first()).toBeVisible();
   });
 });

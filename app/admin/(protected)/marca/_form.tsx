@@ -238,31 +238,20 @@ export function FormularioDaMarca({
           `<PublicEnvScript/>` passou a injetar a marca RESOLVIDA em vez de
           `env.APP_NAME` cru.
 
-          Agora envelheceu uma TERCEIRA vez, e vale registrar o porquê: dizia que
-          os 4 client components (os dois menus, o painel de códigos de
-          recuperação e a tela da Nuvemshop) liam `window.__PUBLIC_ENV__`. Eles
-          liam — e era um DEFEITO, não um caminho. `branding()` lê
-          `window.__PUBLIC_ENV__` no navegador e `process.env` no servidor, e a
-          injeção da marca resolvida fez as duas divergirem: no SSR de um
-          `"use client"` não há `window`, então o servidor renderizava o nome do
-          arquivo de instalação e o navegador hidratava o do banco — React #418
-          em toda tela. Hoje esses 4 recebem a marca por PROP
-          (`useMarcaDaInstalacao`, alimentado pelo layout raiz), então continuam
-          mostrando o banco, e os dois lados concordam.
+          A fachada de entrada também usa a marca resolvida do banco. O login
+          deixou de chamar `branding()` (que lê apenas o `.env`) e passou a usar
+          `marcaDaSaida(null)`, a mesma precedência banco → ambiente usada pelo
+          restante da fachada. Isso evita a situação em que o título da aba dizia
+          uma marca e o formulário dizia outra.
 
-          Medido AGORA, sobre os call sites de `branding()`: nenhum é client
-          component (há catraca em
-          `tests/unit/marca-sem-divergencia-de-hidratacao.test.tsx`); os que
-          sobram são server components (login, cadastro, casca e boas-vindas da
-          configuração inicial, mais o texto legal) e leem `process.env` direto.
-          São esses que continuam no arquivo de instalação — e o login segue ali
-          de propósito, porque `tests/e2e/icone-da-marca.spec.ts` cruza o título
-          da aba (banco) contra o texto do login (arquivo) e a spec mediria nada
-          se os dois viessem da mesma fonte.
+          Os client components continuam recebendo a marca por PROP
+          (`useMarcaDaInstalacao`, alimentado pelo layout raiz), evitando
+          divergência entre SSR e hidratação. A catraca de fonte fica em
+          `tests/unit/nome-da-marca-nas-telas-vem-do-banco.test.ts`.
         */}
         <p className="text-xs text-text-muted">
           {t(
-            "Deixe em branco para voltar ao nome padrão. Este nome já aparece no título da aba do navegador, nos menus laterais, nos e-mails que o sistema envia (para as empresas que não definiram um nome próprio), no aplicativo de verificação em duas etapas e no arquivo de códigos de recuperação que o usuário baixa. Ainda NÃO chega às telas de entrada e cadastro nem às da configuração inicial: essas continuam com o nome gravado no arquivo de instalação do servidor até a próxima atualização da stack.",
+            "Deixe em branco para voltar ao nome padrão. Este nome aparece no título da aba do navegador, na tela de entrada, nos menus laterais, nos e-mails que o sistema envia (para as empresas que não definiram um nome próprio), no aplicativo de verificação em duas etapas e no arquivo de códigos de recuperação que o usuário baixa.",
           )}
         </p>
       </Card>

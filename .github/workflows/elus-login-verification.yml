@@ -1,0 +1,128 @@
+name: Elus login verification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/elus-login-verification.yml"
+      - "app/(public)/login/**"
+      - "components/auth/LoginForm.tsx"
+      - "app/globals.css"
+      - "lib/branding/**"
+      - "public/brand/elus/**"
+      - "tests/e2e/login-elus-candidate.spec.ts"
+      - "tests/e2e/icone-da-marca.spec.ts"
+      - "tests/unit/login-elus-acesso-restrito.test.ts"
+      - "tests/unit/branding-*.test.ts"
+      - "tests/unit/nome-da-marca-nas-telas-vem-do-banco.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  login-elus:
+    name: Elus login browser flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Login and branding unit gates
+        run: >-
+          pnpm vitest run
+          tests/unit/login-elus-acesso-restrito.test.ts
+          tests/unit/branding-contraste.test.ts
+          tests/unit/branding-fallback-alcancavel.test.ts
+          tests/unit/branding-logo-arquivo.test.ts
+          tests/unit/branding-pares-pintados.test.ts
+          tests/unit/nome-da-marca-nas-telas-vem-do-banco.test.ts
+
+      - name: Check candidate E2E formatting
+        run: >-
+          pnpm exec prettier --check
+          "tests/e2e/login-elus-candidate.spec.ts"
+          "tests/e2e/icone-da-marca.spec.ts"
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.117.0
+
+      - name: Start local Supabase without migration chain
+        run: |
+          set -euo pipefail
+          mv supabase/migrations /tmp/migrations-off
+          mkdir -p supabase/migrations
+          supabase start -x studio,postgres-meta
+
+      - name: Enable baseline extensions
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q <<'SQL'
+          create schema if not exists extensions;
+          create extension if not exists "uuid-ossp" with schema extensions;
+          create extension if not exists pgcrypto with schema extensions;
+          create extension if not exists vector with schema public;
+          create extension if not exists citext with schema public;
+          create extension if not exists pg_trgm with schema public;
+          SQL
+
+      - name: Apply product baseline
+        run: >-
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          -v ON_ERROR_STOP=1 -q -f supabase/baseline.sql
+
+      - name: Seed Elus installation brand
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 <<'SQL'
+          insert into public.platform_branding (id, app_name, seeded_from_env)
+          values (1, 'Elus', false)
+          on conflict (id) do update
+          set app_name = excluded.app_name,
+              seeded_from_env = false;
+          SQL
+
+      - name: Generate local E2E environment
+        run: pnpm e2e:env
+
+      - name: Publish E2E environment
+        run: grep -vE '^[[:space:]]*(#|$)' .env.e2e >> "$GITHUB_ENV"
+
+      - name: Build production app for E2E
+        run: pnpm e2e:build
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Elus login browser proof
+        run: >-
+          pnpm exec playwright test
+          tests/e2e/login-elus-candidate.spec.ts
+          tests/e2e/icone-da-marca.spec.ts
+          --workers=1
+          --reporter=list
+
+      - name: Upload visual evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: elus-login-visual-evidence
+          path: test-results
+          if-no-files-found: error
+          retention-days: 14

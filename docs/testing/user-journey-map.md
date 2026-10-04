@@ -3220,3 +3220,55 @@ respondeu; se a mensagem do fluxo saiu da janela do histórico (`historyLimit`),
 vale o horário, no segundo. Uma inbound sem texto acorda o nó, não é
 classificada, e a carência recomeça desse despertar (comportamento anterior do
 motor, não mexido aqui).
+
+
+## J39 — Entrar no Elus pela fachada aprovada `[P0]` (2026-10-02)
+
+Spec: `tests/e2e/login-elus-candidate.spec.ts`. A prova roda deslogada contra Supabase local
+fresco, `baseline.sql`, `platform_branding.app_name = 'Elus'` e build de produção. O
+componente continua resolvendo a marca por `marcaDaSaida(null)`; a spec não aceita
+`DeskcommCRM` na fachada e não introduz hardcode do nome no produto.
+
+| # | Caso | Esperado | Resultado |
+|---|------|----------|-----------|
+| J39.1 | Abrir `/login` em 1440×900 | logo Elus, hero aprovado, “Bem-vindo ao Elus”, Email, Senha, recuperação e Entrar visíveis; sem cadastro público nem Google | PASS no gate Elus login verification |
+| J39.2 | Mostrar/ocultar senha | o campo troca de `password` para `text` e mantém o controle de ocultar | PASS |
+| J39.3 | Abrir `/login` em 390×844 | logo e formulário acessíveis; hero lateral não é forçado no mobile; sem `DeskcommCRM` | PASS |
+
+Evidência versionada: `evidence/elus-login-erp-20261002/login-elus-desktop.png` e
+`evidence/elus-login-erp-20261002/login-elus-mobile.png`. A inspeção original veio do
+artifact `elus-login-visual-evidence`, run 36987807665, sobre o head funcional
+`3782d82acfcc04d81abb9a83305359b5735ffe71`. Depois desse head, a reconciliação
+não alterou o componente de login nem os assets aprovados; versionou a evidência e fechou
+documentação/gates.
+
+## J40 — Instalar Integrações ERP e abrir VendaERP sem chamada externa `[P0]` (2026-10-02)
+
+Spec: `tests/e2e/integracoes-erp.spec.ts`. O dono instala `integracoes_erp` por
+`/admin/modulos`, entra em `/app/integracoes-erp` e encontra VendaERP marcado como
+“Somente leitura”. A prova de segurança usa somente credenciais falsas e
+`https://127.0.0.1:54321`: a guarda textual recusa o destino privado antes de DNS/fetch,
+portanto o E2E não consome request real do VendaERP nem envia segredo para fora.
+
+| # | Caso | Esperado | Resultado |
+|---|------|----------|-----------|
+| J40.1 | Instalar `integracoes_erp` pela tela | cartão muda para instalado e a porta do módulo passa a existir | PASS no gate ERP browser verification |
+| J40.2 | Abrir `/app/integracoes-erp` | “Integrações ERP”, “VendaERP” e “Somente leitura” visíveis | PASS |
+| J40.3 | Tentar salvar URL loopback com credenciais E2E falsas | aparece `unsafe_url:private_host` e não aparece “Conexão salva” | PASS; zero chamada real ao provider |
+
+Evidência versionada:
+`evidence/elus-login-erp-20261002/integracoes-erp-vendaerp.png`. A inspeção original
+veio do artifact `erp-browser-visual-evidence`, run 36987808174, sobre o mesmo head
+funcional `3782d82acfcc04d81abb9a83305359b5735ffe71`.
+
+### Integrações ERP — DANFE no atendimento
+
+- [P0] **Atendente envia DANFE pela conversa correta, sem sender paralelo.**
+  - Entrada: conversa já selecionada no Inbox; papel `agent+`.
+  - Consulta: pedido/NFe via `/api/v1/conversations/[id]/erp`, sem URL escolhida pelo browser.
+  - Preparação: referência VendaERP passa por SSRF/DNS/redirect guard, teto de mídia e MIME documental; bytes entram em `whatsapp-media/{org}/{conversation}`.
+  - Envio: botão usa `useSendMessage` → `POST /api/v1/messages`; o E2E também força o refetch do histórico e exige que a mensagem DANFE continue visível no thread.
+  - Segurança negativa: viewer não aciona a capacidade; redirect, host privado, HTML e arquivo >50 MB não podem chegar ao sender.
+  - **Resultado: PASS** no `ERP browser verification`, run `37030957243`, head `23ee7c61a29ffe166a70fc105a96c30d50e7e8bc`. A prova usa banco Supabase local fresco e doubles somente nas bordas externas; não consome chamada real do VendaERP nem envia WhatsApp real.
+  - Evidência visual versionada: `evidence/elus-login-erp-20261002/erp-danfe-atendimento-preparado.jpg`. O artifact original em resolução integral é `erp-browser-visual-evidence` do mesmo run.
+  - **Prova externa continua pendente, por desenho:** o comportamento real da `danfeUrl` do VendaERP (autenticação, MIME, redirect e formato) só pode ser marcado como compatível após canário explicitamente autorizado.

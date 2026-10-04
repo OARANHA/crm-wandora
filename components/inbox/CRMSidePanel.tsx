@@ -3,6 +3,7 @@
 import { RoteirosDoContato } from "@/components/contacts/RoteirosDoContato";
 import { AcervoSearch } from "./AcervoSearch";
 import { LeadEnrichment } from "./LeadEnrichment";
+import { ErpDanfeCard } from "./ErpDanfeCard";
 import type { ProspectEnrichment } from "@/lib/prospecting/schema";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
@@ -744,6 +745,8 @@ export function CRMSidePanel({ conversation }: Props) {
       />}
 
       <Separator />
+
+      <ErpDanfeCard conversationId={conversation.id} />
 
       {/* ANTES dos negócios de propósito (doutrina cap. 5): lead é o negócio,
           conversa é o canal, demanda é o que precisa acabar. Quem abre esta

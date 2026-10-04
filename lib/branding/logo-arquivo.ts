@@ -86,13 +86,19 @@ export function farejarTipo(bytes: Uint8Array): TipoDeLogo | null {
  * falso NEGATIVO. `farejarTipo` já recusa tudo que não seja PNG/JPEG, então esta
  * função não decide se o arquivo entra — decide se a pessoa recebe a frase que
  * explica o problema dela. Um "quase-SVG" que escape daqui ainda é barrado pelo
- * farejador; um PNG que caia aqui por engano é impossível, porque a assinatura
- * PNG começa com `0x89`, que não é `<` nem espaço.
+ * farejador.
+ *
+ * IMPORTANTE: PNG e JPEG legítimos podem carregar metadados textuais (XMP/XML)
+ * logo no começo do arquivo. A versão anterior varria os primeiros 1 KB antes de
+ * respeitar a assinatura binária e, por isso, um PNG transparente com `<?xml`
+ * em metadados podia receber a mensagem "SVG não é aceito". Formato reconhecido
+ * pela assinatura sempre vence a heurística textual.
  *
  * Varre a janela inteira em vez de olhar só o começo porque BOM, `<?xml …?>`,
- * `<!DOCTYPE …>` e comentários podem preceder a tag raiz.
+ * `<!DOCTYPE …>` e comentários podem preceder a tag raiz de um SVG real.
  */
 export function pareceSvg(bytes: Uint8Array): boolean {
+  if (farejarTipo(bytes)) return false;
   const janela = bytes.subarray(0, BYTES_PARA_FAREJAR);
   // `latin1` e não `utf-8`: aqui não se quer interpretar texto, só procurar uma
   // sequência ASCII. UTF-16 com BOM viraria mojibake em utf-8 e a busca falharia.

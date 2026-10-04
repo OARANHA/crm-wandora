@@ -1,0 +1,117 @@
+name: ERP browser verification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/erp-browser-verification.yml"
+      - "app/api/v1/integracoes-erp/**"
+      - "app/api/v1/conversations/**/erp/**"
+      - "app/app/integracoes-erp/**"
+      - "components/inbox/CRMSidePanel.tsx"
+      - "components/inbox/ErpDanfeCard.tsx"
+      - "components/modulos/**"
+      - "lib/integracoes-erp/**"
+      - "lib/modulos/**"
+      - "supabase/baseline.sql"
+      - "supabase/migrations/**"
+      - "tests/e2e/integracoes-erp.spec.ts"
+      - "docs/testing/user-journey-map.md"
+      - "evidence/elus-login-erp-20261002/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-erp:
+    name: ERP browser flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check ERP E2E formatting
+        run: pnpm exec prettier --check "tests/e2e/integracoes-erp.spec.ts"
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.117.0
+
+      - name: Start local Supabase without migration chain
+        run: |
+          set -euo pipefail
+          mv supabase/migrations /tmp/migrations-off
+          mkdir -p supabase/migrations
+          supabase start -x studio,postgres-meta
+
+      - name: Enable baseline extensions
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q <<'SQL'
+          create schema if not exists extensions;
+          create extension if not exists "uuid-ossp" with schema extensions;
+          create extension if not exists pgcrypto with schema extensions;
+          create extension if not exists vector with schema public;
+          create extension if not exists citext with schema public;
+          create extension if not exists pg_trgm with schema public;
+          SQL
+
+      - name: Apply product baseline
+        run: >-
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          -v ON_ERROR_STOP=1 -q -f supabase/baseline.sql
+
+      - name: Seed Elus installation brand
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 <<'SQL'
+          insert into public.platform_branding (id, app_name, seeded_from_env)
+          values (1, 'Elus', false)
+          on conflict (id) do update
+          set app_name = excluded.app_name,
+              seeded_from_env = false;
+          SQL
+
+      - name: Generate local E2E environment
+        run: pnpm e2e:env
+
+      - name: Publish E2E environment
+        run: grep -vE '^[[:space:]]*(#|$)' .env.e2e >> "$GITHUB_ENV"
+
+      - name: Build production app for E2E
+        run: pnpm e2e:build
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run ERP browser proof
+        run: >-
+          pnpm exec playwright test
+          tests/e2e/integracoes-erp.spec.ts
+          --workers=1
+          --reporter=list
+
+      - name: Upload visual evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: erp-browser-visual-evidence
+          path: test-results
+          if-no-files-found: error
+          retention-days: 14

@@ -28,6 +28,7 @@ import { describe, expect, it } from "vitest";
 
 /** As telas que escrevem o nome da marca em texto, fora da árvore de `/app`. */
 const TELAS = [
+  "app/(public)/login/page.tsx",
   "app/onboarding/layout.tsx",
   "app/onboarding/welcome/page.tsx",
   "app/get-started/page.tsx",
@@ -36,7 +37,7 @@ const TELAS = [
 /** O resolvedor do banco é quem decide — banco acima, `.env` como piso. */
 const RESOLVEDOR = "marcaDaSaida";
 
-describe("o nome em texto do onboarding/welcome/get-started vem do BANCO", () => {
+describe("o nome em texto do login/onboarding/welcome/get-started vem do BANCO", () => {
   it("cada tela chama o resolvedor do banco (`marcaDaSaida`) para o nome", () => {
     for (const tela of TELAS) {
       const fonte = fs.readFileSync(path.join(process.cwd(), tela), "utf8");

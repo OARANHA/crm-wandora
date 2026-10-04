@@ -632,6 +632,14 @@ export const AUDIT_ACTIONS = [
   "honorarios.contrato_criado",
   "honorarios.parcela_criada",
   "honorarios.parcela_paga",
+  // Módulo opcional Integrações ERP: guardar/testar uma conexão muda quais
+  // dados externos a organização consegue consultar. O metadata leva só provider
+  // e resultado; credenciais nunca entram na trilha.
+  "integracao_erp.conexao_salva",
+  "integracao_erp.conexao_testada",
+  // Documento fiscal lido do ERP e materializado no Storage da conversa antes
+  // do clique de envio. Não carrega URL externa nem credencial.
+  "integracao_erp.danfe_preparada",
   "fidelidade.ponto_dado",
   "fidelidade.ponto_resgatado",
   "financeiro.recorrencia_gerada",
