@@ -3,10 +3,7 @@ import { MAX_MEDIA_BYTES, extFromMime } from "@/lib/messaging/media/types";
 import { validateOutboundMedia } from "@/lib/messaging/media/upload-validation";
 import { ErroRenderizacaoDocumento } from "@/lib/documentos/renderizar-url-pdf";
 
-import {
-  ehUrlDanfePublicoVendaErp,
-  renderizarDanfeVendaErpParaPdf,
-} from "./vendaerp-danfe-pdf";
+import { ehUrlDanfePublicoVendaErp, renderizarDanfeVendaErpParaPdf } from "./vendaerp-danfe-pdf";
 
 const DANFE_TIMEOUT_MS = 20_000;
 
