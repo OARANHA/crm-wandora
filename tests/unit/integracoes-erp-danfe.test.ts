@@ -28,11 +28,9 @@ describe("materialização segura do DANFE", () => {
         }),
     ) as unknown as typeof fetch;
 
-    await materializarDanfeExterno(
-      "https://erp.example.test/danfe",
-      fetcher,
-      { headers: { "Authorization-Token": "segredo", User: "usuario", App: "app" } },
-    );
+    await materializarDanfeExterno("https://erp.example.test/danfe", fetcher, {
+      headers: { "Authorization-Token": "segredo", User: "usuario", App: "app" },
+    });
 
     expect(fetcher).toHaveBeenCalledWith(
       "https://erp.example.test/danfe",
