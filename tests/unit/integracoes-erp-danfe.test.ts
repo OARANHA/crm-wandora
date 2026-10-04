@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ehUrlDanfePublicoVendaErp, materializarDanfeExterno } from "@/lib/integracoes-erp/danfe";
+import { materializarDanfeExterno } from "@/lib/integracoes-erp/danfe";
+import { ehUrlDanfePublicoVendaErp } from "@/lib/integracoes-erp/vendaerp-danfe-pdf";
 
 describe("materialização segura do DANFE", () => {
   it("aceita PDF provado pelos bytes sem confiar no sufixo da URL", async () => {
