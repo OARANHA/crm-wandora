@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { cabecalhosVendaErp, montarUrlVendaErp } from "@/lib/integracoes-erp/vendaerp";
+import {
+  cabecalhosDanfeVendaErp,
+  cabecalhosVendaErp,
+  montarUrlVendaErp,
+} from "@/lib/integracoes-erp/vendaerp";
 
 describe("cliente VendaERP", () => {
   it("monta endpoints sem perder um prefixo configurado na base", () => {
@@ -45,5 +49,33 @@ describe("cliente VendaERP", () => {
       User: "usuario",
       App: "app",
     });
+  });
+
+  it("só envia autenticação ao DANFE quando a URL mantém o mesmo origin do VendaERP", () => {
+    const credenciais = {
+      baseUrl: "https://erp.exemplo.test/integracao",
+      authorizationToken: "segredo",
+      user: "usuario",
+      app: "app",
+    };
+
+    expect(
+      cabecalhosDanfeVendaErp(
+        credenciais,
+        "https://erp.exemplo.test/api/request/Fiscal/ImprimirDanfe?id=1",
+      ),
+    ).toMatchObject({
+      "Authorization-Token": "segredo",
+      User: "usuario",
+      App: "app",
+    });
+
+    expect(
+      cabecalhosDanfeVendaErp(credenciais, "https://cdn.exemplo.test/danfe/1.pdf"),
+    ).toBeUndefined();
+
+    expect(
+      cabecalhosDanfeVendaErp(credenciais, "https://erp.exemplo.test.evil.invalid/danfe"),
+    ).toBeUndefined();
   });
 });
