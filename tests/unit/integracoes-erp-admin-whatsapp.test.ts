@@ -165,6 +165,37 @@ describe("Admin WhatsApp Read-Only V1", () => {
     expect(serializado).not.toContain("authorization");
   });
 
+  it("a auditoria aceita diagnóstico técnico sanitizado sem URL ou credencial", async () => {
+    const autoridade = resolver() as AutoridadeAdminWhatsapp;
+    await auditarConsultaAdminWhatsapp({
+      autoridade,
+      toolName: "crm_erp_prepare_admin_danfe",
+      requestId: "run-danfe",
+      success: false,
+      motivo: "danfe_download_failed",
+      codigoTecnico: "http_invalido",
+      statusHttp: 403,
+      autenticacaoSameOrigin: true,
+    });
+
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: "run-danfe",
+        metadata: expect.objectContaining({
+          motivo: "danfe_download_failed",
+          codigo_tecnico: "http_invalido",
+          status_http: 403,
+          autenticacao_same_origin: true,
+        }),
+      }),
+    );
+
+    const serializado = JSON.stringify(vi.mocked(audit).mock.calls[0]);
+    expect(serializado).not.toContain("http://");
+    expect(serializado).not.toContain("https://");
+    expect(serializado).not.toContain(telefone);
+  });
+
   it("o bridge administrativo só cria a tool de DANFE para autoridade real e fora de preview", () => {
     const bridge = readFileSync(
       join(process.cwd(), "lib/agent-engine/edge/crm/mcp-tools.ts"),
