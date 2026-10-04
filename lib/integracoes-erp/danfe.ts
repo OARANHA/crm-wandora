@@ -85,6 +85,7 @@ function executarChromium(args: string[]): Promise<void> {
     const filho = spawn(binario, args, {
       stdio: "ignore",
       env: {
+        NODE_ENV: process.env.NODE_ENV ?? "production",
         PATH: process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         HOME: "/tmp",
       },
