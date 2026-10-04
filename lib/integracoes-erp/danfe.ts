@@ -67,11 +67,7 @@ export function ehUrlDanfePublicoVendaErp(urlBruta: string): boolean {
     const trib = url.searchParams.get("trib");
 
     if (!/^[a-f0-9]{24}$/i.test(cod)) return false;
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        geren,
-      )
-    ) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(geren)) {
       return false;
     }
     if (token !== null && !/^[a-f0-9]{16,128}$/i.test(token)) return false;
@@ -85,15 +81,12 @@ export function ehUrlDanfePublicoVendaErp(urlBruta: string): boolean {
 
 function executarChromium(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const binario =
-      process.env.CHROMIUM_PATH?.trim() || "/usr/bin/chromium-browser";
+    const binario = process.env.CHROMIUM_PATH?.trim() || "/usr/bin/chromium-browser";
     const filho = spawn(binario, args, {
       stdio: "ignore",
       env: {
         NODE_ENV: process.env.NODE_ENV ?? "production",
-        PATH:
-          process.env.PATH ??
-          "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        PATH: process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         HOME: "/tmp",
       },
     });
@@ -109,9 +102,7 @@ function executarChromium(args: string[]): Promise<void> {
       filho.kill("SIGKILL");
       concluir(new ErroDanfeExterno("timeout"));
     }, DANFE_RENDER_TIMEOUT_MS);
-    filho.once("error", () =>
-      concluir(new ErroDanfeExterno("download_falhou")),
-    );
+    filho.once("error", () => concluir(new ErroDanfeExterno("download_falhou")));
     filho.once("exit", (codigo) => {
       if (codigo === 0) concluir();
       else concluir(new ErroDanfeExterno("download_falhou"));
@@ -119,9 +110,7 @@ function executarChromium(args: string[]): Promise<void> {
   });
 }
 
-export const renderizarDanfePublicoVendaErp: RenderizadorDanfeVendaErp = async (
-  url,
-) => {
+export const renderizarDanfePublicoVendaErp: RenderizadorDanfeVendaErp = async (url) => {
   if (!ehUrlDanfePublicoVendaErp(url)) {
     throw new ErroDanfeExterno("destino_inseguro");
   }
@@ -172,9 +161,7 @@ function mimeBase(valor: string | null): string | null {
 }
 
 function parecePdf(buffer: Buffer): boolean {
-  return buffer
-    .subarray(0, Math.min(buffer.length, 1024))
-    .includes(Buffer.from("%PDF-"));
+  return buffer.subarray(0, Math.min(buffer.length, 1024)).includes(Buffer.from("%PDF-"));
 }
 
 async function lerCorpoComLimite(
@@ -262,9 +249,7 @@ export async function materializarDanfeExterno(
 
     if (!resposta.ok) {
       throw new ErroDanfeExterno(
-        resposta.status >= 300 && resposta.status < 400
-          ? "destino_inseguro"
-          : "http_invalido",
+        resposta.status >= 300 && resposta.status < 400 ? "destino_inseguro" : "http_invalido",
         resposta.status,
       );
     }
@@ -287,15 +272,12 @@ export async function materializarDanfeExterno(
     }
 
     if (mime === "text/html" && ehUrlDanfePublicoVendaErp(url)) {
-      const renderizador =
-        options?.renderizadorVendaErp ?? renderizarDanfePublicoVendaErp;
+      const renderizador = options?.renderizadorVendaErp ?? renderizarDanfePublicoVendaErp;
       const pdf = await renderizador(url);
       const validacaoPdf = validateOutboundMedia("application/pdf", pdf.length);
       if (!validacaoPdf.ok) {
         throw new ErroDanfeExterno(
-          validacaoPdf.code === "payload_too_large"
-            ? "arquivo_grande"
-            : "tipo_nao_documento",
+          validacaoPdf.code === "payload_too_large" ? "arquivo_grande" : "tipo_nao_documento",
         );
       }
       if (!parecePdf(pdf) || validacaoPdf.kind !== "document") {
@@ -312,9 +294,7 @@ export async function materializarDanfeExterno(
     const validacao = validateOutboundMedia(mime, buffer.length);
     if (!validacao.ok) {
       throw new ErroDanfeExterno(
-        validacao.code === "payload_too_large"
-          ? "arquivo_grande"
-          : "tipo_nao_documento",
+        validacao.code === "payload_too_large" ? "arquivo_grande" : "tipo_nao_documento",
       );
     }
     if (validacao.kind !== "document") {
