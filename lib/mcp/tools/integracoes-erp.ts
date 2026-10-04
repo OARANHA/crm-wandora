@@ -265,7 +265,23 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       skip: input.skip,
     });
     const saida = resposta(r);
-    return saida.erro ? saida : { pedidos: saida.dados };
+    if (saida.erro) return saida;
+    return {
+      pedidos: saida.dados?.map((pedido) => ({
+        id: pedido.id,
+        codigo: pedido.codigo,
+        cliente: pedido.cliente,
+        status: pedido.status,
+        statusSistema: pedido.statusSistema,
+        total: pedido.total,
+        data: pedido.data,
+        finalizado: pedido.finalizado,
+        numeroNFe: pedido.numeroNFe,
+        dataFaturamento: pedido.dataFaturamento,
+        chaveAcessoNFe: pedido.chaveAcessoNFe,
+        danfeDisponivel: Boolean(pedido.danfeUrl),
+      })),
+    };
   },
 };
 
@@ -276,7 +292,7 @@ const notaInputShape = {
 export const crmErpGetInvoice: McpToolDefinition<typeof notaInputShape> = {
   name: "crm_erp_get_invoice",
   description:
-    "Consulta diretamente uma NFe/NFCe já emitida no VendaERP pelo número e devolve status de autorização, chave, lote e endereço do DANFE. O XML fiscal bruto não é entregue ao agente.",
+    "Consulta diretamente uma NFe/NFCe já emitida no VendaERP pelo número e devolve status de autorização, chave, lote e se há DANFE disponível. O XML fiscal bruto e a URL externa do DANFE não são entregues ao agente.",
   inputSchema: notaInputShape,
   category: "read",
   requiresRole: "agent",
@@ -285,6 +301,19 @@ export const crmErpGetInvoice: McpToolDefinition<typeof notaInputShape> = {
   handler: async (input, ctx) => {
     const r = await obterNotaErp(ctx.supabase, ctx.organizationId, input.codigo_nfe);
     const saida = resposta(r);
-    return saida.erro ? saida : { nota: saida.dados };
+    if (saida.erro) return saida;
+    const nota = saida.dados;
+    return {
+      nota: nota
+        ? {
+            numero: nota.numero,
+            codigoStatus: nota.codigoStatus,
+            mensagemStatus: nota.mensagemStatus,
+            chave: nota.chave,
+            lote: nota.lote,
+            danfeDisponivel: Boolean(nota.danfeUrl),
+          }
+        : null,
+    };
   },
 };

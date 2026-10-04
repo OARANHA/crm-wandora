@@ -28,6 +28,11 @@ import { recusaDeCapacidadeParaOModelo } from "@/lib/mcp/recusa-para-o-modelo";
 import type { McpContext, McpToolDefinition } from "@/lib/mcp/types";
 import { resolveActiveLeadForContact, type LeadCandidate } from "@/lib/leads/active-lead";
 import { podeChamarFerramenta, recusaParaOModelo } from "@/lib/leads/escopo-de-funil";
+import {
+  auditarConsultaAdminWhatsapp,
+  ferramentaErpExigeAutoridadeAdminWhatsapp,
+  type AutoridadeAdminWhatsapp,
+} from "@/lib/integracoes-erp/autoridade-admin-whatsapp";
 
 export interface RuntimeHandoffSignal {
   triggered: boolean;
@@ -74,6 +79,12 @@ export interface PickToolsInput {
    * do turno à mão, esse id é traduzido para o negócio aberto dele.
    */
   contatoDoTurno?: string;
+  /**
+   * Autoridade separada da identidade do cliente: só existe quando o número
+   * remetente da conversa está explicitamente vinculado a um usuário admin ativo
+   * desta mesma organização.
+   */
+  autoridadeAdminWhatsapp?: AutoridadeAdminWhatsapp;
 }
 
 /**
@@ -233,6 +244,16 @@ function wrapMcpTool(
       try {
         ensureScope(input.auth.scopes, def.requiresScope);
         ensureRole(input.auth.role, def.requiresRole);
+        if (
+          ferramentaErpExigeAutoridadeAdminWhatsapp(def.name) &&
+          !input.autoridadeAdminWhatsapp
+        ) {
+          return {
+            permitido: false,
+            motivo: "autoridade_admin_whatsapp_ausente",
+            mensagem: "esta consulta administrativa não está disponível nesta conversa.",
+          };
+        }
 
         // ── DE QUE NEGÓCIO É ESTA ESCRITA — do contato da conversa ──────────
         //
@@ -379,9 +400,33 @@ function wrapMcpTool(
             ? {}
             : { desfecho: "sem_resultado" as const, motivo: motivoDoVazio }),
         });
+        if (
+          input.autoridadeAdminWhatsapp &&
+          ferramentaErpExigeAutoridadeAdminWhatsapp(def.name)
+        ) {
+          await auditarConsultaAdminWhatsapp({
+            autoridade: input.autoridadeAdminWhatsapp,
+            toolName: def.name,
+            requestId: input.ctx.requestId,
+            success: motivoDoVazio === null,
+            motivo: motivoDoVazio,
+          });
+        }
         return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : "unknown_error";
+        if (
+          input.autoridadeAdminWhatsapp &&
+          ferramentaErpExigeAutoridadeAdminWhatsapp(def.name)
+        ) {
+          await auditarConsultaAdminWhatsapp({
+            autoridade: input.autoridadeAdminWhatsapp,
+            toolName: def.name,
+            requestId: input.ctx.requestId,
+            success: false,
+            motivo: "falha_execucao",
+          });
+        }
         void auditMcpToolCall({
           ctx: input.ctx,
           toolName: def.name,
@@ -441,6 +486,15 @@ export function pickToolsFromMcp(input: PickToolsInput): Record<string, Tool> {
     // A marca era declaração sem efeito no runtime: eu a criei no catálogo e
     // não a apliquei aqui. Não montar é o que faz a declaração valer.
     if (catalogEntry(def.name)?.apenasHumano) continue;
+
+    // Cliente/pedido/NFe são consultas administrativas no WhatsApp deste V1.
+    // Sem autoridade explícita elas nem entram no toolset; o check no execute
+    // acima é defesa em profundidade.
+    if (
+      ferramentaErpExigeAutoridadeAdminWhatsapp(def.name) &&
+      !input.autoridadeAdminWhatsapp
+    )
+      continue;
 
     // Módulo opcional desligado nesta instalação (doc 37): a capacidade não
     // existe aqui, então nem chega ao modelo — mesmo que a versão publicada do

@@ -640,6 +640,9 @@ export const AUDIT_ACTIONS = [
   // Documento fiscal lido do ERP e materializado no Storage da conversa antes
   // do clique de envio. Não carrega URL externa nem credencial.
   "integracao_erp.danfe_preparada",
+  "integracao_erp.admin_whatsapp_vinculado",
+  "integracao_erp.admin_whatsapp_desvinculado",
+  "integracao_erp.admin_consulta",
   "fidelidade.ponto_dado",
   "fidelidade.ponto_resgatado",
   "financeiro.recorrencia_gerada",
