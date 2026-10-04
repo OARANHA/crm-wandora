@@ -20,9 +20,8 @@ describe("capability erp.vendaerp.danfe_to_pdf", () => {
   });
 
   it("chama o renderer genérico com policy fechada e sem credenciais ERP", async () => {
-    const renderer = vi.fn(
-      async (_url: string, _politica: PoliticaRenderizacaoUrlPdf) =>
-        Buffer.from("%PDF-1.7\ncapability"),
+    const renderer = vi.fn(async (_url: string, _politica: PoliticaRenderizacaoUrlPdf) =>
+      Buffer.from("%PDF-1.7\ncapability"),
     );
 
     const pdf = await renderizarDanfeVendaErpParaPdf(URL_DANFE, renderer);
