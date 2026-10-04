@@ -26,7 +26,9 @@ describe("capability erp.vendaerp.danfe_to_pdf", () => {
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(renderer).toHaveBeenCalledTimes(1);
 
-    const [url, politica] = renderer.mock.calls[0];
+    const chamada = renderer.mock.calls[0];
+    expect(chamada).toBeDefined();
+    const [url, politica] = chamada!;
     expect(url).toBe(URL_DANFE);
     expect(politica.nome).toBe("erp.vendaerp.danfe_to_pdf");
     expect(politica.permiteUrl(URL_DANFE)).toBe(true);
