@@ -1,7 +1,4 @@
-import {
-  renderizarUrlParaPdf,
-  type RenderizadorUrlPdf,
-} from "@/lib/documentos/renderizar-url-pdf";
+import { renderizarUrlParaPdf, type RenderizadorUrlPdf } from "@/lib/documentos/renderizar-url-pdf";
 import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
 
 const VENDAERP_DANFE_HOST = "app.vendaerp.com.br";
