@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "titulo": "Integrações ERP — VendaERP read-only + entrega humana de DANFE",
-  "descricao": "O módulo continua read-only no ERP. No Inbox, um humano agent+ localiza pedido/nota; o Elus materializa a referência de DANFE com guards de egress, grava no whatsapp-media da conversa e entrega pelo sender core já existente. O agente de IA continua apenas consultando tools read.",
+  "titulo": "Integrações ERP — VendaERP read-only + DANFE cliente + Admin WhatsApp Read-Only",
+  "descricao": "O módulo continua read-only no ERP. O fluxo de cliente preserva a prova contato→Pessoa antes de DANFE. Separadamente, um número remetente pode ser vinculado a um usuário admin Elus da mesma organização; só essa autoridade expõe cliente/pedido/NFe no turno administrativo. Toda resposta usa o sender core existente.",
   "lanes": [
     {
       "id": "instalacao",
@@ -162,6 +162,27 @@
       "type": "service",
       "label": "POST /api/v1/messages → sendMessageHandler → lib/channels",
       "sublabel": "sender único; grava messages, audit message.sent e event_log"
+    },
+    {
+      "id": "adminwhatsappbinding",
+      "lane": "organizacao",
+      "type": "database",
+      "label": "erp_admin_whatsapp_bindings",
+      "sublabel": "org + usuário Elus + telefone E.164 + erp.admin.read; server-only, sem credencial ERP"
+    },
+    {
+      "id": "adminwhatsappconfig",
+      "lane": "organizacao",
+      "type": "ui",
+      "label": "Integrações ERP → WhatsApp administrativo",
+      "sublabel": "o próprio admin ativo vincula/desvincula seu número; sem usuário VendaERP"
+    },
+    {
+      "id": "adminwhatsappauthority",
+      "lane": "runtime",
+      "type": "service",
+      "label": "resolverAutoridadeAdminWhatsapp",
+      "sublabel": "contact.phone → binding do mesmo tenant → user_organizations role=admin não revogado; falha fechado"
     }
   ],
   "edges": [
@@ -326,6 +347,42 @@
       "from": "rotaerpconversa",
       "to": "auditoria",
       "label": "preparo deixa rastro sem URL/credencial"
+    },
+    {
+      "id": "e28",
+      "from": "provisionador",
+      "to": "adminwhatsappbinding",
+      "label": "cria o vínculo junto do módulo instalado"
+    },
+    {
+      "id": "e29",
+      "from": "telaerp",
+      "to": "adminwhatsappconfig",
+      "label": "admin gerencia apenas o próprio número"
+    },
+    {
+      "id": "e30",
+      "from": "adminwhatsappconfig",
+      "to": "adminwhatsappbinding",
+      "label": "API admin + membership real"
+    },
+    {
+      "id": "e31",
+      "from": "adminwhatsappbinding",
+      "to": "adminwhatsappauthority",
+      "label": "resolve identidade do remetente"
+    },
+    {
+      "id": "e32",
+      "from": "adminwhatsappauthority",
+      "to": "tools",
+      "label": "libera somente customer/order/invoice read"
+    },
+    {
+      "id": "e33",
+      "from": "adminwhatsappauthority",
+      "to": "auditoria",
+      "label": "consulta registra actor_user_id real sem PII da busca"
     }
   ]
 }

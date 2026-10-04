@@ -174,3 +174,54 @@ falha sem enviar nada ao cliente.
 - erro de transporte: segue o status/erro normal da mensagem, visível no thread;
 - continuidade IA↔humano: a IA pode localizar pedido/nota por tools read, mas a
   ação de preparar/enviar fica fora do catálogo MCP do agente.
+
+## Admin WhatsApp Read-Only V1
+
+Esta frente adiciona uma autoridade **administrativa de conversa** sem alterar a
+autoridade de cliente da seção DANFE acima. As duas permanecem separadas:
+
+```text
+cliente WhatsApp
+→ contato da conversa
+→ Pedido/Pessoa VendaERP
+→ CPF/e-mail/telefone conferem
+→ documento daquele cliente
+
+admin WhatsApp
+→ contato da conversa
+→ erp_admin_whatsapp_bindings
+→ usuário Elus
+→ user_organizations da MESMA organização, role=admin e não revogado
+→ capability erp.admin.read
+→ consultas administrativas read-only da organização
+```
+
+O vínculo é explícito e tenant-scoped. O V1 permite ao próprio administrador
+ativo vincular o seu número em **Integrações ERP → WhatsApp administrativo**.
+Não se usa uma identidade do VendaERP para autenticar o administrador e não
+existe telefone mágico. A credencial VendaERP continua pertencendo à
+organização.
+
+No turno do agente, `crm_erp_search_customers`,
+`crm_erp_search_orders` e `crm_erp_get_invoice` só entram no toolset quando
+a autoridade administrativa acima foi resolvida. O gate é reaplicado antes da
+execução. Quando a mesma autoridade existe e a consulta de NFe está habilitada,
+o bridge acrescenta `crm_erp_prepare_admin_danfe`: ela materializa o documento
+com o mesmo guard de egress, grava no bucket privado da própria conversa e
+devolve um `preview_url` assinado por 10 minutos. A URL externa do VendaERP não
+entra no contexto do modelo. O modelo devolve o preview ao administrador pelo
+`send_message` normal. Produto/estoque continuam seguindo o contrato read-only
+anterior. Nenhuma tool de write no VendaERP é acrescentada.
+
+A resposta continua saindo pelo sender normal do agente para a conversa que
+originou o turno. Não existe sender administrativo, provider paralelo ou troca
+de telefone de cliente.
+
+Cada consulta administrativa gera `integracao_erp.admin_consulta` com
+`actor_user_id` do usuário Elus, organização, canal, capability, tool e
+desfecho. Telefone, valor pesquisado, token ERP, XML e URL de DANFE não entram
+nessa linha.
+
+A tabela `erp_admin_whatsapp_bindings` é parte do próprio módulo
+`integracoes_erp` e segue a ADR-0002: server-only, RLS ligada, sem grants para
+`anon/authenticated`, provisionada somente onde o módulo foi instalado.

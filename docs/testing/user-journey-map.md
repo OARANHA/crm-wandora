@@ -3272,3 +3272,16 @@ funcional `3782d82acfcc04d81abb9a83305359b5735ffe71`.
   - **Resultado: PASS** no `ERP browser verification`, run `37030957243`, head `23ee7c61a29ffe166a70fc105a96c30d50e7e8bc`. A prova usa banco Supabase local fresco e doubles somente nas bordas externas; não consome chamada real do VendaERP nem envia WhatsApp real.
   - Evidência visual versionada: `evidence/elus-login-erp-20261002/erp-danfe-atendimento-preparado.jpg`. O artifact original em resolução integral é `erp-browser-visual-evidence` do mesmo run.
   - **Prova externa continua pendente, por desenho:** o comportamento real da `danfeUrl` do VendaERP (autenticação, MIME, redirect e formato) só pode ser marcado como compatível após canário explicitamente autorizado.
+
+## J41 — Admin WhatsApp Read-Only V1 `[P0]` (2026-10-03)
+
+| # | Caso | Esperado | Resultado |
+|---|------|----------|-----------|
+| J41.1 | Admin ativo vincula o próprio WhatsApp em Integrações ERP | vínculo fica associado ao usuário Elus e à organização, capability `erp.admin.read`; nenhum token ERP por usuário | PENDENTE — CI/DB + prova visual após green |
+| J41.2 | Mensagem chega do número vinculado | runtime resolve contato → vínculo → membership admin do mesmo tenant antes de expor cliente/pedido/NFe | PENDENTE — CI |
+| J41.3 | Número sem vínculo, role abaixo de admin ou membership revogada | as tools administrativas sensíveis não entram no turno | PENDENTE — CI |
+| J41.4 | Admin de outra organização tenta atravessar tenant | autoridade não é formada; consultas seguem presas ao `organizationId` do job | PENDENTE — CI |
+| J41.5 | Cliente comum usa fluxo de documento | `provarPedidoDoContato` continua exigindo CPF/e-mail/telefone comparáveis; nenhuma capability admin vira bypass | PENDENTE — regressão da PR #11 + CI |
+| J41.6 | Admin procura cliente/pedido/NFe/DANFE | usa as mesmas tools/services VendaERP read-only; não troca telefone do cliente e não exige cadastro do admin no ERP | PENDENTE — teste humano só depois de merge/deploy validado |
+| J41.7 | Consulta administrativa executa | audit guarda usuário Elus, tenant, canal, capability, recurso e sucesso/falha, sem telefone/filtro/token/XML/URL DANFE | PENDENTE — CI |
+| J41.8 | Resposta ao admin | DANFE é materializada no storage privado da conversa, a URL externa do VendaERP não vai ao modelo, e o preview temporário é devolvido pelo `send_message` normal; nenhuma escrita VendaERP e nenhum WhatsApp real em CI | PENDENTE — teste humano final deliberado |

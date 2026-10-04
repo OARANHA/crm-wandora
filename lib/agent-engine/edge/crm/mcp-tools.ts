@@ -17,7 +17,8 @@ import { claimOfJob } from '@/lib/agent-engine/queue/claim';
  *     durável + cancelamento de follow-ups — duas tools de handoff confundiriam
  *     o modelo e a variante do CRM não silencia o harness.
  */
-import type { Tool } from 'ai';
+import { tool, type Tool } from 'ai';
+import { z } from 'zod';
 
 import { pickToolsFromMcp, type RuntimeHandoffSignal } from '@/lib/ai/runtime/tools';
 import { mintEphemeralToken, revokeEphemeralToken } from '@/lib/ai/runtime/mcp_token';
@@ -27,6 +28,11 @@ import type { McpContext } from '@/lib/mcp/types';
 import { modulosLigados } from '@/lib/instalacao/modulos';
 import { capacidadesDaOrganizacao } from '@/lib/organizacao/capacidades';
 import { filtrarToolsComCallbackDesabilitado } from '@/lib/followup/callback-policy';
+import {
+  filtrarFerramentasErpPorAutoridadeAdminWhatsapp,
+  prepararDanfeAdminWhatsapp,
+  resolverAutoridadeAdminWhatsapp,
+} from '@/lib/integracoes-erp/autoridade-admin-whatsapp';
 
 import type { Logger } from '../../obs/logger';
 import type { CrmEdgeConfig } from './mcp-client';
@@ -57,7 +63,12 @@ export interface McpTurnTools {
 export async function buildMcpTurnTools(
   cfg: CrmEdgeConfig,
   /** `contactId`: o contato do turno — ver `contatoDoTurno` em `lib/ai/runtime/tools.ts`. */
-  ids: { organizationId: string; jobId: string; contactId?: string },
+  ids: {
+    organizationId: string;
+    jobId: string;
+    contactId?: string;
+    conversationId?: string;
+  },
   agentConfig: PublishedAgentConfig,
   log: Logger,
   options?: { readOnly: boolean },
@@ -66,7 +77,7 @@ export async function buildMcpTurnTools(
     agentConfig.toolIds,
     agentConfig.followup,
   );
-  const allowed = callbackFiltered.filter((id) => !BLOCKED_TOOL_IDS.has(id));
+  const allowedBeforeAdminGate = callbackFiltered.filter((id) => !BLOCKED_TOOL_IDS.has(id));
   const blocked = agentConfig.toolIds.filter((id) => BLOCKED_TOOL_IDS.has(id));
   if (blocked.length > 0) {
     // A tela não oferece mais estas capacidades (a rota serve `marcavel: false`
@@ -77,6 +88,19 @@ export async function buildMcpTurnTools(
     log.warn('tools MCP bloqueadas no turno do engine (envio/handoff são do harness)', {
       blocked_tool_ids: blocked,
       motivos: blocked.map((id) => motivoDoHarness(id)),
+    });
+  }
+  const autoridadeAdminWhatsapp = ids.contactId
+    ? await resolverAutoridadeAdminWhatsapp(cfg.supabase, ids.organizationId, ids.contactId)
+    : null;
+  const allowed = filtrarFerramentasErpPorAutoridadeAdminWhatsapp(
+    allowedBeforeAdminGate,
+    autoridadeAdminWhatsapp,
+  );
+  const removidasPeloAdminGate = allowedBeforeAdminGate.filter((id) => !allowed.includes(id));
+  if (removidasPeloAdminGate.length > 0) {
+    log.info('tools ERP administrativas fora do turno sem autoridade WhatsApp admin', {
+      tool_ids: removidasPeloAdminGate,
     });
   }
   if (allowed.length === 0) {
@@ -143,7 +167,34 @@ export async function buildMcpTurnTools(
     modulosLigados: await modulosLigados(cfg.supabase),
     capacidadesLigadas: await capacidadesDaOrganizacao(cfg.supabase, ids.organizationId),
     ...(ids.contactId ? { contatoDoTurno: ids.contactId } : {}),
+    ...(autoridadeAdminWhatsapp ? { autoridadeAdminWhatsapp } : {}),
   });
+
+  if (
+    options?.readOnly !== true &&
+    autoridadeAdminWhatsapp &&
+    ids.conversationId &&
+    allowed.includes("crm_erp_get_invoice")
+  ) {
+    tools.crm_erp_prepare_admin_danfe = tool({
+      description:
+        "Prepara uma DANFE já emitida para esta conversa administrativa. " +
+        "Use somente quando o administrador pedir para ver a DANFE e você já tiver o número da NFe/NFCe. " +
+        "A ferramenta devolve um preview_url temporário; envie esse link ao administrador com send_message. " +
+        "Nunca use esta capacidade em conversa comum de cliente.",
+      inputSchema: z.object({
+        codigo_nfe: z.number().int().min(1).max(2_147_483_647),
+      }),
+      execute: async ({ codigo_nfe }) =>
+        prepararDanfeAdminWhatsapp(
+          cfg.supabase,
+          autoridadeAdminWhatsapp,
+          ids.conversationId!,
+          codigo_nfe,
+          ids.jobId,
+        ),
+    });
+  }
 
   return {
     tools,

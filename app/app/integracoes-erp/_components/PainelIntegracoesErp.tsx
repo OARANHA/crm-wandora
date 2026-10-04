@@ -12,12 +12,23 @@ import { useT } from "@/hooks/i18n/useT";
 import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
 import type { ConexaoErpSegura } from "@/lib/integracoes-erp/tipos";
 
+interface VinculoAdminWhatsapp {
+  id: string;
+  phone_number: string;
+  capability: "erp.admin.read";
+  enabled: boolean;
+}
+
 export function PainelIntegracoesErp({
   inicial,
   canWrite,
+  canBindWhatsapp,
+  vinculoAdminWhatsapp: vinculoInicial,
 }: {
   inicial: readonly ConexaoErpSegura[];
   canWrite: boolean;
+  canBindWhatsapp: boolean;
+  vinculoAdminWhatsapp: VinculoAdminWhatsapp | null;
 }) {
   const t = useT();
   const [conexoes, setConexoes] = useState<readonly ConexaoErpSegura[]>(inicial);
@@ -29,6 +40,11 @@ export function PainelIntegracoesErp({
   const [app, setApp] = useState("");
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [vinculoAdminWhatsapp, setVinculoAdminWhatsapp] =
+    useState<VinculoAdminWhatsapp | null>(vinculoInicial);
+  const [telefoneAdmin, setTelefoneAdmin] = useState(vinculoInicial?.phone_number ?? "");
+  const [mensagemAdmin, setMensagemAdmin] = useState<string | null>(null);
+  const [erroAdmin, setErroAdmin] = useState<string | null>(null);
   const [pendente, startTransition] = useTransition();
 
   const venda = useMemo(() => conexoes.find((c) => c.provider === "vendaerp") ?? null, [conexoes]);
@@ -74,6 +90,50 @@ export function PainelIntegracoesErp({
       }
       setConexoes((atuais) => [r.data, ...atuais.filter((c) => c.provider !== "vendaerp")]);
       setMensagem(t("Conexão com o VendaERP confirmada em modo somente leitura."));
+    });
+  }
+
+  function salvarWhatsappAdmin() {
+    setErroAdmin(null);
+    setMensagemAdmin(null);
+    startTransition(async () => {
+      const r = await requestExtensionApi<VinculoAdminWhatsapp>(
+        "/api/v1/integracoes-erp/admin-whatsapp",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ phone_number: telefoneAdmin }),
+        },
+      );
+      if (!r.ok) {
+        setErroAdmin(r.error.message);
+        return;
+      }
+      setVinculoAdminWhatsapp(r.data);
+      setTelefoneAdmin(r.data.phone_number);
+      setMensagemAdmin(
+        t(
+          "WhatsApp administrativo vinculado. O acesso continua limitado a consultas do ERP desta organização.",
+        ),
+      );
+    });
+  }
+
+  function removerWhatsappAdmin() {
+    setErroAdmin(null);
+    setMensagemAdmin(null);
+    startTransition(async () => {
+      const r = await requestExtensionApi<{ removed: boolean }>(
+        "/api/v1/integracoes-erp/admin-whatsapp",
+        { method: "DELETE" },
+      );
+      if (!r.ok) {
+        setErroAdmin(r.error.message);
+        return;
+      }
+      setVinculoAdminWhatsapp(null);
+      setTelefoneAdmin("");
+      setMensagemAdmin(t("WhatsApp administrativo desvinculado."));
     });
   }
 
@@ -192,6 +252,66 @@ export function PainelIntegracoesErp({
           ) : null}
         </CardContent>
       </Card>
+
+      {canBindWhatsapp ? (
+        <Card data-testid="erp-admin-whatsapp">
+          <CardHeader>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle>{t("WhatsApp administrativo")}</CardTitle>
+              <Badge variant="secondary">{t("Somente leitura")}</Badge>
+              {vinculoAdminWhatsapp?.enabled ? (
+                <Badge variant="success">{t("Ativo")}</Badge>
+              ) : null}
+            </div>
+            <CardDescription>
+              {t(
+                "Vincule o seu próprio WhatsApp ao seu usuário administrador do Elus. Esse número poderá consultar clientes, pedidos e notas da organização sem se passar pelo cliente.",
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+              {t(
+                "A autorização é conferida de novo a cada conversa: número vinculado, usuário da mesma organização e papel de administrador ativo. O VendaERP continua somente leitura.",
+              )}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="erp-admin-whatsapp-phone">{t("Meu WhatsApp")}</Label>
+              <Input
+                id="erp-admin-whatsapp-phone"
+                inputMode="tel"
+                value={telefoneAdmin}
+                onChange={(e) => setTelefoneAdmin(e.target.value)}
+                placeholder="+5551999999999"
+                autoComplete="tel"
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("Use o formato internacional com + e código do país.")}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={salvarWhatsappAdmin} disabled={pendente || !telefoneAdmin.trim()}>
+                {pendente
+                  ? t("Salvando…")
+                  : vinculoAdminWhatsapp
+                    ? t("Atualizar meu WhatsApp")
+                    : t("Vincular meu WhatsApp")}
+              </Button>
+              {vinculoAdminWhatsapp ? (
+                <Button variant="outline" onClick={removerWhatsappAdmin} disabled={pendente}>
+                  {t("Desvincular")}
+                </Button>
+              ) : null}
+            </div>
+            {mensagemAdmin ? <p className="text-sm text-emerald-600">{mensagemAdmin}</p> : null}
+            {erroAdmin ? (
+              <p role="alert" className="text-sm text-destructive">
+                {erroAdmin}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

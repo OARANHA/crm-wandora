@@ -13,6 +13,7 @@ describe("módulo Integrações ERP segue ADR-0002", () => {
     expect(modulos).toContain('["honorarios", "integracoes_erp"]');
     expect(baseline).toContain("fn_integracoes_erp_provisionar");
     expect(baseline).toContain("create table if not exists public.erp_connections");
+    expect(baseline).toContain("create table if not exists public.erp_admin_whatsapp_bindings");
   });
 
   it("tem porta de navegação própria, protegida pelo módulo", () => {
