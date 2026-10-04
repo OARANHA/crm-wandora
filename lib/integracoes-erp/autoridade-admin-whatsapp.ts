@@ -275,6 +275,9 @@ export async function auditarConsultaAdminWhatsapp(input: {
   requestId: string;
   success: boolean;
   motivo?: string | null;
+  codigoTecnico?: string | null;
+  statusHttp?: number | null;
+  autenticacaoSameOrigin?: boolean | null;
 }): Promise<void> {
   if (!ferramentaErpExigeAutoridadeAdminWhatsapp(input.toolName)) return;
   await audit({
@@ -290,6 +293,11 @@ export async function auditarConsultaAdminWhatsapp(input: {
       tool: input.toolName,
       success: input.success,
       ...(input.motivo ? { motivo: input.motivo } : {}),
+      ...(input.codigoTecnico ? { codigo_tecnico: input.codigoTecnico } : {}),
+      ...(typeof input.statusHttp === "number" ? { status_http: input.statusHttp } : {}),
+      ...(typeof input.autenticacaoSameOrigin === "boolean"
+        ? { autenticacao_same_origin: input.autenticacaoSameOrigin }
+        : {}),
     },
   });
 }
@@ -332,6 +340,11 @@ export async function prepararDanfeAdminWhatsapp(
 ): Promise<PrepararDanfeAdminWhatsappResultado> {
   const falhar = async (
     motivo: Exclude<PrepararDanfeAdminWhatsappResultado, { ok: true }>["motivo"],
+    diagnostico?: {
+      codigoTecnico?: string | null;
+      statusHttp?: number | null;
+      autenticacaoSameOrigin?: boolean | null;
+    },
   ): Promise<PrepararDanfeAdminWhatsappResultado> => {
     await auditarConsultaAdminWhatsapp({
       autoridade,
@@ -339,6 +352,13 @@ export async function prepararDanfeAdminWhatsapp(
       requestId,
       success: false,
       motivo,
+      ...(diagnostico?.codigoTecnico ? { codigoTecnico: diagnostico.codigoTecnico } : {}),
+      ...(typeof diagnostico?.statusHttp === "number"
+        ? { statusHttp: diagnostico.statusHttp }
+        : {}),
+      ...(typeof diagnostico?.autenticacaoSameOrigin === "boolean"
+        ? { autenticacaoSameOrigin: diagnostico.autenticacaoSameOrigin }
+        : {}),
     });
     return { ok: false, motivo };
   };
@@ -365,6 +385,11 @@ export async function prepararDanfeAdminWhatsapp(
     if (erro instanceof ErroDanfeExterno) {
       return falhar(
         erro.codigo === "destino_inseguro" ? "danfe_inseguro" : "danfe_download_failed",
+        {
+          codigoTecnico: erro.codigo,
+          ...(typeof erro.status === "number" ? { statusHttp: erro.status } : {}),
+          autenticacaoSameOrigin: Boolean(headers),
+        },
       );
     }
     return falhar("danfe_download_failed");
