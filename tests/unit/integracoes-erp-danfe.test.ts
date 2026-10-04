@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ehUrlDanfePublicoVendaErp, materializarDanfeExterno } from "@/lib/integracoes-erp/danfe";
+import { ErroRenderizacaoDocumento } from "@/lib/documentos/renderizar-url-pdf";
+import { materializarDanfeExterno } from "@/lib/integracoes-erp/danfe";
+import { ehUrlDanfePublicoVendaErp } from "@/lib/integracoes-erp/vendaerp-danfe-pdf";
 
 describe("materialização segura do DANFE", () => {
   it("aceita PDF provado pelos bytes sem confiar no sufixo da URL", async () => {
@@ -86,6 +88,28 @@ describe("materialização segura do DANFE", () => {
     expect(r.mime).toBe("application/pdf");
     expect(r.extensao).toBe("pdf");
     expect(r.buffer.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+
+  it("mapeia timeout da capability de documento para o contrato técnico do DANFE", async () => {
+    const url =
+      "https://app.vendaerp.com.br/v3/public/NFe/Danfe?print=true&Cod=6abe71151d133d5c8962c4e9&t=2d3d6ffdcd8352708eefd81413758ac8&trib=false&g=34b6208d-4d02-49bc-8a59-8823d1b10765";
+    const fetcher = vi.fn(
+      async () =>
+        new Response("<!doctype html><html></html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+    ) as unknown as typeof fetch;
+    const renderizadorVendaErp = vi.fn(async () => {
+      throw new ErroRenderizacaoDocumento("timeout");
+    });
+
+    await expect(
+      materializarDanfeExterno(url, fetcher, { renderizadorVendaErp }),
+    ).rejects.toMatchObject({
+      codigo: "timeout",
+      message: "timeout",
+    });
   });
 
   it("continua recusando HTML para qualquer outra URL", async () => {
