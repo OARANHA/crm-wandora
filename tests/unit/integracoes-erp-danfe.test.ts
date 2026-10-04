@@ -19,6 +19,33 @@ describe("materialização segura do DANFE", () => {
     expect(r.sizeBytes).toBeGreaterThan(0);
   });
 
+  it("encaminha headers de download fornecidos pelo chamador", async () => {
+    const fetcher = vi.fn(
+      async () =>
+        new Response("%PDF-1.7\nconteudo", {
+          status: 200,
+          headers: { "content-type": "application/pdf" },
+        }),
+    ) as unknown as typeof fetch;
+
+    await materializarDanfeExterno(
+      "https://erp.example.test/danfe",
+      fetcher,
+      { headers: { "Authorization-Token": "segredo", User: "usuario", App: "app" } },
+    );
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://erp.example.test/danfe",
+      expect.objectContaining({
+        headers: {
+          "Authorization-Token": "segredo",
+          User: "usuario",
+          App: "app",
+        },
+      }),
+    );
+  });
+
   it("recusa HTML no lugar de documento fiscal", async () => {
     const fetcher = vi.fn(
       async () =>
