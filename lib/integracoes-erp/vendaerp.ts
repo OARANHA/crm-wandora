@@ -98,6 +98,28 @@ export function cabecalhosVendaErp(
   };
 }
 
+/**
+ * O provider pode devolver UrlImpressaoDanfe no mesmo host autenticado da API.
+ * Só nesse caso reaproveitamos os três headers do contrato. Se a referência
+ * apontar para CDN/host diferente, não enviamos credencial nenhuma.
+ */
+export function cabecalhosDanfeVendaErp(
+  credenciais: CredenciaisVendaErp,
+  danfeUrl: string,
+): Record<string, string> | undefined {
+  try {
+    const base = new URL(credenciais.baseUrl.trim());
+    const danfe = new URL(danfeUrl.trim());
+    if (base.origin !== danfe.origin) return undefined;
+    return {
+      ...cabecalhosVendaErp(credenciais),
+      Accept: "application/pdf, application/octet-stream;q=0.9, */*;q=0.1",
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 async function getVendaErp(
   credenciais: CredenciaisVendaErp,
   caminho: string,

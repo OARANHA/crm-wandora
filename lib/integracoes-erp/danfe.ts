@@ -75,9 +75,9 @@ async function lerCorpoComLimite(
  *
  * A URL veio de um provider configurado pela organização, então usa a mesma
  * régua de egress de organização do restante do produto: valida esquema/host,
- * resolve DNS e não segue redirect. Nenhuma credencial do VendaERP é enviada
- * para esta URL — o contrato observado só prova a referência, não autenticação
- * adicional do recurso.
+ * resolve DNS e não segue redirect. O chamador pode fornecer headers de download
+ * já restringidos ao mesmo origin do provider; este módulo nunca decide sozinho
+ * para onde uma credencial pode sair.
  *
  * Não presume PDF. O MIME efetivo precisa pertencer à allowlist documental já
  * usada pelo upload outbound. A única correção conservadora é
@@ -87,6 +87,7 @@ async function lerCorpoComLimite(
 export async function materializarDanfeExterno(
   urlBruta: string,
   fetcher: typeof fetch = fetchParaDestinoDaOrganizacao(),
+  options?: { headers?: Record<string, string> },
 ): Promise<DanfeMaterializado> {
   const url = urlBruta.trim();
   if (!url) throw new ErroDanfeExterno("url_ausente");
@@ -100,7 +101,11 @@ export async function materializarDanfeExterno(
   try {
     let resposta: Response;
     try {
-      resposta = await fetcher(url, { method: "GET", signal: ctrl.signal });
+      resposta = await fetcher(url, {
+        method: "GET",
+        signal: ctrl.signal,
+        ...(options?.headers ? { headers: options.headers } : {}),
+      });
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
       if (mensagem.startsWith("unsafe_url:")) {

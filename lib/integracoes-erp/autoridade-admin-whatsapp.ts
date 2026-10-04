@@ -5,7 +5,9 @@ import { audit } from "@/lib/audit";
 import { canonicalPhoneBR } from "@/lib/channels/phone-variants";
 
 import { ErroDanfeExterno, materializarDanfeExterno } from "./danfe";
+import { carregarConexaoVendaErp } from "./credenciais";
 import { obterNotaErp } from "./service";
+import { cabecalhosDanfeVendaErp } from "./vendaerp";
 
 export const CAPACIDADE_ERP_ADMIN_READ = "erp.admin.read" as const;
 
@@ -347,9 +349,18 @@ export async function prepararDanfeAdminWhatsapp(
   const nota = notaResultado.dados;
   if (!nota.danfeUrl?.trim()) return falhar("danfe_indisponivel");
 
+  const leitura = await carregarConexaoVendaErp(db, autoridade.organizationId);
+  if (!leitura.ok) return falhar("erp_read_failed");
+
+  const headers = cabecalhosDanfeVendaErp(leitura.credenciais, nota.danfeUrl);
+
   let documento;
   try {
-    documento = await materializarDanfeExterno(nota.danfeUrl);
+    documento = await materializarDanfeExterno(
+      nota.danfeUrl,
+      undefined,
+      headers ? { headers } : undefined,
+    );
   } catch (erro) {
     if (erro instanceof ErroDanfeExterno) {
       return falhar(
