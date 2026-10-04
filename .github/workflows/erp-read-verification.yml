@@ -97,6 +97,7 @@ jobs:
           tests/unit/integracoes-erp-danfe.test.ts
           tests/unit/integracoes-erp-danfe-authority.test.ts
           tests/unit/integracoes-erp-documento-cliente.test.ts
+          tests/unit/integracoes-erp-admin-whatsapp.test.ts
 
       - name: Catalog invariants touched by ERP tools
         run: >
