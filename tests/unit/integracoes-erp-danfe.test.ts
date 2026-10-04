@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  ehUrlDanfePublicoVendaErp,
-  materializarDanfeExterno,
-} from "@/lib/integracoes-erp/danfe";
+import { ehUrlDanfePublicoVendaErp, materializarDanfeExterno } from "@/lib/integracoes-erp/danfe";
 
 describe("materialização segura do DANFE", () => {
   it("aceita PDF provado pelos bytes sem confiar no sufixo da URL", async () => {
@@ -15,10 +12,7 @@ describe("materialização segura do DANFE", () => {
         }),
     ) as unknown as typeof fetch;
 
-    const r = await materializarDanfeExterno(
-      "https://erp.example.test/imprimir?id=1",
-      fetcher,
-    );
+    const r = await materializarDanfeExterno("https://erp.example.test/imprimir?id=1", fetcher);
 
     expect(r.mime).toBe("application/pdf");
     expect(r.extensao).toBe("pdf");
@@ -82,9 +76,7 @@ describe("materialização segura do DANFE", () => {
           headers: { "content-type": "text/html" },
         }),
     ) as unknown as typeof fetch;
-    const renderizadorVendaErp = vi.fn(async () =>
-      Buffer.from("%PDF-1.7\nrenderizado"),
-    );
+    const renderizadorVendaErp = vi.fn(async () => Buffer.from("%PDF-1.7\nrenderizado"));
 
     const r = await materializarDanfeExterno(url, fetcher, {
       renderizadorVendaErp,
