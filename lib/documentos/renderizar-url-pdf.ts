@@ -8,11 +8,7 @@ import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
 const RENDER_TIMEOUT_MS = 35_000;
 
 export type CodigoErroRenderizacaoDocumento =
-  | "destino_inseguro"
-  | "timeout"
-  | "render_falhou"
-  | "arquivo_grande"
-  | "tipo_nao_pdf";
+  "destino_inseguro" | "timeout" | "render_falhou" | "arquivo_grande" | "tipo_nao_pdf";
 
 export class ErroRenderizacaoDocumento extends Error {
   constructor(public readonly codigo: CodigoErroRenderizacaoDocumento) {
@@ -92,7 +88,7 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
   try {
     await writeFile(
       entrada,
-      "<!doctype html><meta charset=\"utf-8\"><script>location.replace(" +
+      '<!doctype html><meta charset="utf-8"><script>location.replace(' +
         destinoSerializado +
         ")</script>",
       { encoding: "utf8", mode: 0o600 },
