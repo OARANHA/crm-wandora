@@ -108,11 +108,19 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     NEXT_TELEMETRY_DISABLED=1 \
-    KEEP_ALIVE_TIMEOUT=125000
+    KEEP_ALIVE_TIMEOUT=125000 \
+    CHROMIUM_PATH=/usr/local/bin/elus-chromium
 # ffmpeg: a derivação de vídeo (Onda 3.1) roda no processo do app — o cron
 # event-log-drain executa o media_derive handler, que chama `ffmpeg` via spawn
 # pra extrair áudio+frames. Sem o binário, todo vídeo recebido falha a derivação.
-RUN apk add --no-cache ffmpeg
+#
+# chromium: fallback estritamente allowlisted para o DANFE público do VendaERP.
+# A URL oficial é uma SPA HTML (não um PDF); o Chromium apenas imprime essa
+# página pública em PDF. font-liberation fornece métricas compatíveis com Arial.
+RUN apk add --no-cache ffmpeg chromium font-liberation && \
+    CHROMIUM_BIN="$(command -v chromium || command -v chromium-browser)" && \
+    test -n "$CHROMIUM_BIN" && \
+    ln -s "$CHROMIUM_BIN" /usr/local/bin/elus-chromium
 # non-root
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 # A versão que /api/v1/health reporta (invariante 7). Precisa vir por ARG: a
