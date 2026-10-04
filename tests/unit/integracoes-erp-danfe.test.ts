@@ -15,7 +15,10 @@ describe("materialização segura do DANFE", () => {
         }),
     ) as unknown as typeof fetch;
 
-    const r = await materializarDanfeExterno("https://erp.example.test/imprimir?id=1", fetcher);
+    const r = await materializarDanfeExterno(
+      "https://erp.example.test/imprimir?id=1",
+      fetcher,
+    );
 
     expect(r.mime).toBe("application/pdf");
     expect(r.extensao).toBe("pdf");
@@ -32,7 +35,11 @@ describe("materialização segura do DANFE", () => {
     ) as unknown as typeof fetch;
 
     await materializarDanfeExterno("https://erp.example.test/danfe", fetcher, {
-      headers: { "Authorization-Token": "segredo", User: "usuario", App: "app" },
+      headers: {
+        "Authorization-Token": "segredo",
+        User: "usuario",
+        App: "app",
+      },
     });
 
     expect(fetcher).toHaveBeenCalledWith(
