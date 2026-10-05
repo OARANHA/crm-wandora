@@ -68,33 +68,11 @@ describe("materialização segura do DANFE", () => {
     ).toBe(false);
   });
 
-  it("renderiza a SPA pública do VendaERP quando a resposta direta é HTML", async () => {
-    const url =
-      "https://app.vendaerp.com.br/v3/public/NFe/Danfe?print=true&Cod=6abe71151d133d5c8962c4e9&t=2d3d6ffdcd8352708eefd81413758ac8&trib=false&g=34b6208d-4d02-49bc-8a59-8823d1b10765";
-    const fetcher = vi.fn(
-      async () =>
-        new Response("<!doctype html><html></html>", {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-    ) as unknown as typeof fetch;
-    const renderizadorVendaErp = vi.fn(async () => Buffer.from("%PDF-1.7\nrenderizado"));
-
-    const r = await materializarDanfeExterno(url, fetcher, {
-      renderizadorVendaErp,
-    });
-
-    expect(renderizadorVendaErp).toHaveBeenCalledWith(url);
-    expect(r.mime).toBe("application/pdf");
-    expect(r.extensao).toBe("pdf");
-    expect(r.buffer.subarray(0, 5).toString()).toBe("%PDF-");
-  });
-
-  it("faz fallback para Chromium quando o fetch da rota pública VendaERP expira", async () => {
+  it("renderiza a rota pública VendaERP direto no Chromium, sem fazer fetch intermediário", async () => {
     const url =
       "https://app.vendaerp.com.br/v3/public/NFe/Danfe?print=true&Cod=6abe71151d133d5c8962c4e9&t=2d3d6ffdcd8352708eefd81413758ac8&trib=false&g=34b6208d-4d02-49bc-8a59-8823d1b10765";
     const fetcher = vi.fn(async () => {
-      throw new DOMException("DANFE fetch timeout", "TimeoutError");
+      throw new Error("fetch não deveria ser chamado para DANFE VendaERP");
     }) as unknown as typeof fetch;
     const renderizadorVendaErp = vi.fn(async () => Buffer.from("%PDF-1.7\nrenderizado"));
 
@@ -102,6 +80,7 @@ describe("materialização segura do DANFE", () => {
       renderizadorVendaErp,
     });
 
+    expect(fetcher).not.toHaveBeenCalled();
     expect(renderizadorVendaErp).toHaveBeenCalledWith(url);
     expect(r.mime).toBe("application/pdf");
     expect(r.extensao).toBe("pdf");
@@ -126,13 +105,9 @@ describe("materialização segura do DANFE", () => {
   it("mapeia timeout da capability de documento para o contrato técnico do DANFE", async () => {
     const url =
       "https://app.vendaerp.com.br/v3/public/NFe/Danfe?print=true&Cod=6abe71151d133d5c8962c4e9&t=2d3d6ffdcd8352708eefd81413758ac8&trib=false&g=34b6208d-4d02-49bc-8a59-8823d1b10765";
-    const fetcher = vi.fn(
-      async () =>
-        new Response("<!doctype html><html></html>", {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-    ) as unknown as typeof fetch;
+    const fetcher = vi.fn(async () => {
+      throw new Error("fetch não deveria ser chamado para DANFE VendaERP");
+    }) as unknown as typeof fetch;
     const renderizadorVendaErp = vi.fn(async () => {
       throw new ErroRenderizacaoDocumento("timeout");
     });
@@ -143,6 +118,7 @@ describe("materialização segura do DANFE", () => {
       codigo: "timeout",
       message: "timeout",
     });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("continua recusando HTML para qualquer outra URL", async () => {
