@@ -206,6 +206,12 @@ describe("Admin WhatsApp Read-Only V1", () => {
     expect(bridge).toContain('allowed.includes("crm_erp_get_invoice")');
     expect(bridge).toContain("options?.readOnly !== true");
     expect(bridge).toContain("crm_erp_prepare_admin_danfe");
+    expect(bridge).toContain(
+      "quando o administrador pedir para mandar, enviar, ver, baixar, obter ou receber uma DANFE",
+    );
+    expect(bridge).toContain("chame esta ferramenta ANTES de qualquer send_message");
+    expect(bridge).toContain("use esse número em codigo_nfe");
+    expect(bridge).toContain("Não diga que não consegue");
   });
 
   it("pedido/NFe apresentados ao modelo não expõem a URL externa do DANFE", () => {
