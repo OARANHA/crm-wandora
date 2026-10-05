@@ -66,7 +66,10 @@ async function resolverClienteErp(
   db: Db,
   organizationId: string,
   pedido: PedidoErpComIdentidadeInterna,
-): Promise<{ ok: true; cliente: ClienteErp } | { ok: false; motivo: MotivoResolucaoDestinoDanfe }> {
+): Promise<
+  | { ok: true; cliente: ClienteErp }
+  | { ok: false; motivo: MotivoResolucaoDestinoDanfe }
+> {
   const cpfCnpj = pedido.identidadeCliente.cpfCnpj?.trim();
   const email = pedido.identidadeCliente.email?.trim();
   if (!cpfCnpj && !email) return { ok: false, motivo: "identidade_erp_insuficiente" };
@@ -180,9 +183,10 @@ export async function resolverDestinoDanfeDaNota(
   if (confirmados.length === 0) {
     return {
       ok: false,
-      motivo: candidatos.contatos.length > 0
-        ? "identidade_inconsistente"
-        : "contato_crm_nao_encontrado",
+      motivo:
+        candidatos.contatos.length > 0
+          ? "identidade_inconsistente"
+          : "contato_crm_nao_encontrado",
     };
   }
   if (confirmados.length > 1) return { ok: false, motivo: "contato_crm_ambiguo" };
