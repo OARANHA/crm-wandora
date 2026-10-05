@@ -54,20 +54,18 @@ describe("approved_reply usa a entrega governada sem perder sua policy", () => {
       body: "Resposta aprovada.",
       agent_id: agent,
     });
-    mocks.deliverGovernedMessageToConversation.mockImplementation(
-      async (_deps, input) => {
-        await input.beforeDispatch?.();
-        return {
-          status: "sent",
-          outcome: {
-            kind: "sent",
-            idempotencyKey: "ledger-1",
-            messageId: "message-1",
-          },
-          trace: [],
-        };
-      },
-    );
+    mocks.deliverGovernedMessageToConversation.mockImplementation(async (_deps, input) => {
+      await input.beforeDispatch?.();
+      return {
+        status: "sent",
+        outcome: {
+          kind: "sent",
+          idempotencyKey: "ledger-1",
+          messageId: "message-1",
+        },
+        trace: [],
+      };
+    });
   });
 
   it(
@@ -94,9 +92,7 @@ describe("approved_reply usa a entrega governada sem perder sua policy", () => {
       await handler(job, pool);
 
       expect(mocks.deliverGovernedMessageToConversation).toHaveBeenCalledTimes(1);
-      expect(
-        mocks.deliverGovernedMessageToConversation.mock.calls[0]![1],
-      ).toMatchObject({
+      expect(mocks.deliverGovernedMessageToConversation.mock.calls[0]![1]).toMatchObject({
         organizationId: org,
         conversationId: conversation,
         expectedContactId: contact,
