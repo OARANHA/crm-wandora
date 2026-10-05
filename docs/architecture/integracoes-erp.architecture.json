@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "titulo": "Integrações ERP — VendaERP read-only + DANFE cliente + DANFE administrativa canônica por WhatsApp",
-  "descricao": "O módulo continua read-only no ERP. O fluxo de cliente preserva a prova contato→Pessoa antes de DANFE. Separadamente, um número remetente pode ser vinculado a um usuário admin Elus da mesma organização; essa autoridade expõe consultas administrativas e a preparação de DANFE. Para a rota pública allowlisted do VendaERP, o PDF é renderizado diretamente por Chromium, salvo no bucket privado da conversa e entregue pelo sender core existente como document/application/pdf, passando por before_send e send_ledger. O seam genérico deliverGovernedMessageToConversation reidrata conversa, contato, sessão e LGPD do destino antes de before_send; approved_reply é o primeiro consumidor, e a integração ERP ainda não ganhou resolução/envio automático para terceiro.",
+  "titulo": "Integrações ERP — VendaERP read-only + DANFE administrativa e entrega governada ao cliente",
+  "descricao": "O módulo continua read-only no ERP. O fluxo de cliente preserva prova de identidade e o WhatsApp administrativo usa binding/membership do Elus. Para uma NFe conhecida, a composição administrativa pode resolver pedido/Pessoa ERP → contato CRM único → conversa destino única, materializar o DANFE no namespace dessa conversa e enfileirar governed_delivery. O worker revalida a service boundary do destino e termina em deliverGovernedMessageToConversation, preservando before_send, send_ledger, sendMessageHandler e adapter. Ambiguidade falha fechado; não há telefone arbitrário, criação automática de contato/conversa ou sender paralelo.",
   "lanes": [
     {
       "id": "instalacao",
@@ -218,6 +218,20 @@
       "type": "service",
       "label": "deliverGovernedMessageToConversation",
       "sublabel": "rehidrata conversa/contato/sessão/LGPD do destino e chama before_send; não resolve destinatário nem autoridade administrativa"
+    },
+    {
+      "id": "erpdanfedestino",
+      "lane": "runtime",
+      "type": "service",
+      "label": "resolverDestinoDanfeDaNota",
+      "sublabel": "NFe → pedido/Pessoa ERP → contato CRM único → conversa/sessão únicas; identidade determinística e fail-closed"
+    },
+    {
+      "id": "governeddeliveryjob",
+      "lane": "runtime",
+      "type": "database",
+      "label": "job_queue: governed_delivery",
+      "sublabel": "job derivado com service_boundary do destino e dedupe por origem+operação+NFe"
     }
   ],
   "edges": [
@@ -478,6 +492,30 @@
       "from": "whatsappmedia",
       "to": "governeddelivery",
       "label": "aceita mídia somente se o path pertencer à conversa destino"
+    },
+    {
+      "id": "e44",
+      "from": "adminwhatsappauthority",
+      "to": "erpdanfedestino",
+      "label": "admin autorizado ordena; backend resolve o cliente"
+    },
+    {
+      "id": "e45",
+      "from": "erpdanfedestino",
+      "to": "whatsappmedia",
+      "label": "materializa DANFE no namespace da conversa destino"
+    },
+    {
+      "id": "e46",
+      "from": "erpdanfedestino",
+      "to": "governeddeliveryjob",
+      "label": "captura fn_service_boundary e agenda intenção idempotente"
+    },
+    {
+      "id": "e47",
+      "from": "governeddeliveryjob",
+      "to": "governeddelivery",
+      "label": "worker revalida destino antes do efeito"
     }
   ]
 }
