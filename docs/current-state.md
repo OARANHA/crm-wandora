@@ -118,6 +118,18 @@ paralelo, credencial ERP no Chromium nem `storage_path` exposto ao modelo.
 Contrato e prova datada: `docs/specs/integracoes-erp-vendaerp-descobertas.md`.
 Mapa vivo: `docs/architecture/integracoes-erp.architecture.json`.
 
+### Entrega governada para conversa destino — seam interno V1
+
+A mensageria agora possui um seam interno que reidrata a conversa destino antes de
+`before_send`: contato, sessão, limite do canal e contexto LGPD vêm da conversa
+explicitamente escolhida no mesmo tenant. O primeiro consumidor é `approved_reply`,
+que mantém sua policy/receipt próprios e passou a compartilhar apenas a camada inferior.
+
+Esse seam ainda **não** resolve NFe → cliente → conversa e não autoriza uma ação
+administrativa sobre terceiro. Um futuro caller precisa provar essa autoridade e usar um
+job/service boundary compatível com a conversa destino; reutilizar a fronteira da conversa
+administrativa e trocar apenas `conversation_id` continua proibido.
+
 ### Épico de Governança de Atendimento (G1–G6) — COMPLETO
 
 CONFIRMADO em `plan/features.json` (31/31 features com `passes: true`) e
