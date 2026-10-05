@@ -54,6 +54,56 @@ export async function beginServiceAtOrigin(
   );
   return boundary!;
 }
+
+/**
+ * Abre/reabre uma origem de atendimento DERIVADA para outro contato, sem
+ * reutilizar a fronteira do turno que autorizou a ação.
+ *
+ * Só funciona dentro de uma execução já governada e exige que a conversa fonte
+ * seja exatamente a fronteira corrente. A autorização para escolher
+ * `targetContact` continua pertencendo ao chamador; esta função apenas garante
+ * que a transição para uma nova service boundary passe pelo RPC canônico
+ * `fn_service_begin`.
+ */
+export async function beginDerivedServiceFromCurrentOrigin(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string;
+    sourceConversationId: string;
+    targetContactId: string;
+    targetSessionId: string;
+  },
+): Promise<ServiceBoundary> {
+  const inherited = currentExecutionBoundary();
+  if (!inherited) throw new Error("derived_service_origin_missing");
+
+  await guardServiceEffect();
+  if (
+    inherited.organization_id !== input.organizationId ||
+    inherited.conversation_id !== input.sourceConversationId
+  ) {
+    throw new Error("service_scope_mismatch");
+  }
+
+  const { data, error } = await admin.rpc("fn_service_begin", {
+    p_org: input.organizationId,
+    p_contact: input.targetContactId,
+    p_session: input.targetSessionId,
+  });
+  if (error) throw error;
+
+  const boundary = parseServiceBoundary(data);
+  if (
+    !boundary ||
+    boundary.organization_id !== input.organizationId ||
+    boundary.contact_id !== input.targetContactId
+  ) {
+    throw new Error("service_scope_mismatch");
+  }
+
+  await assertServiceBoundarySupabase(admin, boundary);
+  return boundary;
+}
 export async function assertServiceBoundarySupabase(
   admin: SupabaseClient,
   boundary: ServiceBoundary | null,
