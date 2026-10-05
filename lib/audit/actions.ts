@@ -643,6 +643,7 @@ export const AUDIT_ACTIONS = [
   "integracao_erp.admin_whatsapp_vinculado",
   "integracao_erp.admin_whatsapp_desvinculado",
   "integracao_erp.admin_consulta",
+  "integracao_erp.admin_entrega_danfe",
   "fidelidade.ponto_dado",
   "fidelidade.ponto_resgatado",
   "financeiro.recorrencia_gerada",

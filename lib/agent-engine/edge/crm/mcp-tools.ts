@@ -1,4 +1,4 @@
-import { currentExecutionBoundary, currentExecutionJob } from '@/lib/atendimento/fronteira-server';
+import { currentExecutionBoundary, currentExecutionJob, guardServiceEffect } from '@/lib/atendimento/fronteira-server';
 import { claimOfJob } from '@/lib/agent-engine/queue/claim';
 /**
  * Tools MCP habilitadas NA TELA entrando no turno do engine (Fase 2B-tools).
@@ -33,6 +33,7 @@ import {
   prepararDanfeAdminWhatsapp,
   resolverAutoridadeAdminWhatsapp,
 } from '@/lib/integracoes-erp/autoridade-admin-whatsapp';
+import { solicitarEntregaDanfeAoClienteDaNota } from '@/lib/integracoes-erp/entrega-danfe-terceiro';
 
 import type { Logger } from '../../obs/logger';
 import type { CrmEdgeConfig } from './mcp-client';
@@ -185,8 +186,10 @@ export async function buildMcpTurnTools(
   ) {
     tools.crm_erp_prepare_admin_danfe = tool({
       description:
-        "Prepara uma DANFE já emitida para esta conversa administrativa. " +
-        "REGRA DE USO: quando o administrador pedir para mandar, enviar, ver, baixar, obter ou receber uma DANFE e informar o número da NFe/NFCe, chame esta ferramenta ANTES de qualquer send_message ou resposta textual; use esse número em codigo_nfe. " +
+        "Prepara uma DANFE já emitida para ESTA conversa administrativa. " +
+        "Use quando o administrador quiser ver, baixar, obter ou receber a DANFE no próprio WhatsApp. " +
+        "Se ele pedir para enviar ao cliente vinculado à nota, use crm_erp_send_danfe_to_invoice_customer em vez desta ferramenta. " +
+        "REGRA DE USO: quando o administrador pedir para mandar, enviar, ver, baixar, obter ou receber uma DANFE PARA O PRÓPRIO ADMIN e informar o número da NFe/NFCe, chame esta ferramenta ANTES de qualquer send_message ou resposta textual; use esse número em codigo_nfe. " +
         "Não diga que não consegue e não responda apenas em texto antes de tentar esta ferramenta. " +
         "Depois de preparar com sucesso, chame send_message UMA vez com a legenda curta: o runtime anexará o PDF automaticamente como documento. " +
         "Não copie nem envie preview_url ao administrador. Nunca use esta capacidade em conversa comum de cliente.",
@@ -211,6 +214,29 @@ export async function buildMcpTurnTools(
 
         const { storage_path: _interno, ...documentoPublico } = preparado.documento;
         return { ok: true, documento: documentoPublico };
+      },
+    });
+
+    tools.crm_erp_send_danfe_to_invoice_customer = tool({
+      description:
+        "Agenda a entrega governada de uma DANFE já emitida para o CLIENTE VINCULADO À PRÓPRIA NOTA. " +
+        "Use somente quando um administrador autorizado pedir algo como 'mande a DANFE 64996397 para o cliente dessa nota'. " +
+        "O backend resolve NFe, pedido, Pessoa ERP, contato CRM e uma única conversa destino por identidade determinística; nome ou telefone digitado não escolhem destinatário. " +
+        "Zero ou múltiplos contatos/conversas falham fechado. Não chame send_message depois: o job próprio usa before_send, ledger e sender canônico do destino.",
+      inputSchema: z.object({
+        codigo_nfe: z.number().int().min(1).max(2_147_483_647),
+      }),
+      execute: async ({ codigo_nfe }) => {
+        // A ordem nasce na conversa administrativa atual: revalida essa fronteira
+        // antes de consultar ERP, materializar mídia ou criar o job derivado.
+        await guardServiceEffect();
+        return solicitarEntregaDanfeAoClienteDaNota(cfg.supabase, {
+          autoridade: autoridadeAdminWhatsapp,
+          originConversationId: ids.conversationId!,
+          originJobId: ids.jobId,
+          agentId: agentConfig.agentId,
+          codigoNfe: codigo_nfe,
+        });
       },
     });
   }

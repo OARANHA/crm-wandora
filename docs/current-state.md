@@ -118,6 +118,16 @@ paralelo, credencial ERP no Chromium nem `storage_path` exposto ao modelo.
 Contrato e prova datada: `docs/specs/integracoes-erp-vendaerp-descobertas.md`.
 Mapa vivo: `docs/architecture/integracoes-erp.architecture.json`.
 
+
+### Slice em revisão — DANFE para o cliente vinculado à NFe
+
+A branch `feat/erp-governed-danfe-delivery-v1` compõe a autoridade administrativa já
+existente com o seam de entrega governada da PR #39. O backend resolve NFe → pedido/Pessoa
+ERP → contato CRM único → conversa destino única, materializa o PDF no namespace do destino
+e cria um job `governed_delivery` com a `service_boundary` do cliente. O consumer termina
+em `deliverGovernedMessageToConversation`; ambiguidades falham fechado e o ERP segue
+somente leitura. Este parágrafo descreve a branch em revisão, não produção.
+
 ### Entrega governada para conversa destino — seam interno V1
 
 A mensageria agora possui um seam interno que reidrata a conversa destino antes de

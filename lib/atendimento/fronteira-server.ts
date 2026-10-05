@@ -103,6 +103,7 @@ export async function withServiceJob<T>(
       "operator_turn",
       "transactional_delivery",
       "approved_reply",
+      "governed_delivery",
     ].includes(job.kind)
   )
     return action();
