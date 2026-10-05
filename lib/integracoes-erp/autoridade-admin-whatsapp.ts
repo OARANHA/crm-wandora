@@ -312,6 +312,8 @@ export type PrepararDanfeAdminWhatsappResultado =
         media_size_bytes: number;
         preview_url: string;
         preview_expires_seconds: 600;
+        /** Referência interna para o sender canônico; nunca deve ser devolvida ao modelo. */
+        storage_path: string;
       };
     }
   | {
@@ -427,6 +429,7 @@ export async function prepararDanfeAdminWhatsapp(
       media_size_bytes: documento.sizeBytes,
       preview_url: signed.signedUrl,
       preview_expires_seconds: 600,
+      storage_path: storagePath,
     },
   };
 }
