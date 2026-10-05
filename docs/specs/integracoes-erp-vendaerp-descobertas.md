@@ -213,19 +213,51 @@ Nada desta descoberta altera a fronteira de autoridade da V1:
 
 A etapa atual continua estritamente READ-ONLY.
 
-## DANFE como documento de atendimento — lacuna preservada
+## DANFE como documento de atendimento — contrato canônico comprovado
 
-A resposta observada de `Fiscal/ConsultarNFE` prova a existência de
-`UrlImpressaoDanfe`; ela **não** prova o protocolo do recurso apontado:
+Em 2026-10-05 o caminho administrativo foi provado em produção, de ponta a ponta,
+com uma NFe real solicitada pelo administrador via WhatsApp. O documento foi
+preparado com sucesso, persistido no bucket privado da conversa e enviado como
+`type=document`, `application/pdf`, pelo sender canônico; o provider retornou
+receipt e a mensagem chegou ao estado `read`.
 
-- não há schema de MIME;
-- não há garantia documentada de PDF;
-- não há prova de que a URL seja pública/sem autenticação adicional;
-- não há política documentada de redirects da URL de impressão.
+A forma canônica passa a ser:
 
-Por isso a ponte do Inbox não envia a URL diretamente ao gateway WhatsApp e não
-reutiliza as credenciais VendaERP fora dos endpoints oficiais. Ela tenta
-materializar a referência com a guarda de egress da organização e aceita apenas
-um documento que passe pela validação real de bytes/MIME. Um canário futuro,
-autorizado separadamente, ainda é necessário para afirmar compatibilidade real
-da `danfeUrl` com esse caminho.
+1. `crm_erp_get_invoice` consulta `Fiscal/ConsultarNFE` em modo read-only;
+2. `crm_erp_prepare_admin_danfe` recebe o número da NFe e usa somente a
+   `danfeUrl` normalizada;
+3. se a URL casar exatamente com a rota pública allowlisted
+   `https://app.vendaerp.com.br/v3/public/NFe/Danfe`, o Elus **não** faz um
+   fetch HTTP intermediário: renderiza diretamente pelo Chromium através de
+   `erp.vendaerp.danfe_to_pdf`;
+4. a policy especializada mantém host/path/query fechados, sem credenciais ERP,
+   e timeout de 60 s; a capability genérica `document.render.url_to_pdf`
+   permanece com seu timeout padrão;
+5. os bytes precisam validar como PDF/documento antes de qualquer upload;
+6. o PDF entra no bucket privado `whatsapp-media` no path da própria
+   organização/conversa;
+7. o `storage_path` permanece interno ao runtime e não é exposto ao modelo;
+8. a próxima `send_message` do mesmo turno anexa esse objeto como documento;
+9. a entrega segue o único caminho outbound:
+   `before_send → send_ledger → sendMessageHandler → adapter → WAHA`.
+
+Esse caminho é a referência canônica para DANFE administrativa do VendaERP.
+Não se envia `UrlImpressaoDanfe` diretamente ao WhatsApp, não se usa um sender
+paralelo, não se expõe `storage_path` ao modelo e nenhuma escrita fiscal é
+executada no VendaERP.
+
+### Prova real de produção — 2026-10-05
+
+Evidência observável do turno que fechou o aceite:
+
+- job: `18330315-1df7-4980-adcd-8a076d31a21c`;
+- `api_audit_log`: `crm_erp_prepare_admin_danfe` com `success=true`;
+- `send_ledger`: sequência 1 em `accepted`;
+- `messages.type=document`;
+- `messages.media_mime=application/pdf`;
+- objeto salvo em `whatsapp-media` sob o prefixo canônico
+  `{organization_id}/{conversation_id}/danfe-admin-nfe-...`;
+- mensagem outbound com `sent_via=ai` e status final observado `read`.
+
+A prova é do fluxo e de seus invariantes; os identificadores acima são recibos
+datados de produção, não configuração a ser reutilizada em outra organização.

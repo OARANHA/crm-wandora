@@ -102,6 +102,22 @@ correspondentes localizados no repo):
 - **Operação visível** — transparência do motivo de retenção anti-ban, central de avisos,
   knobs de proteção de envio, propostas do flywheel com gate humano.
 
+### Integração VendaERP — DANFE administrativa por WhatsApp — PROVADA EM PRODUÇÃO
+
+Em 2026-10-05 foi fechado o aceite real do caminho administrativo da DANFE:
+um administrador pediu uma NFe pelo WhatsApp, `crm_erp_prepare_admin_danfe`
+preparou o PDF, o objeto foi salvo no `whatsapp-media` da própria conversa e o
+sender core enviou a mídia como `document/application/pdf`. O receipt entrou no
+`send_ledger` como `accepted` e a mensagem chegou a `read`.
+
+A forma canônica é:
+`crm_erp_get_invoice → crm_erp_prepare_admin_danfe → Chromium allowlisted → whatsapp-media → send_message → before_send → send_ledger → sendMessageHandler → WAHA`.
+
+O VendaERP permanece **READ-ONLY**. Não há envio direto da URL externa, sender
+paralelo, credencial ERP no Chromium nem `storage_path` exposto ao modelo.
+Contrato e prova datada: `docs/specs/integracoes-erp-vendaerp-descobertas.md`.
+Mapa vivo: `docs/architecture/integracoes-erp.architecture.json`.
+
 ### Épico de Governança de Atendimento (G1–G6) — COMPLETO
 
 CONFIRMADO em `plan/features.json` (31/31 features com `passes: true`) e
