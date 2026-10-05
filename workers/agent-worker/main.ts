@@ -741,6 +741,7 @@ export async function main(): Promise<void> {
   };
   handlers.set("approved_reply", createApprovedReplyHandler(turnDeps));
   handlers.set("transactional_delivery", createMeetDeliveryHandler(turnDeps));
+  handlers.set("governed_delivery", createGovernedDeliveryHandler(turnDeps));
   handlers.set("inbound_turn", createInboundTurnHandler(turnDeps));
   handlers.set("followup_turn", createFollowupTurnHandler(turnDeps));
   handlers.set("case_reply_turn", createCaseReplyTurnHandler(turnDeps));
