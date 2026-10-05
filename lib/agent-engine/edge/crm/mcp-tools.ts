@@ -1,4 +1,4 @@
-import { currentExecutionBoundary, currentExecutionJob } from '@/lib/atendimento/fronteira-server';
+import { currentExecutionBoundary, currentExecutionJob, guardServiceEffect } from '@/lib/atendimento/fronteira-server';
 import { claimOfJob } from '@/lib/agent-engine/queue/claim';
 /**
  * Tools MCP habilitadas NA TELA entrando no turno do engine (Fase 2B-tools).
@@ -226,14 +226,18 @@ export async function buildMcpTurnTools(
       inputSchema: z.object({
         codigo_nfe: z.number().int().min(1).max(2_147_483_647),
       }),
-      execute: async ({ codigo_nfe }) =>
-        solicitarEntregaDanfeAoClienteDaNota(cfg.supabase, {
+      execute: async ({ codigo_nfe }) => {
+        // A ordem nasce na conversa administrativa atual: revalida essa fronteira
+        // antes de consultar ERP, materializar mídia ou criar o job derivado.
+        await guardServiceEffect();
+        return solicitarEntregaDanfeAoClienteDaNota(cfg.supabase, {
           autoridade: autoridadeAdminWhatsapp,
           originConversationId: ids.conversationId!,
           originJobId: ids.jobId,
           agentId: agentConfig.agentId,
           codigoNfe: codigo_nfe,
-        }),
+        });
+      },
     });
   }
 
