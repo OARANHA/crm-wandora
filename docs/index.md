@@ -81,6 +81,7 @@ Detalham schema SQL e payloads exatos. **Consulte antes de modelar qualquer cois
 | [`specs/18`](specs/18-spec-voice-calls-wacalls.md) | Chamada de voz WhatsApp (WaCalls) — rascunho, sem sub-PRD dedicado |
 | [`specs/extensoes-declarativas-v1.md`](specs/extensoes-declarativas-v1.md) | **Extensões declarativas v1** — pacote JSON estrito, catálogo admitido pelo dono da instalação, ativação por organização, guia no hub CRM |
 | [`specs/integracoes-erp-vendaerp-descobertas.md`](specs/integracoes-erp-vendaerp-descobertas.md) | **VendaERP read-only + DANFE** — contrato observado, autoridade administrativa e forma canônica comprovada de entrega do PDF via WhatsApp |
+| [`specs/governed-cross-conversation-delivery-v1.md`](specs/governed-cross-conversation-delivery-v1.md) | **Entrega governada cross-conversation V1** — reidratação do destino, guardrails do destinatário e reuso do sender canônico sem escolher destinatário |
 | [`integracao/webhooks-de-saida.md`](integracao/webhooks-de-saida.md) | Webhook de saída do lado de quem recebe: cabeçalhos, assinatura com carimbo de tempo, id de entrega, exemplos em Node e Python |
 | [`specs/RECONCILIATION-LOG.md`](specs/RECONCILIATION-LOG.md) | Log de reconciliação entre specs |
 

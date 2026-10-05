@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "titulo": "Integrações ERP — VendaERP read-only + DANFE cliente + DANFE administrativa canônica por WhatsApp",
-  "descricao": "O módulo continua read-only no ERP. O fluxo de cliente preserva a prova contato→Pessoa antes de DANFE. Separadamente, um número remetente pode ser vinculado a um usuário admin Elus da mesma organização; essa autoridade expõe consultas administrativas e a preparação de DANFE. Para a rota pública allowlisted do VendaERP, o PDF é renderizado diretamente por Chromium, salvo no bucket privado da conversa e entregue pelo sender core existente como document/application/pdf, passando por before_send e send_ledger.",
+  "descricao": "O módulo continua read-only no ERP. O fluxo de cliente preserva a prova contato→Pessoa antes de DANFE. Separadamente, um número remetente pode ser vinculado a um usuário admin Elus da mesma organização; essa autoridade expõe consultas administrativas e a preparação de DANFE. Para a rota pública allowlisted do VendaERP, o PDF é renderizado diretamente por Chromium, salvo no bucket privado da conversa e entregue pelo sender core existente como document/application/pdf, passando por before_send e send_ledger. O seam genérico deliverGovernedMessageToConversation reidrata conversa, contato, sessão e LGPD do destino antes de before_send; approved_reply é o primeiro consumidor, e a integração ERP ainda não ganhou resolução/envio automático para terceiro.",
   "lanes": [
     {
       "id": "instalacao",
@@ -204,6 +204,20 @@
       "type": "test",
       "label": "Aceite real 2026-10-05",
       "sublabel": "produção: prepare success=true; PDF em whatsapp-media; send_ledger accepted; messages document/application/pdf; status final read"
+    },
+    {
+      "id": "approvedreply",
+      "lane": "runtime",
+      "type": "service",
+      "label": "approved_reply",
+      "sublabel": "primeiro consumidor real do seam; mantém policy, receipt e settle próprios"
+    },
+    {
+      "id": "governeddelivery",
+      "lane": "runtime",
+      "type": "service",
+      "label": "deliverGovernedMessageToConversation",
+      "sublabel": "rehidrata conversa/contato/sessão/LGPD do destino e chama before_send; não resolve destinatário nem autoridade administrativa"
     }
   ],
   "edges": [
@@ -446,6 +460,24 @@
       "from": "admindanfe",
       "to": "danfeproof",
       "label": "audit success=true fecha a prova do preparo"
+    },
+    {
+      "id": "e41",
+      "from": "approvedreply",
+      "to": "governeddelivery",
+      "label": "reusa a camada inferior sem mudar semântica de aprovação"
+    },
+    {
+      "id": "e42",
+      "from": "governeddelivery",
+      "to": "sendercore",
+      "label": "entrega pelo RuntimeSendChannel e caminho canônico"
+    },
+    {
+      "id": "e43",
+      "from": "whatsappmedia",
+      "to": "governeddelivery",
+      "label": "aceita mídia somente se o path pertencer à conversa destino"
     }
   ]
 }

@@ -2,13 +2,12 @@ import type pg from "pg";
 import type { JobRow } from "../queue/queue";
 import { claimOfJob } from "../queue/claim";
 import { reconcileAcceptedSend } from "../edge/crm/send-ledger";
-import { createRuntimeSendChannel, type RuntimeSendChannel } from "@/lib/channels/runtime";
-import { runBeforeSend } from "../guardrails/before-send";
-import { deriveLgpdFromContact, type LgpdContactFields } from "../guardrails/lgpd/legal-basis";
+import type { RuntimeSendChannel } from "@/lib/channels/runtime";
 import { assertApprovedReplyPg, assertApprovedReplyReceiptPg } from "@/lib/ai/replies/delivery";
 import { StaleServiceBoundaryError } from "@/lib/atendimento/fronteira";
 import { withServiceJob } from "@/lib/atendimento/fronteira-server";
 import type { InboundTurnDeps } from "./inbound-turn";
+import { deliverGovernedMessageToConversation } from "./governed-conversation-delivery";
 export function createApprovedReplyHandler(
   deps: Pick<InboundTurnDeps, "crmCfg" | "log" | "sleep"> & {
     channel?: (pool: pg.Pool) => RuntimeSendChannel;
@@ -41,44 +40,31 @@ export function createApprovedReplyHandler(
       }
       await withServiceJob(pool, job, async () => {
         const policy = await assertApprovedReplyPg(pool, context);
-        const { rows } = await pool.query<
-          LgpdContactFields & { daily_message_limit: number | null }
-        >(
-          `select c.source,c.consent,c.is_anonymized,s.daily_message_limit from contacts c join channel_sessions s on s.organization_id=c.organization_id and s.id=$3 where c.organization_id=$1 and c.id=$2`,
-          [job.organization_id, job.contact_id, policy.channel_session_id],
-        );
-        if (!rows[0]) throw new StaleServiceBoundaryError();
-        const channel =
-          deps.channel?.(pool) ??
-          createRuntimeSendChannel(pool, { ...deps.crmCfg, agentActorId: policy.agent_id });
-        const result = await runBeforeSend({
-          pool,
-          log: deps.log,
-          tenantId: job.organization_id,
-          leadId: job.contact_id!,
-          jobId: job.id,
-          agentId: policy.agent_id,
-          approvedReply: context,
-          channelSessionId: policy.channel_session_id,
-          body: policy.body,
-          optedOutThisTurn: false,
-          crmDailyLimit: rows[0].daily_message_limit,
-          now: new Date(),
-          lgpd: deriveLgpdFromContact(rows[0], false),
-          sleep: deps.sleep,
-          send: async (body) => {
-            await assertApprovedReplyPg(pool, context);
-            return channel.send({
-              tenantId: job.organization_id,
-              leadId: job.contact_id,
-              jobId: job.id,
-              jobClaim: claim,
-              seq: 1,
-              conversationId: policy.conversation_id,
-              body,
-            });
+        if (policy.contact_id !== job.contact_id) throw new StaleServiceBoundaryError();
+        const result = await deliverGovernedMessageToConversation(
+          {
+            pool,
+            crmCfg: deps.crmCfg,
+            log: deps.log,
+            sleep: deps.sleep,
+            ...(deps.channel ? { channel: deps.channel(pool) } : {}),
           },
-        });
+          {
+            organizationId: job.organization_id,
+            conversationId: policy.conversation_id,
+            expectedContactId: job.contact_id,
+            expectedChannelSessionId: policy.channel_session_id,
+            jobId: job.id,
+            jobClaim: claim,
+            agentId: policy.agent_id,
+            seq: 1,
+            body: policy.body,
+            approvedReply: context,
+            beforeDispatch: async () => {
+              await assertApprovedReplyPg(pool, context);
+            },
+          },
+        );
         if (result.status === "vetoed") {
           await settle(result.nextAllowedAt ? "queued" : "failed", result.code);
           return;
