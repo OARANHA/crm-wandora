@@ -148,4 +148,3 @@ e a nova fronteira nasce exclusivamente de `fn_service_begin` para o contato do 
 O contato precisa já existir, estar ativo e possuir telefone discável. Não há criação de contato,
 fuzzy match, `fn_upsert_wa_contact` nem telefone arbitrário vindo do modelo. A fronteira
 retornada pelo RPC pertence ao destinatário e é a única que segue para `governed_delivery`.
-
