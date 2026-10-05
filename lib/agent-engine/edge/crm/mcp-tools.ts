@@ -189,7 +189,7 @@ export async function buildMcpTurnTools(
         "Prepara uma DANFE já emitida para ESTA conversa administrativa. " +
         "Use quando o administrador quiser ver, baixar, obter ou receber a DANFE no próprio WhatsApp. " +
         "Se ele pedir para enviar ao cliente vinculado à nota, use crm_erp_send_danfe_to_invoice_customer em vez desta ferramenta. " +
-        "REGRA DE USO: quando o administrador pedir a DANFE para si e informar o número da NFe/NFCe, chame esta ferramenta ANTES de qualquer send_message ou resposta textual; use esse número em codigo_nfe. " +
+        "REGRA DE USO: quando o administrador pedir para mandar, enviar, ver, baixar, obter ou receber uma DANFE PARA O PRÓPRIO ADMIN e informar o número da NFe/NFCe, chame esta ferramenta ANTES de qualquer send_message ou resposta textual; use esse número em codigo_nfe. " +
         "Não diga que não consegue e não responda apenas em texto antes de tentar esta ferramenta. " +
         "Depois de preparar com sucesso, chame send_message UMA vez com a legenda curta: o runtime anexará o PDF automaticamente como documento. " +
         "Não copie nem envie preview_url ao administrador. Nunca use esta capacidade em conversa comum de cliente.",
