@@ -21,6 +21,7 @@ export interface PoliticaRenderizacaoUrlPdf {
   nome: string;
   permiteUrl: (url: string) => boolean;
   maxBytes?: number;
+  timeoutMs?: number;
 }
 
 export type RenderizadorUrlPdf = (
@@ -49,7 +50,7 @@ export function argumentosChromiumParaPdf(entrada: string, saida: string): strin
   ];
 }
 
-function executarChromium(args: string[]): Promise<void> {
+function executarChromium(args: string[], timeoutMs: number = RENDER_TIMEOUT_MS): Promise<void> {
   return new Promise((resolve, reject) => {
     const binario = process.env.CHROMIUM_PATH?.trim() || "/usr/bin/chromium-browser";
     const filho = spawn(binario, args, {
@@ -73,7 +74,7 @@ function executarChromium(args: string[]): Promise<void> {
     const timer = setTimeout(() => {
       filho.kill("SIGKILL");
       concluir(new ErroRenderizacaoDocumento("timeout"));
-    }, RENDER_TIMEOUT_MS);
+    }, timeoutMs);
 
     filho.once("error", () => concluir(new ErroRenderizacaoDocumento("render_falhou")));
     filho.once("exit", (codigo) => {
@@ -111,7 +112,10 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
       { encoding: "utf8", mode: 0o600 },
     );
 
-    await executarChromium(argumentosChromiumParaPdf(entrada, saida));
+    await executarChromium(
+      argumentosChromiumParaPdf(entrada, saida),
+      politica.timeoutMs ?? RENDER_TIMEOUT_MS,
+    );
 
     const buffer = await readFile(saida);
     if (!buffer.length) throw new ErroRenderizacaoDocumento("render_falhou");
