@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/auth/require-role"
 import { loadAuthUser } from "@/lib/auth/server"
 import { authenticatedSessionId } from "@/lib/impersonate/support"
 import { issueState } from "@/lib/nuvemshop/state"
-import { gerarPkce, VIGIA_PKCE_COOKIE, VIGIA_PKCE_TTL_SECONDS } from "@/lib/vigia/pkce"
+import { gerarNomeCookiePkceVigia, gerarPkce, VIGIA_PKCE_TTL_SECONDS } from "@/lib/vigia/pkce"
 
 const querySchema = z.object({
   vigia_project: z.string().min(1).max(256).regex(/^[A-Za-z0-9_-]+$/),
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
   })
 
   const store = await cookies()
-  store.set(VIGIA_PKCE_COOKIE, verifier, {
+  store.set(gerarNomeCookiePkceVigia(state), verifier, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
