@@ -2,7 +2,9 @@ import type pg from "pg";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const runBeforeSendMock = vi.fn();
+const { runBeforeSendMock } = vi.hoisted(() => ({
+  runBeforeSendMock: vi.fn(),
+}));
 
 vi.mock("../guardrails/before-send", () => ({
   runBeforeSend: (...args: unknown[]) => runBeforeSendMock(...args),
