@@ -1,4 +1,5 @@
 import { createApprovedReplyHandler } from "@/lib/agent-engine/agent/approved-reply";
+import { createGovernedDeliveryHandler } from "@/lib/agent-engine/agent/governed-delivery";
 import { turnKnobsFromEnv } from "@/lib/agent-engine/agent/turn-knobs";
 import { createMeetDeliveryHandler } from "@/lib/agent-engine/agent/meet-delivery";
 import { claimOfJob } from "@/lib/agent-engine/queue/claim";
