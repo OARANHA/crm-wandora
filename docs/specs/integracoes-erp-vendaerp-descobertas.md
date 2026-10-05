@@ -264,13 +264,10 @@ datados de produção, não configuração a ser reutilizada em outra organizaç
 
 ## Resolução NFe → cliente CRM
 
-A composição nova parte de uma NFe conhecida, localiza o pedido exato e mantém `pessoaID`,
-CPF/CNPJ e e-mail somente no backend para selecionar a Pessoa ERP. Depois reconcilia essa
-identidade com um único contato CRM. Nome não identifica; divergência ou multiplicidade
-interrompem a operação.
+A composição nova parte de uma NFe conhecida, localiza o pedido exato e mantém `pessoaID`, CPF/CNPJ
+e e-mail somente no backend para selecionar a Pessoa ERP. Depois reconcilia essa identidade com um
+único contato CRM. Nome não identifica; divergência ou multiplicidade interrompem a operação.
 
-A conversa destino precisa ser única, não terminal e usar sessão ativa. Sua
-`fn_service_boundary` é capturada antes do job derivado. O documento é materializado no
-namespace dessa conversa e o consumer reutiliza o seam governado de messaging. O VendaERP
-permanece somente leitura.
-
+A conversa destino precisa ser única, não terminal e usar sessão ativa. Sua `fn_service_boundary` é
+capturada antes do job derivado. O documento é materializado no namespace dessa conversa e o
+consumer reutiliza o seam governado de messaging. O VendaERP permanece somente leitura.
