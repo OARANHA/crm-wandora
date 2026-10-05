@@ -149,6 +149,15 @@ export async function materializarDanfeExterno(
   const url = urlBruta.trim();
   if (!url) throw new ErroDanfeExterno("url_ausente");
 
+  // A rota pública conhecida do DANFE VendaERP é uma SPA. Em produção o fetch
+  // HTTP direto é instável e ainda atrasa o fallback em 20s antes de abrir o
+  // Chromium. Como a URL já passou pela allowlist estrita desta integração,
+  // renderizamos diretamente e preservamos o fetch genérico para os demais ERPs.
+  if (ehUrlDanfePublicoVendaErp(url)) {
+    const renderizador = options?.renderizadorVendaErp ?? renderizarDanfeVendaErpParaPdf;
+    return materializarPdfRenderizadoVendaErp(url, renderizador);
+  }
+
   const ctrl = new AbortController();
   const timer = setTimeout(
     () => ctrl.abort(new DOMException("DANFE fetch timeout", "TimeoutError")),
@@ -172,10 +181,6 @@ export async function materializarDanfeExterno(
         erro instanceof DOMException &&
         (erro.name === "TimeoutError" || erro.name === "AbortError")
       ) {
-        if (ehUrlDanfePublicoVendaErp(url)) {
-          const renderizador = options?.renderizadorVendaErp ?? renderizarDanfeVendaErpParaPdf;
-          return materializarPdfRenderizadoVendaErp(url, renderizador);
-        }
         throw new ErroDanfeExterno("timeout");
       }
       throw new ErroDanfeExterno("download_falhou");

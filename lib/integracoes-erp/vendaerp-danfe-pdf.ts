@@ -56,5 +56,6 @@ export async function renderizarDanfeVendaErpParaPdf(
     nome: "erp.vendaerp.danfe_to_pdf",
     permiteUrl: ehUrlDanfePublicoVendaErp,
     maxBytes: MAX_MEDIA_BYTES,
+    timeoutMs: 60_000,
   });
 }
