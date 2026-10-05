@@ -126,3 +126,15 @@ Os testes do seam cobrem:
 
 As garantias de `send_ledger`, `sendMessageHandler`, opt-out e ownership no sink continuam
 nos testes das respectivas camadas canônicas; o seam não as reimplementa.
+
+## Primeiro consumidor: DANFE do cliente vinculado à nota
+
+A composição ERP mantém a autoridade administrativa da origem separada da identidade do cliente
+e dos guardrails do destino. O backend resolve pedido/Pessoa ERP, reconcilia um único contato
+CRM, exige uma única conversa não terminal com sessão ativa e captura a
+`fn_service_boundary` dessa conversa.
+
+O PDF é materializado diretamente no namespace da conversa destino. Um job
+`governed_delivery` revalida a fronteira e termina neste seam; não troca o
+`conversation_id` de um turno administrativo já em execução.
+
