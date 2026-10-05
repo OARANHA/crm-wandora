@@ -179,7 +179,8 @@ export async function buildMcpTurnTools(
     tools.crm_erp_prepare_admin_danfe = tool({
       description:
         "Prepara uma DANFE já emitida para esta conversa administrativa. " +
-        "Use somente quando o administrador pedir para ver a DANFE e você já tiver o número da NFe/NFCe. " +
+        "REGRA DE USO: quando o administrador pedir para mandar, enviar, ver, baixar, obter ou receber uma DANFE e informar o número da NFe/NFCe, chame esta ferramenta ANTES de qualquer send_message ou resposta textual; use esse número em codigo_nfe. " +
+        "Não diga que não consegue e não responda apenas em texto antes de tentar esta ferramenta. " +
         "A ferramenta devolve um preview_url temporário; envie esse link ao administrador com send_message. " +
         "Nunca use esta capacidade em conversa comum de cliente.",
       inputSchema: z.object({
