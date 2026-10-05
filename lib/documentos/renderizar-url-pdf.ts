@@ -32,6 +32,23 @@ function parecePdf(buffer: Buffer): boolean {
   return buffer.subarray(0, Math.min(buffer.length, 1024)).includes(Buffer.from("%PDF-"));
 }
 
+export function argumentosChromiumParaPdf(entrada: string, saida: string): string[] {
+  return [
+    "--headless=new",
+    // O runner do Elus já está isolado pelo container e não concede os
+    // namespaces de usuário/PID que o sandbox do Chromium tenta criar.
+    // Sem esta flag o processo aborta com EPERM antes de carregar qualquer URL.
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--hide-scrollbars",
+    "--run-all-compositor-stages-before-draw",
+    "--virtual-time-budget=12000",
+    "--no-pdf-header-footer",
+    "--print-to-pdf=" + saida,
+    "file://" + entrada,
+  ];
+}
+
 function executarChromium(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const binario = process.env.CHROMIUM_PATH?.trim() || "/usr/bin/chromium-browser";
@@ -94,20 +111,7 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
       { encoding: "utf8", mode: 0o600 },
     );
 
-    await executarChromium([
-      "--headless=new",
-      // O runner do Elus já está isolado pelo container e não concede os
-      // namespaces de usuário/PID que o sandbox do Chromium tenta criar.
-      // Sem esta flag o processo aborta com EPERM antes de carregar qualquer URL.
-      "--no-sandbox",
-      "--disable-dev-shm-usage",
-      "--hide-scrollbars",
-      "--run-all-compositor-stages-before-draw",
-      "--virtual-time-budget=12000",
-      "--no-pdf-header-footer",
-      "--print-to-pdf=" + saida,
-      "file://" + entrada,
-    ]);
+    await executarChromium(argumentosChromiumParaPdf(entrada, saida));
 
     const buffer = await readFile(saida);
     if (!buffer.length) throw new ErroRenderizacaoDocumento("render_falhou");
