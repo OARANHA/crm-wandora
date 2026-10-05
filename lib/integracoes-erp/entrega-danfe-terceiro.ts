@@ -4,7 +4,6 @@ import { audit } from "@/lib/audit";
 import { parseServiceBoundary, type ServiceBoundary } from "@/lib/atendimento/fronteira";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { hashCpf, normalizeCpf } from "@/lib/contacts/cpf";
-import { CONVERSATION_TERMINAL_STATUSES } from "@/lib/schemas/messaging";
 
 import {
   conferirContatoComClienteErp,
