@@ -109,6 +109,23 @@ describe("ERP → cliente → entrega governada", () => {
     expect(bridge).toContain("await guardServiceEffect()");
   });
 
+  it("quando não há conversa, abre somente para contato CRM já provado e pela sessão da origem", () => {
+    const composer = readFileSync(
+      join(process.cwd(), "lib/integracoes-erp/entrega-danfe-terceiro.ts"),
+      "utf8",
+    );
+    const origin = readFileSync(join(process.cwd(), "lib/atendimento/origem.ts"), "utf8");
+
+    expect(composer).toContain("beginDerivedServiceFromCurrentOrigin");
+    expect(composer).toContain("targetContactId: contactId");
+    expect(composer).toContain("targetSessionId: origem.channel_session_id");
+    expect(composer).toContain("parseDialablePhone(contatoDestino.phone_number)");
+    expect(composer).not.toContain("fn_upsert_wa_contact");
+    expect(origin).toContain("await guardServiceEffect()");
+    expect(origin).toContain("inherited.conversation_id !== input.sourceConversationId");
+    expect(origin).toContain('admin.rpc("fn_service_begin"');
+  });
+
   it("worker e fronteira reconhecem o job derivado", () => {
     const worker = readFileSync(join(process.cwd(), "workers/agent-worker/main.ts"), "utf8");
     const boundary = readFileSync(
