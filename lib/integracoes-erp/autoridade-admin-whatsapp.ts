@@ -16,6 +16,7 @@ const FERRAMENTAS_ERP_ADMIN = new Set([
   "crm_erp_search_orders",
   "crm_erp_get_invoice",
   "crm_erp_prepare_admin_danfe",
+  "crm_erp_send_danfe_to_invoice_customer",
 ]);
 
 export interface AutoridadeAdminWhatsapp {
@@ -267,6 +268,7 @@ const RECURSO_POR_TOOL: Record<string, string> = {
   crm_erp_search_orders: "erp_order",
   crm_erp_get_invoice: "erp_invoice",
   crm_erp_prepare_admin_danfe: "erp_danfe",
+  crm_erp_send_danfe_to_invoice_customer: "erp_danfe_delivery",
 };
 
 export async function auditarConsultaAdminWhatsapp(input: {
