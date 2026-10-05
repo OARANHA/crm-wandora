@@ -152,7 +152,10 @@ export async function resolverDestinoDanfeDaNota(
   db: Db,
   organizationId: string,
   codigoNfe: number,
-): Promise<{ ok: true; destino: DestinoDanfeResolvido } | { ok: false; motivo: MotivoResolucaoDestinoDanfe }> {
+): Promise<
+  | { ok: true; destino: DestinoDanfeResolvido }
+  | { ok: false; motivo: MotivoResolucaoDestinoDanfe }
+> {
   const pedidos = await buscarPedidosErpComIdentidadeInterna(db, organizationId, {
     numeroNFe: String(codigoNfe),
     pageSize: 20,
