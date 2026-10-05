@@ -216,6 +216,25 @@ export async function buildMcpTurnTools(
         return { ok: true, documento: documentoPublico };
       },
     });
+
+    tools.crm_erp_send_danfe_to_invoice_customer = tool({
+      description:
+        "Agenda a entrega governada de uma DANFE já emitida para o CLIENTE VINCULADO À PRÓPRIA NOTA. " +
+        "Use somente quando um administrador autorizado pedir algo como 'mande a DANFE 64996397 para o cliente dessa nota'. " +
+        "O backend resolve NFe, pedido, Pessoa ERP, contato CRM e uma única conversa destino por identidade determinística; nome ou telefone digitado não escolhem destinatário. " +
+        "Zero ou múltiplos contatos/conversas falham fechado. Não chame send_message depois: o job próprio usa before_send, ledger e sender canônico do destino.",
+      inputSchema: z.object({
+        codigo_nfe: z.number().int().min(1).max(2_147_483_647),
+      }),
+      execute: async ({ codigo_nfe }) =>
+        solicitarEntregaDanfeAoClienteDaNota(cfg.supabase, {
+          autoridade: autoridadeAdminWhatsapp,
+          originConversationId: ids.conversationId!,
+          originJobId: ids.jobId,
+          agentId: agentConfig.agentId,
+          codigoNfe: codigo_nfe,
+        }),
+    });
   }
 
   return {
