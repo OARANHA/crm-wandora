@@ -8,7 +8,7 @@ describe("Dockerfile.worker inclui runtime do renderer de documentos", () => {
 
   it("instala Chromium e expõe CHROMIUM_PATH estável", () => {
     expect(dockerfile).toContain("apk add --no-cache chromium font-liberation");
-    expect(dockerfile).toContain("ln -s \"$CHROMIUM_BIN\" /usr/local/bin/elus-chromium");
+    expect(dockerfile).toContain('ln -s "$CHROMIUM_BIN" /usr/local/bin/elus-chromium');
     expect(dockerfile).toContain("ENV CHROMIUM_PATH=/usr/local/bin/elus-chromium");
   });
 });
