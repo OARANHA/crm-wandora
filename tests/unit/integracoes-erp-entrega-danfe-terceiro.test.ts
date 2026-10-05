@@ -106,6 +106,17 @@ describe("ERP → cliente → entrega governada", () => {
     expect(composer).toContain("fn_service_boundary");
     expect(composer).toContain("conversationId: resolucao.destino.conversationId");
     expect(composer).toContain('filenamePrefix: "danfe-nfe"');
+    expect(bridge).toContain("await guardServiceEffect()");
+  });
+
+  it("worker e fronteira reconhecem o job derivado", () => {
+    const worker = readFileSync(join(process.cwd(), "workers/agent-worker/main.ts"), "utf8");
+    const boundary = readFileSync(
+      join(process.cwd(), "lib/atendimento/fronteira-server.ts"),
+      "utf8",
+    );
+    expect(worker).toContain('handlers.set("governed_delivery"');
+    expect(boundary).toContain('"governed_delivery"');
   });
 
   it("migration deduplica replay da mesma ordem/NFe", () => {
