@@ -63,8 +63,13 @@ export interface SendMessageInput {
    * colidirem no ledger e o segundo virar `already_sent` sem ter saído.
    */
   template?: { name: string; language: string; values: Record<string, string> };
-  /** Presente = imagem da pasta da conversa em `whatsapp-media`; `body` é a legenda. */
-  media?: { storagePath: string; mime: string };
+  /** Presente = mídia da pasta da conversa em `whatsapp-media`; `body` é a legenda. */
+  media?: {
+    storagePath: string;
+    mime: string;
+    /** Ausente preserva o comportamento legado de imagem. */
+    kind?: "image" | "document";
+  };
 }
 
 /**
@@ -87,7 +92,7 @@ export function corpoDoEnvio(
         }
       : input.media
         ? {
-            type: 'image' as const,
+            type: (input.media.kind ?? 'image') as 'image' | 'document',
             media_storage_path: input.media.storagePath,
             media_mime: input.media.mime,
           }

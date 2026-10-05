@@ -71,7 +71,14 @@ export async function buildMcpTurnTools(
   },
   agentConfig: PublishedAgentConfig,
   log: Logger,
-  options?: { readOnly: boolean },
+  options?: {
+    readOnly?: boolean;
+    onAdminDocumentPrepared?: (documento: {
+      storagePath: string;
+      mime: string;
+      filename: string;
+    }) => void;
+  },
 ): Promise<McpTurnTools | null> {
   const callbackFiltered = filtrarToolsComCallbackDesabilitado(
     agentConfig.toolIds,
@@ -181,19 +188,30 @@ export async function buildMcpTurnTools(
         "Prepara uma DANFE já emitida para esta conversa administrativa. " +
         "REGRA DE USO: quando o administrador pedir para mandar, enviar, ver, baixar, obter ou receber uma DANFE e informar o número da NFe/NFCe, chame esta ferramenta ANTES de qualquer send_message ou resposta textual; use esse número em codigo_nfe. " +
         "Não diga que não consegue e não responda apenas em texto antes de tentar esta ferramenta. " +
-        "A ferramenta devolve um preview_url temporário; envie esse link ao administrador com send_message. " +
-        "Nunca use esta capacidade em conversa comum de cliente.",
+        "Depois de preparar com sucesso, chame send_message UMA vez com a legenda curta: o runtime anexará o PDF automaticamente como documento. " +
+        "Não copie nem envie preview_url ao administrador. Nunca use esta capacidade em conversa comum de cliente.",
       inputSchema: z.object({
         codigo_nfe: z.number().int().min(1).max(2_147_483_647),
       }),
-      execute: async ({ codigo_nfe }) =>
-        prepararDanfeAdminWhatsapp(
+      execute: async ({ codigo_nfe }) => {
+        const preparado = await prepararDanfeAdminWhatsapp(
           cfg.supabase,
           autoridadeAdminWhatsapp,
           ids.conversationId!,
           codigo_nfe,
           ids.jobId,
-        ),
+        );
+        if (!preparado.ok) return preparado;
+
+        options?.onAdminDocumentPrepared?.({
+          storagePath: preparado.documento.storage_path,
+          mime: preparado.documento.media_mime,
+          filename: preparado.documento.filename,
+        });
+
+        const { storage_path: _interno, ...documentoPublico } = preparado.documento;
+        return { ok: true, documento: documentoPublico };
+      },
     });
   }
 

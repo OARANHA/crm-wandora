@@ -212,6 +212,28 @@ describe("Admin WhatsApp Read-Only V1", () => {
     expect(bridge).toContain("chame esta ferramenta ANTES de qualquer send_message");
     expect(bridge).toContain("use esse número em codigo_nfe");
     expect(bridge).toContain("Não diga que não consegue");
+    expect(bridge).toContain("o runtime anexará o PDF automaticamente como documento");
+    expect(bridge).toContain("Não copie nem envie preview_url");
+    expect(bridge).toContain("onAdminDocumentPrepared");
+    expect(bridge).toContain("storage_path: _interno");
+  });
+
+  it("o DANFE preparado entra no send_message canônico como documento sem expor storage_path ao modelo", () => {
+    const turno = readFileSync(
+      join(process.cwd(), "lib/agent-engine/agent/inbound-turn.ts"),
+      "utf8",
+    );
+    const sender = readFileSync(
+      join(process.cwd(), "lib/agent-engine/edge/crm/send-message.ts"),
+      "utf8",
+    );
+
+    expect(turno).toContain("let documentoAdminPreparado");
+    expect(turno).toContain("onAdminDocumentPrepared: (documento)");
+    expect(turno).toContain("kind: 'document'");
+    expect(turno).toContain("return enviar(finalBody");
+    expect(sender).toContain('kind?: "image" | "document"');
+    expect(sender).toContain("type: (input.media.kind ?? 'image')");
   });
 
   it("pedido/NFe apresentados ao modelo não expõem a URL externa do DANFE", () => {
