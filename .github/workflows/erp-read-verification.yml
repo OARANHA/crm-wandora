@@ -16,6 +16,15 @@ on:
       - "lib/mcp/tools/catalogo/index.ts"
       - "lib/instalacao/modulos.ts"
       - "lib/audit/actions.ts"
+      - "lib/agent-engine/agent/governed-conversation-delivery.ts"
+      - "lib/agent-engine/agent/governed-conversation-delivery.test.ts"
+      - "lib/agent-engine/agent/approved-reply.ts"
+      - "lib/agent-engine/agent/approved-reply-governed-delivery.test.ts"
+      - "lib/agent-engine/guardrails/before-send.ts"
+      - "lib/agent-engine/edge/crm/send-message.ts"
+      - "lib/agent-engine/edge/crm/send-ledger.ts"
+      - "lib/channels/runtime.ts"
+      - "lib/messaging/media/upload-validation.ts"
       - "supabase/migrations/**"
       - "tests/unit/integracoes-erp-*.test.ts"
       - "tests/invariants/integracoes-erp-provisionadora.test.ts"
@@ -25,6 +34,7 @@ on:
       - "tests/unit/pacote-reserva-vaga-da-critica.test.ts"
       - "tests/unit/tool-read-nao-muta.test.ts"
       - "docs/specs/integracoes-erp*.md"
+      - "docs/specs/governed-cross-conversation-delivery-v1.md"
   workflow_dispatch:
 
 permissions:
@@ -69,6 +79,10 @@ jobs:
           lib/mcp/tools/integracoes-erp.ts
           lib/mcp/tools/catalogo/integracoes-erp.ts
           tests/unit/integracoes-erp-*.test.ts
+          lib/agent-engine/agent/governed-conversation-delivery.ts
+          lib/agent-engine/agent/governed-conversation-delivery.test.ts
+          lib/agent-engine/agent/approved-reply.ts
+          lib/agent-engine/agent/approved-reply-governed-delivery.test.ts
 
       - name: Check ERP formatting
         run: >
@@ -83,7 +97,12 @@ jobs:
           "lib/mcp/tools/catalogo/integracoes-erp.ts"
           "tests/unit/integracoes-erp-*.test.ts"
           "tests/invariants/integracoes-erp-provisionadora.test.ts"
+          "lib/agent-engine/agent/governed-conversation-delivery.ts"
+          "lib/agent-engine/agent/governed-conversation-delivery.test.ts"
+          "lib/agent-engine/agent/approved-reply.ts"
+          "lib/agent-engine/agent/approved-reply-governed-delivery.test.ts"
           "docs/specs/integracoes-erp*.md"
+          "docs/specs/governed-cross-conversation-delivery-v1.md"
 
       - name: ERP unit tests
         run: >
@@ -98,6 +117,9 @@ jobs:
           tests/unit/integracoes-erp-danfe-authority.test.ts
           tests/unit/integracoes-erp-documento-cliente.test.ts
           tests/unit/integracoes-erp-admin-whatsapp.test.ts
+          lib/agent-engine/agent/governed-conversation-delivery.test.ts
+          lib/agent-engine/agent/approved-reply-governed-delivery.test.ts
+          tests/unit/before-send-chain-shape.test.ts
 
       - name: Catalog invariants touched by ERP tools
         run: >
