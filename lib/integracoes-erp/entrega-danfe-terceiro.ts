@@ -191,7 +191,7 @@ export async function resolverDestinoDanfeDaNota(
     .eq("organization_id", organizationId)
     .eq("contact_id", contactId)
     .eq("is_group", false)
-    .not("status", "in", `(${CONVERSATION_TERMINAL_STATUSES.join(",")})`)
+    .not("status", "in", "(closed,resolved,archived)")
     .limit(3);
   if (conversaError) return { ok: false, motivo: "banco" };
   if (!conversas || conversas.length === 0) {
