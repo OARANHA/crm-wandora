@@ -5,6 +5,16 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+ENV CHROMIUM_PATH=/usr/local/bin/elus-chromium
+
+# O agent_turn roda neste worker 24/7. Capabilities internas de documento,
+# como erp.vendaerp.danfe_to_pdf, precisam do mesmo Chromium disponível no app.
+# O runner já está isolado pelo container; o renderer aplica --no-sandbox.
+RUN apk add --no-cache chromium font-liberation && \
+    CHROMIUM_BIN="$(command -v chromium || command -v chromium-browser)" && \
+    test -n "$CHROMIUM_BIN" && \
+    ln -s "$CHROMIUM_BIN" /usr/local/bin/elus-chromium
+
 # Procedência (doutrina de packaging, invariante 2).
 LABEL org.opencontainers.image.source="https://github.com/melgarafael/DeskcommCRM" \
       org.opencontainers.image.licenses="MIT" \
