@@ -56,6 +56,35 @@ function mapearErroRenderizacao(erro: unknown): ErroDanfeExterno {
   }
 }
 
+async function materializarPdfRenderizadoVendaErp(
+  url: string,
+  renderizador: RenderizadorDanfeVendaErp,
+): Promise<DanfeMaterializado> {
+  let pdf: Buffer;
+  try {
+    pdf = await renderizador(url);
+  } catch (erro) {
+    throw mapearErroRenderizacao(erro);
+  }
+
+  const validacaoPdf = validateOutboundMedia("application/pdf", pdf.length);
+  if (!validacaoPdf.ok) {
+    throw new ErroDanfeExterno(
+      validacaoPdf.code === "payload_too_large" ? "arquivo_grande" : "tipo_nao_documento",
+    );
+  }
+  if (!parecePdf(pdf) || validacaoPdf.kind !== "document") {
+    throw new ErroDanfeExterno("tipo_nao_documento");
+  }
+
+  return {
+    buffer: pdf,
+    mime: "application/pdf",
+    sizeBytes: pdf.length,
+    extensao: "pdf",
+  };
+}
+
 function mimeBase(valor: string | null): string | null {
   const mime = valor?.split(";")[0]?.trim().toLowerCase();
   return mime ? mime : null;
@@ -143,6 +172,10 @@ export async function materializarDanfeExterno(
         erro instanceof DOMException &&
         (erro.name === "TimeoutError" || erro.name === "AbortError")
       ) {
+        if (ehUrlDanfePublicoVendaErp(url)) {
+          const renderizador = options?.renderizadorVendaErp ?? renderizarDanfeVendaErpParaPdf;
+          return materializarPdfRenderizadoVendaErp(url, renderizador);
+        }
         throw new ErroDanfeExterno("timeout");
       }
       throw new ErroDanfeExterno("download_falhou");
@@ -174,27 +207,7 @@ export async function materializarDanfeExterno(
 
     if (mime === "text/html" && ehUrlDanfePublicoVendaErp(url)) {
       const renderizador = options?.renderizadorVendaErp ?? renderizarDanfeVendaErpParaPdf;
-      let pdf: Buffer;
-      try {
-        pdf = await renderizador(url);
-      } catch (erro) {
-        throw mapearErroRenderizacao(erro);
-      }
-      const validacaoPdf = validateOutboundMedia("application/pdf", pdf.length);
-      if (!validacaoPdf.ok) {
-        throw new ErroDanfeExterno(
-          validacaoPdf.code === "payload_too_large" ? "arquivo_grande" : "tipo_nao_documento",
-        );
-      }
-      if (!parecePdf(pdf) || validacaoPdf.kind !== "document") {
-        throw new ErroDanfeExterno("tipo_nao_documento");
-      }
-      return {
-        buffer: pdf,
-        mime: "application/pdf",
-        sizeBytes: pdf.length,
-        extensao: "pdf",
-      };
+      return materializarPdfRenderizadoVendaErp(url, renderizador);
     }
 
     const validacao = validateOutboundMedia(mime, buffer.length);
