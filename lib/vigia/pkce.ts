@@ -1,7 +1,12 @@
 import { createHash, randomBytes } from "node:crypto"
 
-export const VIGIA_PKCE_COOKIE = "elus_vigia_pkce"
+const VIGIA_PKCE_COOKIE_PREFIX = "elus_vigia_pkce"
 export const VIGIA_PKCE_TTL_SECONDS = 10 * 60
+
+export function gerarNomeCookiePkceVigia(state: string): string {
+  const suffix = createHash("sha256").update(state, "utf8").digest("hex").slice(0, 24)
+  return `${VIGIA_PKCE_COOKIE_PREFIX}_${suffix}`
+}
 
 export function gerarPkce(): { verifier: string; challenge: string } {
   const verifier = randomBytes(48).toString("base64url")

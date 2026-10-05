@@ -6,7 +6,7 @@ import { audit } from "@/lib/audit"
 import { supportCallbackWriteAllowed } from "@/lib/impersonate/support"
 import { verifyState } from "@/lib/nuvemshop/state"
 import { salvarIntegracaoVigia } from "@/lib/vigia/config"
-import { VIGIA_PKCE_COOKIE } from "@/lib/vigia/pkce"
+import { gerarNomeCookiePkceVigia } from "@/lib/vigia/pkce"
 
 const callbackSchema = z.object({
   code: z.string().min(1).max(12_000),
@@ -42,7 +42,8 @@ export async function GET(request: Request) {
   }
 
   const store = await cookies()
-  const verifier = store.get(VIGIA_PKCE_COOKIE)?.value
+  const cookieName = gerarNomeCookiePkceVigia(parsed.data.state)
+  const verifier = store.get(cookieName)?.value
   if (!verifier) {
     return NextResponse.json({ error: "missing_verifier" }, { status: 400 })
   }
@@ -56,6 +57,16 @@ export async function GET(request: Request) {
     signal: AbortSignal.timeout(10_000),
   }).catch(() => null)
   if (!exchange?.ok) {
+    const failure = exchange ? await exchange.json().catch(() => null) : null
+    const reason =
+      typeof failure === "object" && failure !== null && typeof (failure as { error?: unknown }).error === "string"
+        ? (failure as { error: string }).error
+        : null
+    console.warn("vigia.integration.exchange_failed", {
+      requestId: requestId ?? null,
+      status: exchange?.status ?? null,
+      reason,
+    })
     return NextResponse.json({ error: "vigia_exchange_failed" }, { status: 502 })
   }
 
@@ -65,7 +76,7 @@ export async function GET(request: Request) {
   }
 
   await salvarIntegracaoVigia(state.orgId, config.data)
-  store.delete(VIGIA_PKCE_COOKIE)
+  store.delete(cookieName)
 
   await audit({
     action: "vigia.integration.connected",

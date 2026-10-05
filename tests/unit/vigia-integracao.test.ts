@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { gerarPkce } from "@/lib/vigia/pkce"
+import { gerarNomeCookiePkceVigia, gerarPkce } from "@/lib/vigia/pkce"
 import { criarPayloadOtlpVigia } from "@/lib/vigia/telemetry"
 
 describe("Vigia native integration PKCE", () => {
@@ -12,6 +12,16 @@ describe("Vigia native integration PKCE", () => {
     expect(first.challenge).toMatch(/^[A-Za-z0-9_-]{43}$/)
     expect(second.verifier).not.toBe(first.verifier)
     expect(second.challenge).not.toBe(first.challenge)
+  })
+
+  it("isolates the verifier cookie by signed state so parallel flows do not overwrite each other", () => {
+    const first = gerarNomeCookiePkceVigia("state-a")
+    const same = gerarNomeCookiePkceVigia("state-a")
+    const second = gerarNomeCookiePkceVigia("state-b")
+
+    expect(first).toBe(same)
+    expect(second).not.toBe(first)
+    expect(first).toMatch(/^elus_vigia_pkce_[0-9a-f]{24}$/)
   })
 })
 
