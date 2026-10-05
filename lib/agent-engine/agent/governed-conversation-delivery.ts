@@ -28,6 +28,7 @@ interface DeliveryInput {
   organizationId: string;
   conversationId: string;
   expectedContactId?: string;
+  expectedChannelSessionId?: string;
   jobId: string;
   jobClaim?: JobClaim;
   agentId: string;
@@ -60,6 +61,7 @@ export async function carregarDestinoGovernadoDaConversa(
   organizationId: string,
   conversationId: string,
   expectedContactId?: string,
+  expectedChannelSessionId?: string,
 ): Promise<GovernedConversationDestination> {
   const { rows } = await pool.query<
     LgpdContactFields & {
@@ -94,6 +96,9 @@ export async function carregarDestinoGovernadoDaConversa(
   if (expectedContactId && row.contact_id !== expectedContactId) {
     throw new StaleServiceBoundaryError();
   }
+  if (expectedChannelSessionId && row.channel_session_id !== expectedChannelSessionId) {
+    throw new StaleServiceBoundaryError();
+  }
   return {
     conversationId: row.conversation_id,
     contactId: row.contact_id,
@@ -123,6 +128,7 @@ export async function deliverGovernedMessageToConversation(
     input.organizationId,
     input.conversationId,
     input.expectedContactId,
+    input.expectedChannelSessionId,
   );
 
   if (
