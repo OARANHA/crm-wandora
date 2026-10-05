@@ -33,6 +33,7 @@ import {
   prepararDanfeAdminWhatsapp,
   resolverAutoridadeAdminWhatsapp,
 } from '@/lib/integracoes-erp/autoridade-admin-whatsapp';
+import { solicitarEntregaDanfeAoClienteDaNota } from '@/lib/integracoes-erp/entrega-danfe-terceiro';
 
 import type { Logger } from '../../obs/logger';
 import type { CrmEdgeConfig } from './mcp-client';
