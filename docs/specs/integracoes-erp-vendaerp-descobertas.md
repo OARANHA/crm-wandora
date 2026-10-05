@@ -271,3 +271,14 @@ e e-mail somente no backend para selecionar a Pessoa ERP. Depois reconcilia essa
 A conversa destino precisa ser única, não terminal e usar sessão ativa. Sua `fn_service_boundary` é
 capturada antes do job derivado. O documento é materializado no namespace dessa conversa e o
 consumer reutiliza o seam governado de messaging. O VendaERP permanece somente leitura.
+
+## Cliente da NFe ainda sem conversa
+
+A ausência de conversa deixou de ser, por si só, um bloqueio quando a identidade ERP já provou
+um único contato CRM ativo. Nesse caso o Elus exige telefone discável no contato existente,
+revalida a origem administrativa e usa a mesma sessão WhatsApp da ordem para criar ou reabrir
+o thread por `fn_service_begin`.
+
+Nada muda na autoridade de identidade: o ERP continua somente leitura, nome não identifica,
+telefone digitado pelo modelo não escolhe destinatário e nenhum contato é criado automaticamente.
+
