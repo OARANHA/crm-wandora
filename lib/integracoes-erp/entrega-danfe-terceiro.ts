@@ -347,7 +347,14 @@ export async function solicitarEntregaDanfeAoClienteDaNota(
     conversation_id: resolucao.destino.conversationId,
     expected_contact_id: resolucao.destino.contactId,
     expected_channel_session_id: resolucao.destino.channelSessionId,
-    service_boundary: resolucao.destino.serviceBoundary,
+    service_boundary: {
+      organization_id: resolucao.destino.serviceBoundary.organization_id,
+      contact_id: resolucao.destino.serviceBoundary.contact_id,
+      conversation_id: resolucao.destino.serviceBoundary.conversation_id,
+      service_revision: resolucao.destino.serviceBoundary.service_revision,
+      demanda_id: resolucao.destino.serviceBoundary.demanda_id,
+      demanda_revision: resolucao.destino.serviceBoundary.demanda_revision,
+    },
     agent_id: input.agentId,
     body: `DANFE da NFe ${input.codigoNfe}.`,
     media: {
