@@ -213,6 +213,10 @@ export async function resolverDestinoDanfeDaNota(
   if (elegiveis.length === 0) return { ok: false, motivo: "conversa_destino_nao_encontrada" };
   if (elegiveis.length > 1) return { ok: false, motivo: "conversa_destino_ambigua" };
   const conversa = elegiveis[0]!;
+  const channelSessionId = conversa.channel_session_id;
+  if (typeof channelSessionId !== "string") {
+    return { ok: false, motivo: "conversa_destino_nao_encontrada" };
+  }
 
   const { data: boundaryRaw, error: boundaryError } = await db.rpc("fn_service_boundary", {
     p_org: organizationId,
@@ -234,7 +238,7 @@ export async function resolverDestinoDanfeDaNota(
     destino: {
       contactId,
       conversationId: conversa.id,
-      channelSessionId: conversa.channel_session_id,
+      channelSessionId,
       serviceBoundary: boundary,
     },
   };
