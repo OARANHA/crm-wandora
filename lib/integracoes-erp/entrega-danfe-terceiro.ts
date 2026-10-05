@@ -203,15 +203,17 @@ export async function resolverDestinoDanfeDaNota(
   const existentes = conversas ?? [];
 
   const sessionIds = [...new Set(existentes.map((c) => c.channel_session_id).filter(Boolean))];
-  const { data: sessoes, error: sessaoError } = await db
-    .from("channel_sessions")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .in("id", sessionIds)
-    .is("archived_at", null);
-  if (sessaoError) return { ok: false, motivo: "banco" };
-
-  const ativas = new Set((sessoes ?? []).map((s) => s.id));
+  let ativas = new Set<string>();
+  if (sessionIds.length > 0) {
+    const { data: sessoes, error: sessaoError } = await db
+      .from("channel_sessions")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .in("id", sessionIds)
+      .is("archived_at", null);
+    if (sessaoError) return { ok: false, motivo: "banco" };
+    ativas = new Set((sessoes ?? []).map((s) => s.id));
+  }
   const elegiveis = existentes.filter((c) => ativas.has(c.channel_session_id));
   if (elegiveis.length > 1) return { ok: false, motivo: "conversa_destino_ambigua" };
 
