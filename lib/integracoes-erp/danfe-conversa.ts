@@ -80,8 +80,7 @@ export async function materializarDanfeNaConversa(
     return { ok: false, motivo: "danfe_download_failed" };
   }
 
-  const filename =
-    `${input.filenamePrefix}-${input.codigoNfe}-${randomUUID()}.${documento.extensao}`;
+  const filename = `${input.filenamePrefix}-${input.codigoNfe}-${randomUUID()}.${documento.extensao}`;
   const storagePath = `${input.organizationId}/${input.conversationId}/${filename}`;
   const { error: uploadError } = await db.storage
     .from("whatsapp-media")
