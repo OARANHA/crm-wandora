@@ -2558,6 +2558,12 @@ async function executarTurnoDoAgente(
 
   // Estado do RUN — vive só neste closure (isolamento por construção, acc 3).
   let seq = 0;
+  // Documento administrativo preparado por uma capability MCP NESTE turno.
+  // Fica só no closure do runtime: o modelo nunca recebe storage_path. A próxima
+  // send_message o entrega pelo sender canônico, sob before_send + ledger.
+  let documentoAdminPreparado:
+    | { storagePath: string; mime: string; filename: string }
+    | null = null;
   // O que o modelo de fato mandou neste turno (depois da cadeia). A trava "a
   // pergunta saiu?" do roteiro de atendimento lê daqui.
   const corposEnviados: string[] = [];
@@ -3217,7 +3223,11 @@ async function executarTurnoDoAgente(
                 Math.floor(Math.random() * (pacingDoTurno?.knobs.jitterMaxMs ?? 800));
               const enviar = (
                 corpo: string,
-                media?: FotoParaEnvio,
+                media?: {
+                  storagePath: string;
+                  mime: string;
+                  kind?: 'image' | 'document';
+                },
               ): Promise<ChannelSendResult> => {
                 seq += 1;
                 return liveChannel().send({
@@ -3232,6 +3242,19 @@ async function executarTurnoDoAgente(
                   ...(media ? { media } : {}),
                 });
               };
+              // DANFE administrativo preparado: a próxima send_message vira UMA
+              // mensagem documental. A referência fica interna ao turno e o arquivo sai
+              // pelo MESMO sender/ledger/guardrails do texto — nunca direto da tool ERP.
+              if (documentoAdminPreparado !== null) {
+                const documento = documentoAdminPreparado;
+                documentoAdminPreparado = null;
+                return enviar(finalBody, {
+                  storagePath: documento.storagePath,
+                  mime: documento.mime,
+                  kind: 'document',
+                });
+              }
+
               // Cada foto é uma mensagem física: só vão as que cabem no que resta do teto
               // do turno (a checagem de `max_sends_per_turn` acima roda uma vez, antes).
               // O resto é medido ANTES DE CADA FOTO, depois do texto: o texto acima do
@@ -3874,7 +3897,13 @@ async function executarTurnoDoAgente(
           },
           configDoTurno,
           runLog,
-          preview ? { readOnly: true } : undefined,
+          preview
+            ? { readOnly: true }
+            : {
+                onAdminDocumentPrepared: (documento) => {
+                  documentoAdminPreparado = documento;
+                },
+              },
         );
         if (mcp !== null) {
           mcpCleanup = mcp.cleanup;
