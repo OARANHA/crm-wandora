@@ -68,60 +68,54 @@ describe("approved_reply usa a entrega governada sem perder sua policy", () => {
     });
   });
 
-  it(
-    "passa conversa/contato/sessão aprovados como expectativas e revalida antes do dispatch",
-    async () => {
-      const pool = {
-        query: vi.fn(async () => ({ rows: [] })),
-      } as unknown as pg.Pool;
-      const job = {
-        id: jobId,
-        kind: "approved_reply",
-        organization_id: org,
-        contact_id: contact,
-        locked_by: "worker-1",
-        claim_acquired_at: "2026-10-05T13:00:00.000Z",
-      } as JobRow;
+  it("passa conversa/contato/sessão aprovados como expectativas e revalida antes do dispatch", async () => {
+    const pool = {
+      query: vi.fn(async () => ({ rows: [] })),
+    } as unknown as pg.Pool;
+    const job = {
+      id: jobId,
+      kind: "approved_reply",
+      organization_id: org,
+      contact_id: contact,
+      locked_by: "worker-1",
+      claim_acquired_at: "2026-10-05T13:00:00.000Z",
+    } as JobRow;
 
-      const handler = createApprovedReplyHandler({
-        crmCfg: {} as never,
-        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-        sleep: async () => undefined,
-      });
+    const handler = createApprovedReplyHandler({
+      crmCfg: {} as never,
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      sleep: async () => undefined,
+    });
 
-      await handler(job, pool);
+    await handler(job, pool);
 
-      expect(mocks.deliverGovernedMessageToConversation).toHaveBeenCalledTimes(1);
-      expect(mocks.deliverGovernedMessageToConversation.mock.calls[0]![1]).toMatchObject({
+    expect(mocks.deliverGovernedMessageToConversation).toHaveBeenCalledTimes(1);
+    expect(mocks.deliverGovernedMessageToConversation.mock.calls[0]![1]).toMatchObject({
+      organizationId: org,
+      conversationId: conversation,
+      expectedContactId: contact,
+      expectedChannelSessionId: session,
+      jobId,
+      agentId: agent,
+      seq: 1,
+      body: "Resposta aprovada.",
+      approvedReply: {
         organizationId: org,
-        conversationId: conversation,
-        expectedContactId: contact,
-        expectedChannelSessionId: session,
         jobId,
-        agentId: agent,
-        seq: 1,
-        body: "Resposta aprovada.",
-        approvedReply: {
-          organizationId: org,
-          jobId,
-          jobClaim: {
-            worker_id: "worker-1",
-            acquired_at: "2026-10-05T13:00:00.000Z",
-          },
+        jobClaim: {
+          worker_id: "worker-1",
+          acquired_at: "2026-10-05T13:00:00.000Z",
         },
-      });
-      expect(mocks.assertApprovedReplyPg).toHaveBeenCalledTimes(2);
-      expect(pool.query).toHaveBeenCalledWith(
-        "select fn_reply_settle($1,$2,$3,$4,$5,$6)",
-        [
-          org,
-          jobId,
-          "worker-1",
-          "2026-10-05T13:00:00.000Z",
-          "sent",
-          null,
-        ],
-      );
-    },
-  );
+      },
+    });
+    expect(mocks.assertApprovedReplyPg).toHaveBeenCalledTimes(2);
+    expect(pool.query).toHaveBeenCalledWith("select fn_reply_settle($1,$2,$3,$4,$5,$6)", [
+      org,
+      jobId,
+      "worker-1",
+      "2026-10-05T13:00:00.000Z",
+      "sent",
+      null,
+    ]);
+  });
 });
