@@ -96,6 +96,10 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
 
     await executarChromium([
       "--headless=new",
+      // O runner do Elus já está isolado pelo container e não concede os
+      // namespaces de usuário/PID que o sandbox do Chromium tenta criar.
+      // Sem esta flag o processo aborta com EPERM antes de carregar qualquer URL.
+      "--no-sandbox",
       "--disable-dev-shm-usage",
       "--hide-scrollbars",
       "--run-all-compositor-stages-before-draw",
