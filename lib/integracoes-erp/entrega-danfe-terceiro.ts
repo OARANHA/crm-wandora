@@ -2,8 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { audit } from "@/lib/audit";
 import { parseServiceBoundary, type ServiceBoundary } from "@/lib/atendimento/fronteira";
+import { beginDerivedServiceFromCurrentOrigin } from "@/lib/atendimento/origem";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { hashCpf, normalizeCpf } from "@/lib/contacts/cpf";
+import { parseDialablePhone } from "@/lib/messaging/contact-card";
 
 import {
   conferirContatoComClienteErp,
@@ -33,6 +35,7 @@ export type MotivoResolucaoDestinoDanfe =
   | "erp_read_failed"
   | "contato_crm_nao_encontrado"
   | "contato_crm_ambiguo"
+  | "contato_sem_whatsapp"
   | "identidade_inconsistente"
   | "conversa_destino_nao_encontrada"
   | "conversa_destino_ambigua"
@@ -152,6 +155,7 @@ export async function resolverDestinoDanfeDaNota(
   db: Db,
   organizationId: string,
   codigoNfe: number,
+  sourceConversationId?: string,
 ): Promise<
   { ok: true; destino: DestinoDanfeResolvido } | { ok: false; motivo: MotivoResolucaoDestinoDanfe }
 > {
@@ -184,7 +188,8 @@ export async function resolverDestinoDanfeDaNota(
     };
   }
   if (confirmados.length > 1) return { ok: false, motivo: "contato_crm_ambiguo" };
-  const contactId = confirmados[0]!.id;
+  const contatoDestino = confirmados[0]!;
+  const contactId = contatoDestino.id;
 
   const { data: conversas, error: conversaError } = await db
     .from("conversations")
@@ -195,35 +200,90 @@ export async function resolverDestinoDanfeDaNota(
     .not("status", "in", "(closed,resolved,archived)")
     .limit(3);
   if (conversaError) return { ok: false, motivo: "banco" };
-  if (!conversas || conversas.length === 0) {
-    return { ok: false, motivo: "conversa_destino_nao_encontrada" };
+  const existentes = conversas ?? [];
+
+  const sessionIds = [...new Set(existentes.map((c) => c.channel_session_id).filter(Boolean))];
+  let ativas = new Set<string>();
+  if (sessionIds.length > 0) {
+    const { data: sessoes, error: sessaoError } = await db
+      .from("channel_sessions")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .in("id", sessionIds)
+      .is("archived_at", null);
+    if (sessaoError) return { ok: false, motivo: "banco" };
+    ativas = new Set((sessoes ?? []).map((s) => s.id));
+  }
+  const elegiveis = existentes.filter((c) => ativas.has(c.channel_session_id));
+  if (elegiveis.length > 1) return { ok: false, motivo: "conversa_destino_ambigua" };
+
+  let conversa = elegiveis[0] ?? null;
+  let boundary: ServiceBoundary | null = null;
+
+  if (!conversa) {
+    if (!sourceConversationId) {
+      return { ok: false, motivo: "conversa_destino_nao_encontrada" };
+    }
+    if (!contatoDestino.phone_number || !parseDialablePhone(contatoDestino.phone_number)) {
+      return { ok: false, motivo: "contato_sem_whatsapp" };
+    }
+
+    const { data: origem, error: origemError } = await db
+      .from("conversations")
+      .select("id, channel_session_id")
+      .eq("organization_id", organizationId)
+      .eq("id", sourceConversationId)
+      .maybeSingle();
+    if (origemError) return { ok: false, motivo: "banco" };
+    if (!origem?.channel_session_id) {
+      return { ok: false, motivo: "conversa_destino_nao_encontrada" };
+    }
+
+    const { data: sessaoOrigem, error: sessaoOrigemError } = await db
+      .from("channel_sessions")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("id", origem.channel_session_id)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (sessaoOrigemError) return { ok: false, motivo: "banco" };
+    if (!sessaoOrigem) return { ok: false, motivo: "conversa_destino_nao_encontrada" };
+
+    try {
+      boundary = await beginDerivedServiceFromCurrentOrigin(db, {
+        organizationId,
+        sourceConversationId,
+        targetContactId: contactId,
+        targetSessionId: origem.channel_session_id,
+      });
+    } catch {
+      return { ok: false, motivo: "fronteira_destino_indisponivel" };
+    }
+
+    const { data: aberta, error: abertaError } = await db
+      .from("conversations")
+      .select("id, contact_id, channel_session_id, status, is_group")
+      .eq("organization_id", organizationId)
+      .eq("id", boundary.conversation_id)
+      .maybeSingle();
+    if (abertaError) return { ok: false, motivo: "banco" };
+    if (!aberta) return { ok: false, motivo: "conversa_destino_nao_encontrada" };
+    conversa = aberta;
   }
 
-  const sessionIds = [...new Set(conversas.map((c) => c.channel_session_id).filter(Boolean))];
-  const { data: sessoes, error: sessaoError } = await db
-    .from("channel_sessions")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .in("id", sessionIds)
-    .is("archived_at", null);
-  if (sessaoError) return { ok: false, motivo: "banco" };
-
-  const ativas = new Set((sessoes ?? []).map((s) => s.id));
-  const elegiveis = conversas.filter((c) => ativas.has(c.channel_session_id));
-  if (elegiveis.length === 0) return { ok: false, motivo: "conversa_destino_nao_encontrada" };
-  if (elegiveis.length > 1) return { ok: false, motivo: "conversa_destino_ambigua" };
-  const conversa = elegiveis[0]!;
   const channelSessionId = conversa.channel_session_id;
   if (typeof channelSessionId !== "string") {
     return { ok: false, motivo: "conversa_destino_nao_encontrada" };
   }
 
-  const { data: boundaryRaw, error: boundaryError } = await db.rpc("fn_service_boundary", {
-    p_org: organizationId,
-    p_conversation: conversa.id,
-  });
-  if (boundaryError) return { ok: false, motivo: "banco" };
-  const boundary = parseServiceBoundary(boundaryRaw);
+  if (!boundary) {
+    const { data: boundaryRaw, error: boundaryError } = await db.rpc("fn_service_boundary", {
+      p_org: organizationId,
+      p_conversation: conversa.id,
+    });
+    if (boundaryError) return { ok: false, motivo: "banco" };
+    boundary = parseServiceBoundary(boundaryRaw);
+  }
   if (
     !boundary ||
     boundary.organization_id !== organizationId ||
@@ -323,6 +383,7 @@ export async function solicitarEntregaDanfeAoClienteDaNota(
     db,
     input.autoridade.organizationId,
     input.codigoNfe,
+    input.originConversationId,
   );
   if (!resolucao.ok) {
     await auditarOrdem({ ...input, success: false, motivo: resolucao.motivo });

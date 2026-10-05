@@ -137,3 +137,14 @@ conversa.
 O PDF é materializado diretamente no namespace da conversa destino. Um job `governed_delivery`
 revalida a fronteira e termina neste seam; não troca o `conversation_id` de um turno administrativo
 já em execução.
+
+## Cliente identificado sem conversa anterior
+
+Se a NFe resolve para um único contato CRM já existente, mas ele ainda não possui conversa
+elegível, a composição pode iniciar o thread do cliente sem reutilizar a fronteira do admin.
+A origem administrativa é revalidada; a sessão escolhida é a mesma da conversa administrativa;
+e a nova fronteira nasce exclusivamente de `fn_service_begin` para o contato do cliente.
+
+O contato precisa já existir, estar ativo e possuir telefone discável. Não há criação de contato,
+fuzzy match, `fn_upsert_wa_contact` nem telefone arbitrário vindo do modelo. A fronteira
+retornada pelo RPC pertence ao destinatário e é a única que segue para `governed_delivery`.
