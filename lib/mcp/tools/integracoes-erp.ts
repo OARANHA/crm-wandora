@@ -297,6 +297,8 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
           "informe ao menos um identificador, cliente, status ou número da nota para procurar pedidos.",
       };
     }
+    const ordenarPorSolicitado = input.ordenar_por ?? "recente";
+
     const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
       codigo: input.codigo,
       cliente: input.cliente,
@@ -311,14 +313,14 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
         input.ultimas_notas ||
         input.somente_faturados ||
         input.somente_finalizados ||
-        input.ordenar_por !== "recente"
+        ordenarPorSolicitado !== "recente"
           ? 20
           : input.limite,
       skip:
         input.ultimas_notas ||
         input.somente_faturados ||
         input.somente_finalizados ||
-        input.ordenar_por !== "recente"
+        ordenarPorSolicitado !== "recente"
           ? 0
           : input.skip,
     });
@@ -329,7 +331,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       const t = Date.parse(valor);
       return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
     };
-    const dataDeNegocio = (pedido: (typeof saida.dados)[number]): number =>
+    const dataDeNegocio = (pedido: NonNullable<typeof saida.dados>[number]): number =>
       Math.max(instante(pedido.dataFaturamento), instante(pedido.data));
 
     let pedidos = [...(saida.dados ?? [])];
@@ -341,7 +343,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       pedidos = pedidos.filter((pedido) => pedido.finalizado === true);
     }
 
-    const ordenarPor = input.ultimas_notas ? "recente" : input.ordenar_por;
+    const ordenarPor = input.ultimas_notas ? "recente" : ordenarPorSolicitado;
     pedidos.sort((a, b) => {
       if (ordenarPor === "maior_valor") {
         const valorA = a.total ?? Number.NEGATIVE_INFINITY;
