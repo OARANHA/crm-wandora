@@ -3,20 +3,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { audit } from "@/lib/audit";
 import { parseServiceBoundary, type ServiceBoundary } from "@/lib/atendimento/fronteira";
 import { beginDerivedServiceFromCurrentOrigin } from "@/lib/atendimento/origem";
-import { phoneLookupVariants } from "@/lib/channels/phone-variants";
-import { hashCpf, normalizeCpf } from "@/lib/contacts/cpf";
 import { parseDialablePhone } from "@/lib/messaging/contact-card";
 
 import {
   conferirContatoComClienteErp,
   selecionarClienteDoPedido,
-  type IdentidadeContatoParaDocumento,
 } from "./autoridade-documento";
 import {
   resolverAutoridadeAdminWhatsapp,
   type AutoridadeAdminWhatsapp,
 } from "./autoridade-admin-whatsapp";
 import { materializarDanfeNaConversa } from "./danfe-conversa";
+import { localizarContatosCandidatosClienteErp } from "./identidade-cliente";
 import {
   buscarClientesErp,
   buscarPedidosErpComIdentidadeInterna,
@@ -49,16 +47,6 @@ export interface DestinoDanfeResolvido {
   serviceBoundary: ServiceBoundary;
 }
 
-function emailNormalizado(valor: string | null | undefined): string | null {
-  const v = valor?.trim().toLowerCase();
-  return v || null;
-}
-
-function documentoNormalizado(valor: string | null | undefined): string | null {
-  const v = normalizeCpf(valor ?? "");
-  return v || null;
-}
-
 function notaDoPedidoEh(pedido: PedidoErpComIdentidadeInterna, codigoNfe: number): boolean {
   const bruto = pedido.pedido.numeroNFe?.trim();
   if (!bruto) return false;
@@ -87,70 +75,6 @@ async function resolverClienteErp(
     : { ok: false, motivo: selecionado.motivo };
 }
 
-/**
- * Descobre candidatos por identificadores canônicos que o CRM realmente persiste.
- * Telefone do ERP NÃO é usado sozinho como autoridade de descoberta.
- */
-async function contatosCandidatos(
-  db: Db,
-  organizationId: string,
-  cliente: ClienteErp,
-): Promise<{ ok: true; contatos: IdentidadeContatoParaDocumento[] } | { ok: false }> {
-  const achados = new Map<string, IdentidadeContatoParaDocumento>();
-  const select = "id, phone_number, email_normalized, cpf_hash, is_anonymized";
-
-  const doc = documentoNormalizado(cliente.cpfCnpj);
-  if (doc?.length === 11) {
-    const { data, error } = await db
-      .from("contacts")
-      .select(select)
-      .eq("organization_id", organizationId)
-      .eq("cpf_hash", hashCpf(doc))
-      .eq("is_anonymized", false)
-      .is("is_merged_into", null)
-      .limit(3);
-    if (error) return { ok: false };
-    for (const row of data ?? []) achados.set(row.id, row as IdentidadeContatoParaDocumento);
-  }
-
-  const email = emailNormalizado(cliente.email);
-  if (email) {
-    const { data, error } = await db
-      .from("contacts")
-      .select(select)
-      .eq("organization_id", organizationId)
-      .eq("email_normalized", email)
-      .eq("is_anonymized", false)
-      .is("is_merged_into", null)
-      .limit(3);
-    if (error) return { ok: false };
-    for (const row of data ?? []) achados.set(row.id, row as IdentidadeContatoParaDocumento);
-  }
-
-  // Telefone só descobre candidatos depois que a Pessoa ERP já foi provada pelo
-  // pedido. A decisão final continua em conferirContatoComClienteErp, que exige
-  // concordância de TODAS as evidências comparáveis.
-  for (const bruto of [cliente.celular, cliente.telefone]) {
-    if (!bruto?.trim()) continue;
-    const digits = bruto.replace(/\D/g, "");
-    const e164 = digits.startsWith("55") ? `+${digits}` : `+55${digits}`;
-    const variantes = phoneLookupVariants(e164);
-    if (variantes.length === 0) continue;
-    const { data, error } = await db
-      .from("contacts")
-      .select(select)
-      .eq("organization_id", organizationId)
-      .in("phone_number", variantes)
-      .eq("is_anonymized", false)
-      .is("is_merged_into", null)
-      .limit(3);
-    if (error) return { ok: false };
-    for (const row of data ?? []) achados.set(row.id, row as IdentidadeContatoParaDocumento);
-  }
-
-  return { ok: true, contatos: [...achados.values()] };
-}
-
 export async function resolverDestinoDanfeDaNota(
   db: Db,
   organizationId: string,
@@ -174,7 +98,7 @@ export async function resolverDestinoDanfeDaNota(
   const cliente = await resolverClienteErp(db, organizationId, pedido);
   if (!cliente.ok) return cliente;
 
-  const candidatos = await contatosCandidatos(db, organizationId, cliente.cliente);
+  const candidatos = await localizarContatosCandidatosClienteErp(db, organizationId, cliente.cliente);
   if (!candidatos.ok) return { ok: false, motivo: "banco" };
 
   const confirmados = candidatos.contatos.filter(
