@@ -127,6 +127,7 @@ describe("POST .../versions/:vid/test — core compartilhado", () => {
         versionId: VERSION,
         runId: "run-1",
         sampleMessage: "oi",
+        erpAdminPreviewAuthorized: true,
       }),
     );
     expect(res.status).toBe(422);

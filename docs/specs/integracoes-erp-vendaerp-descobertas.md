@@ -281,3 +281,36 @@ o thread por `fn_service_begin`.
 
 Nada muda na autoridade de identidade: o ERP continua somente leitura, nome não identifica,
 telefone digitado pelo modelo não escolhe destinatário e nenhum contato é criado automaticamente.
+
+## 2026-10-05 — período de pedidos/notas e limite de ordenação
+
+O Swagger recebido prova que `Pedidos/Pesquisar` aceita `dataInicial`,
+`dataFinal`, `pageSize`, `skip`, `possuiNotaFiscal` e também
+`filtrarPor`. Este último muda a semântica do período: `0` é data de
+cadastro e `3` é data de faturamento. Por isso a capability canônica não
+expõe o enum do provider: usa `dataReferencia: cadastro | faturamento` e o
+adapter VendaERP traduz para o valor proprietário.
+
+Para perguntas fiscais como “notas deste mês” ou consultas de faturamento, o
+período é aplicado à data de faturamento. Para pedidos sem NFe e demais buscas
+não fiscais, o período continua sendo a data de cadastro. Assim uma pergunta
+fiscal não pode passar verde filtrando silenciosamente pela data errada.
+
+O mesmo Swagger também documenta
+`GET /api/request/Fiscal/ConsultarNfePeriodo`, com `DataInicial`,
+`DataFinal`, paginação de até 50 itens e `skip`. O corpo de `200`,
+entretanto, não tem schema documentado. Esse endpoint permanece **não
+integrado** até existir observação de runtime suficiente para definir uma
+projeção estável; não foi criada capability paralela para ele.
+
+`Pedidos/Pesquisar` não declara parâmetro de ordenação. Portanto “últimas N”
+e “maiores compras” não podem ser calculadas ordenando apenas a primeira
+página. Quando uma consulta exige ordenação ou filtro local sobre o conjunto, o
+Elus pagina até 500 registros e faz uma sondagem adicional de um registro para
+provar o fim. Se houver mais resultados, a consulta falha fechada com
+`consulta_parcial` e pede um cliente/período mais estreito, em vez de afirmar
+um ranking incompleto.
+
+A fronteira continua a mesma: `crm_erp_search_orders` → service ERP →
+adapter do provider. Nenhuma segunda tool, trilha de auditoria ou caminho de
+mensageria foi criado.

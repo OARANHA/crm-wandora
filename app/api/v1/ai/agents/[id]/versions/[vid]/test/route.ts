@@ -157,6 +157,9 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
       sampleMessage: parsed.data.sample_message,
       sampleContact: parsed.data.sample_contact,
       channelId: version.channel_session_id,
+      // A rota já exige role=admin e o runtime continua read-only.
+      // A flag é autoridade interna desta superfície; não vem do body.
+      erpAdminPreviewAuthorized: true,
     });
     const finalText = result.candidates.map((c) => c.body).join("\n\n");
     resultPayload = {

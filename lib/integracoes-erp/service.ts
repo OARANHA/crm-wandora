@@ -11,6 +11,7 @@ import type {
   DepositoErp,
   EstoqueErp,
   EstoqueItemErp,
+  FiltrosPedidosErp,
   InformacaoFiscalVendaErp,
   NotaErp,
   PedidoErp,
@@ -18,6 +19,7 @@ import type {
 } from "./tipos";
 import {
   ErroVendaErp,
+  adaptarFiltrosPedidosVendaErp,
   consultarInformacoesVendaVendaErp,
   consultarNfeVendaErp,
   lerEstoqueVendaErp,
@@ -27,7 +29,6 @@ import {
   pesquisarProdutosVendaErp,
   testarConexaoVendaErp,
   type FiltrosClientesVendaErp,
-  type FiltrosPedidosVendaErp,
   type FiltrosProdutosVendaErp,
 } from "./vendaerp";
 
@@ -473,10 +474,12 @@ export async function buscarClientesErp(
 export async function buscarPedidosErp(
   admin: SupabaseClient,
   organizationId: string,
-  filtros: FiltrosPedidosVendaErp,
+  filtros: FiltrosPedidosErp,
 ): Promise<ConsultaErpResultado<PedidoErp[]>> {
   return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
-    normalizarPedidosVendaErp(await pesquisarPedidosVendaErp(credenciais, filtros)),
+    normalizarPedidosVendaErp(
+      await pesquisarPedidosVendaErp(credenciais, adaptarFiltrosPedidosVendaErp(filtros)),
+    ),
   );
 }
 
@@ -488,11 +491,11 @@ export async function buscarPedidosErp(
 export async function buscarPedidosErpComIdentidadeInterna(
   admin: SupabaseClient,
   organizationId: string,
-  filtros: FiltrosPedidosVendaErp,
+  filtros: FiltrosPedidosErp,
 ): Promise<ConsultaErpResultado<PedidoErpComIdentidadeInterna[]>> {
   return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
     normalizarPedidosVendaErpComIdentidadeInterna(
-      await pesquisarPedidosVendaErp(credenciais, filtros),
+      await pesquisarPedidosVendaErp(credenciais, adaptarFiltrosPedidosVendaErp(filtros)),
     ),
   );
 }

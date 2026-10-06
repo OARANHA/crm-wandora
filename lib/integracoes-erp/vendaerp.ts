@@ -1,6 +1,6 @@
 import { fetchParaDestinoDaOrganizacao } from "@/lib/automation/destinos-internos-autorizados";
 
-import type { CredenciaisVendaErp } from "./tipos";
+import type { CredenciaisVendaErp, FiltrosPedidosErp } from "./tipos";
 
 const TIMEOUT_MS = 12_000;
 
@@ -41,25 +41,25 @@ export interface FiltrosClientesVendaErp {
   codigoIdentificadorUnico?: string;
 }
 
-export interface FiltrosPedidosVendaErp {
-  codigo?: number;
-  origem?: string;
-  status?: string;
-  statuscliente?: string;
-  categoria?: string;
-  cliente?: string;
-  pageSize?: number;
-  skip?: number;
-  cpf_cnpj?: string;
-  alteradoApos?: string;
-  dataInicial?: string;
-  dataFinal?: string;
-  empresa?: string;
-  numeroNFe?: string;
-  vendedor?: string;
-  transportadora?: string;
-  possuiNotaFiscal?: boolean;
-  incluirImpostos?: boolean;
+export type FiltrosPedidosVendaErp = Omit<FiltrosPedidosErp, "dataReferencia"> & {
+  /**
+   * Enum do contrato VendaERP:
+   * 0 cadastro, 1 aprovação do orçamento, 2 aprovação do pedido, 3 faturamento.
+   * Este detalhe fica confinado ao adapter.
+   */
+  filtrarPor?: 0 | 1 | 2 | 3;
+};
+
+export function adaptarFiltrosPedidosVendaErp(filtros: FiltrosPedidosErp): FiltrosPedidosVendaErp {
+  const { dataReferencia, ...restante } = filtros;
+  return {
+    ...restante,
+    ...(dataReferencia === "faturamento"
+      ? { filtrarPor: 3 as const }
+      : dataReferencia === "cadastro"
+        ? { filtrarPor: 0 as const }
+        : {}),
+  };
 }
 
 export class ErroVendaErp extends Error {

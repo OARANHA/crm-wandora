@@ -202,10 +202,22 @@ Não se usa uma identidade do VendaERP para autenticar o administrador e não
 existe telefone mágico. A credencial VendaERP continua pertencendo à
 organização.
 
-No turno do agente, `crm_erp_search_customers`,
+No turno real do agente, `crm_erp_search_customers`,
 `crm_erp_search_orders` e `crm_erp_get_invoice` só entram no toolset quando
 a autoridade administrativa acima foi resolvida. O gate é reaplicado antes da
-execução. Quando a mesma autoridade existe e a consulta de NFe está habilitada,
+execução.
+
+A superfície administrativa **Testar agente** é a única exceção: a rota já exige
+papel `admin`, roda em `dry_run` e monta as tools MCP com `readOnly=true`.
+Como esse cenário não tem contato WhatsApp real, somente
+`crm_erp_search_orders` pode atravessar o gate sem
+`AutoridadeAdminWhatsapp`, exclusivamente para provar a consulta read-only pelo
+runtime real do agente. A flag nasce no servidor depois do `requireRole("admin")`
+e não é aceita do body. Ela não cria uma autoridade WhatsApp sintética, não
+libera `crm_erp_search_customers`, `crm_erp_get_invoice`, preparo/envio de
+DANFE nem qualquer escrita, e não altera o gate dos turnos reais.
+
+Quando a autoridade WhatsApp real existe e a consulta de NFe está habilitada,
 o bridge acrescenta `crm_erp_prepare_admin_danfe`: ela materializa o documento
 com o mesmo guard de egress, grava no bucket privado da própria conversa e
 devolve um `preview_url` assinado por 10 minutos. A URL externa do VendaERP não

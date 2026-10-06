@@ -35,6 +35,8 @@ export interface TurnPreview {
   /** Null means a scenario, never a synthetic identifier passed to SQL. */
   contactId: string | null;
   channelId: string | null;
+  /** Só a rota admin "Testar agente" pode ligar esta autoridade read-only. */
+  erpAdminPreviewAuthorized?: boolean;
   gateContext?: GateContext;
   result: PreviewResult;
 }
@@ -141,6 +143,7 @@ export const SCENARIO_READS = new Set([
   // em "vou confirmar e te retorno". Dado de contato/lead continua fora daqui.
   'crm_search_products',
   'crm_search_knowledge',
+  'crm_erp_search_orders',
 ]);
 /** Unknown tools fail closed. A write proposal never calls its original execute. */
 export function applyPreviewPolicy(

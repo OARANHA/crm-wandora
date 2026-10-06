@@ -76,12 +76,30 @@ export function ferramentaErpExigeAutoridadeAdminWhatsapp(nome: string): boolean
   return FERRAMENTAS_ERP_ADMIN.has(nome);
 }
 
+/**
+ * Exceção deliberadamente estreita para a superfície admin "Testar agente".
+ *
+ * O preview é dry-run/read-only e não tem contato WhatsApp real. Neste slice,
+ * só a consulta de pedidos/notas pode atravessar essa ausência de contato para
+ * que o comportamento do agente seja provado pela mesma superfície usada na UI.
+ * DANFE e as demais consultas administrativas continuam exigindo autoridade
+ * WhatsApp até terem aceite próprio.
+ */
+export function ferramentaErpPermitePreviewAdminReadOnly(nome: string): boolean {
+  return nome === "crm_erp_search_orders";
+}
+
 export function filtrarFerramentasErpPorAutoridadeAdminWhatsapp(
   toolIds: readonly string[],
   autoridade: AutoridadeAdminWhatsapp | null,
+  previewAdminReadOnly = false,
 ): string[] {
   if (autoridade) return [...toolIds];
-  return toolIds.filter((id) => !ferramentaErpExigeAutoridadeAdminWhatsapp(id));
+  return toolIds.filter(
+    (id) =>
+      !ferramentaErpExigeAutoridadeAdminWhatsapp(id) ||
+      (previewAdminReadOnly && ferramentaErpPermitePreviewAdminReadOnly(id)),
+  );
 }
 
 export function decidirAutoridadeAdminWhatsapp(input: {

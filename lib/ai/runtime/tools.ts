@@ -31,6 +31,7 @@ import { podeChamarFerramenta, recusaParaOModelo } from "@/lib/leads/escopo-de-f
 import {
   auditarConsultaAdminWhatsapp,
   ferramentaErpExigeAutoridadeAdminWhatsapp,
+  ferramentaErpPermitePreviewAdminReadOnly,
   type AutoridadeAdminWhatsapp,
 } from "@/lib/integracoes-erp/autoridade-admin-whatsapp";
 
@@ -85,6 +86,12 @@ export interface PickToolsInput {
    * desta mesma organização.
    */
   autoridadeAdminWhatsapp?: AutoridadeAdminWhatsapp;
+  /**
+   * Autoridade interna da rota admin "Testar agente", válida apenas para
+   * leituras explicitamente allowlisted no preview. Nunca substitui a
+   * autoridade WhatsApp em turno real.
+   */
+  autoridadeErpAdminPreview?: boolean;
 }
 
 /**
@@ -246,7 +253,11 @@ function wrapMcpTool(
         ensureRole(input.auth.role, def.requiresRole);
         if (
           ferramentaErpExigeAutoridadeAdminWhatsapp(def.name) &&
-          !input.autoridadeAdminWhatsapp
+          !input.autoridadeAdminWhatsapp &&
+          !(
+            input.autoridadeErpAdminPreview === true &&
+            ferramentaErpPermitePreviewAdminReadOnly(def.name)
+          )
         ) {
           return {
             permitido: false,
@@ -492,7 +503,11 @@ export function pickToolsFromMcp(input: PickToolsInput): Record<string, Tool> {
     // acima é defesa em profundidade.
     if (
       ferramentaErpExigeAutoridadeAdminWhatsapp(def.name) &&
-      !input.autoridadeAdminWhatsapp
+      !input.autoridadeAdminWhatsapp &&
+      !(
+        input.autoridadeErpAdminPreview === true &&
+        ferramentaErpPermitePreviewAdminReadOnly(def.name)
+      )
     )
       continue;
 

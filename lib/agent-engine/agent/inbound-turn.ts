@@ -3898,7 +3898,10 @@ async function executarTurnoDoAgente(
           configDoTurno,
           runLog,
           preview
-            ? { readOnly: true }
+            ? {
+                readOnly: true,
+                erpAdminPreviewAuthorized: preview.erpAdminPreviewAuthorized === true,
+              }
             : {
                 onAdminDocumentPrepared: (documento) => {
                   documentoAdminPreparado = documento;

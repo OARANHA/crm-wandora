@@ -74,6 +74,7 @@ export async function buildMcpTurnTools(
   log: Logger,
   options?: {
     readOnly?: boolean;
+    erpAdminPreviewAuthorized?: boolean;
     onAdminDocumentPrepared?: (documento: {
       storagePath: string;
       mime: string;
@@ -101,9 +102,12 @@ export async function buildMcpTurnTools(
   const autoridadeAdminWhatsapp = ids.contactId
     ? await resolverAutoridadeAdminWhatsapp(cfg.supabase, ids.organizationId, ids.contactId)
     : null;
+  const erpAdminPreviewAuthorized =
+    options?.readOnly === true && options?.erpAdminPreviewAuthorized === true;
   const allowed = filtrarFerramentasErpPorAutoridadeAdminWhatsapp(
     allowedBeforeAdminGate,
     autoridadeAdminWhatsapp,
+    erpAdminPreviewAuthorized,
   );
   const removidasPeloAdminGate = allowedBeforeAdminGate.filter((id) => !allowed.includes(id));
   if (removidasPeloAdminGate.length > 0) {
@@ -176,6 +180,7 @@ export async function buildMcpTurnTools(
     capacidadesLigadas: await capacidadesDaOrganizacao(cfg.supabase, ids.organizationId),
     ...(ids.contactId ? { contatoDoTurno: ids.contactId } : {}),
     ...(autoridadeAdminWhatsapp ? { autoridadeAdminWhatsapp } : {}),
+    ...(erpAdminPreviewAuthorized ? { autoridadeErpAdminPreview: true } : {}),
   });
 
   if (
