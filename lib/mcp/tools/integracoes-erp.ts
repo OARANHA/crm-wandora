@@ -233,6 +233,15 @@ const pedidosInputShape = {
   cpf_cnpj: z.string().trim().min(3).max(30).optional(),
   status: z.string().trim().min(1).max(100).optional(),
   numero_nfe: z.string().trim().min(1).max(60).optional(),
+  ultimas_notas: z
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .optional()
+    .describe(
+      "Use quando pedirem as últimas/mais recentes notas de um cliente. Ex.: 'últimas 2 notas da Eco Projetos' => cliente='Eco Projetos', ultimas_notas=2.",
+    ),
   limite: limiteSchema,
   skip: skipSchema,
 };
@@ -240,7 +249,7 @@ const pedidosInputShape = {
 export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   name: "crm_erp_search_orders",
   description:
-    "Procura pedidos no VendaERP por número, cliente, CPF/CNPJ, status ou número da nota e devolve situação, total e os dados fiscais documentados no pedido. Use para conferir pedido existente e faturamento.",
+    "Procura pedidos no VendaERP por número, cliente, CPF/CNPJ, status ou número da nota e devolve situação, total e os dados fiscais documentados no pedido. Para perguntas como 'quais as últimas 2 notas da Eco Projetos', CHAME ESTA FERRAMENTA NO MESMO TURNO com cliente='Eco Projetos' e ultimas_notas=2; não prometa verificar depois. Quando ultimas_notas é informado, a ferramenta considera somente pedidos com NFe, ordena os resultados retornados do mais recente para o mais antigo e devolve apenas a quantidade pedida.",
   inputSchema: pedidosInputShape,
   category: "read",
   requiresRole: "agent",
@@ -261,13 +270,30 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       cpf_cnpj: input.cpf_cnpj,
       status: input.status,
       numeroNFe: input.numero_nfe,
-      pageSize: input.limite,
-      skip: input.skip,
+      ...(input.ultimas_notas ? { possuiNotaFiscal: true } : {}),
+      pageSize: input.ultimas_notas ? 20 : input.limite,
+      skip: input.ultimas_notas ? 0 : input.skip,
     });
     const saida = resposta(r);
     if (saida.erro) return saida;
+    const pedidos = [...(saida.dados ?? [])];
+    if (input.ultimas_notas) {
+      const instante = (valor: string | null): number => {
+        if (!valor) return Number.NEGATIVE_INFINITY;
+        const t = Date.parse(valor);
+        return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
+      };
+      pedidos.sort((a, b) => {
+        const dataA = Math.max(instante(a.dataFaturamento), instante(a.data));
+        const dataB = Math.max(instante(b.dataFaturamento), instante(b.data));
+        if (dataA !== dataB) return dataB - dataA;
+        return (b.codigo ?? Number.NEGATIVE_INFINITY) - (a.codigo ?? Number.NEGATIVE_INFINITY);
+      });
+    }
+
+    const selecionados = input.ultimas_notas ? pedidos.slice(0, input.ultimas_notas) : pedidos;
     return {
-      pedidos: saida.dados?.map((pedido) => ({
+      pedidos: selecionados.map((pedido) => ({
         id: pedido.id,
         codigo: pedido.codigo,
         cliente: pedido.cliente,
