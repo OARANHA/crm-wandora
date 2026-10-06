@@ -219,7 +219,12 @@ function clienteSeguroParaTool(cliente: ClienteErp | undefined, fallback: string
 
 function motivoResolucaoCliente(resultado: unknown): string | null {
   if (!resultado || typeof resultado !== "object") return null;
-  const r = (resultado as { resolucao?: { status?: string; motivo?: string } }).resolucao;
+  const objeto = resultado as {
+    erro?: string;
+    resolucao?: { status?: string; motivo?: string };
+  };
+  if (typeof objeto.erro === "string") return objeto.erro;
+  const r = objeto.resolucao;
   if (!r?.status || r.status === "resolved") return null;
   return r.motivo ?? r.status;
 }
