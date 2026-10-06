@@ -204,6 +204,86 @@ describe("tools ERP READ — comportamento do agente", () => {
     expect(service.buscarPedidosErp).not.toHaveBeenCalled();
   });
 
+  it("últimas notas por cliente consultam no mesmo turno e retornam as mais recentes", async () => {
+    vi.mocked(service.buscarPedidosErp).mockResolvedValue({
+      ok: true,
+      dados: [
+        {
+          id: "p-antigo",
+          codigo: 10,
+          cliente: "Eco Projetos",
+          status: "Faturado",
+          statusSistema: null,
+          total: 100,
+          data: "2026-09-10T10:00:00Z",
+          finalizado: true,
+          numeroNFe: "9001",
+          dataFaturamento: "2026-09-10T10:00:00Z",
+          chaveAcessoNFe: "chave-antiga",
+          danfeUrl: null,
+          urlSefaz: null,
+        },
+        {
+          id: "p-recente",
+          codigo: 12,
+          cliente: "Eco Projetos",
+          status: "Faturado",
+          statusSistema: null,
+          total: 300,
+          data: "2026-10-04T10:00:00Z",
+          finalizado: true,
+          numeroNFe: "9003",
+          dataFaturamento: "2026-10-04T10:00:00Z",
+          chaveAcessoNFe: "chave-recente",
+          danfeUrl: "https://erp.example/danfe-9003",
+          urlSefaz: null,
+        },
+        {
+          id: "p-meio",
+          codigo: 11,
+          cliente: "Eco Projetos",
+          status: "Faturado",
+          statusSistema: null,
+          total: 200,
+          data: "2026-10-01T10:00:00Z",
+          finalizado: true,
+          numeroNFe: "9002",
+          dataFaturamento: "2026-10-01T10:00:00Z",
+          chaveAcessoNFe: "chave-meio",
+          danfeUrl: null,
+          urlSefaz: null,
+        },
+      ],
+    });
+
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { pedidos: Array<{ numeroNFe: string | null }> };
+
+    expect(resultado.pedidos.map((p) => p.numeroNFe)).toEqual(["9003", "9002"]);
+    expect(service.buscarPedidosErp).toHaveBeenCalledWith(
+      ctx.supabase,
+      ctx.organizationId,
+      expect.objectContaining({
+        cliente: "Eco Projetos",
+        possuiNotaFiscal: true,
+        pageSize: 20,
+        skip: 0,
+      }),
+    );
+    expect(crmErpSearchOrders.description).toMatch(/não prometa verificar depois/i);
+  });
+
   it("429 do provider vira orientação ao agente em vez de exceção crua", async () => {
     vi.mocked(service.obterNotaErp).mockResolvedValue({
       ok: false,
