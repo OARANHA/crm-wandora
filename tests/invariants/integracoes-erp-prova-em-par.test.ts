@@ -243,12 +243,19 @@ it("prova em par: agente e capability direta concordam com o mesmo texto cru", a
   controlados.buscarPedidosErp.mockResolvedValue({ ok: true, dados: pedidos });
 
   const fixture = await replyFixture(pool);
-  await pool.query("update ai_agent_versions set tool_ids=$1::text[] where id=$2", [
-    ["crm_erp_search_orders"],
-    fixture.version,
-  ]);
+  const draftVersion = randomUUID();
+  await pool.query(
+    `insert into ai_agent_versions(
+       id, organization_id, agent_id, version_number, system_prompt, provider, model,
+       channel_session_id, status, tool_ids
+     ) values(
+       $1, $2, $3, 2, 'Ajude com informações confirmadas.', 'anthropic', 'test-model',
+       $4, 'draft', $5::text[]
+     )`,
+    [draftVersion, fixture.org, fixture.agent, fixture.channel, ["crm_erp_search_orders"]],
+  );
 
-  const agent = await loadAgentVersionConfig(pool, fixture.org, fixture.agent, fixture.version);
+  const agent = await loadAgentVersionConfig(pool, fixture.org, fixture.agent, draftVersion);
   expect(agent?.toolIds).toEqual(["crm_erp_search_orders"]);
 
   const chamadasDoAgente: unknown[] = [];
