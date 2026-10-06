@@ -477,7 +477,9 @@ export async function buscarPedidosErp(
   filtros: FiltrosPedidosErp,
 ): Promise<ConsultaErpResultado<PedidoErp[]>> {
   return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
-    normalizarPedidosVendaErp(await pesquisarPedidosVendaErp(credenciais, adaptarFiltrosPedidosVendaErp(filtros))),
+    normalizarPedidosVendaErp(
+      await pesquisarPedidosVendaErp(credenciais, adaptarFiltrosPedidosVendaErp(filtros)),
+    ),
   );
 }
 
