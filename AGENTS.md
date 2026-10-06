@@ -6,6 +6,48 @@
 > Precedência quando dois documentos discordam: `CLAUDE.md` > `docs/specs/` > `docs/prd/` >
 > `HANDOFF-*.md` > `README.md`.
 
+
+## Método de continuidade e evidência
+
+Memória de chat, resumos de sessões anteriores e instruções copiadas de outro turno são **contexto,
+não autoridade**. Um `HANDOFF-*.md` versionado segue a precedência documental acima; memória externa
+ao repositório nunca substitui o estado medido na branch, no código, no schema ou na documentação
+vigente.
+
+Para mudança não-trivial, reconcilie primeiro o estado real e siga este funil:
+
+`REAL NOW → PROVEN EVIDENCE → GAPS → REUSE GATE → CORE/PROVIDER GATE → DECISION`
+
+- **REAL NOW:** meça a base atual (`main`/base, HEAD, PRs concorrentes e a superfície tocada).
+  Não repita SHA, contagem ou conclusão lembrada.
+- **PROVEN EVIDENCE:** cite o artefato que prova cada afirmação — código, schema, teste, log,
+  contrato ou documento de autoridade. Separe **CONFIRMADO**, **INFERIDO** e **NÃO MEDIDO**.
+- **GAPS:** descreva somente a lacuna comprovada. Não transforme hipótese em requisito.
+- **REUSE GATE:** localize antes de criar. Reuse capability, serviço, tabela, seam, helper ou
+  contrato existente quando ele já for dono do comportamento; não abra caminho paralelo por
+  conveniência.
+- **CORE/PROVIDER GATE:** regra genérica de produto fica no núcleo; detalhe de provider permanece
+  no adapter/seam específico. Não deixe o núcleo aprender nomes, enums ou formatos de um provider
+  sem necessidade arquitetural comprovada.
+- **DECISION:** escolha a menor mudança que fecha a lacuna e preserve autoridade, tenancy,
+  idempotência, auditoria e caminhos canônicos existentes.
+
+**Diagnostique na camada certa.** Quando um agente de IA responde errado, diferencie prompt,
+roteador/runtime, exposição da tool, capability, adapter/provider, persistência e contexto antes de
+editar o prompt. Prompt não é correção para defeito de capability ou runtime. Se o caminho atravessa
+IA, aplique a prova em par já definida em
+[`docs/doctrine/prova-em-par.md`](docs/doctrine/prova-em-par.md): agente e ferramenta direta, com a
+mesma intenção/texto cru, precisam concordar.
+
+**Rigor com limite.** Leia as autoridades e superfícies necessárias para decidir; não faça auditoria
+indiscriminada do repositório. Pare a descoberta quando houver evidência suficiente para uma decisão
+segura e declare o que ficou não medido.
+
+**Continuidade com upstream.** Este repositório pode carregar skills, doutrina e artefatos herdados.
+Não renomeie, duplique ou reescreva conteúdo herdado só por identidade. Prefira overlays locais
+pequenos e bindings específicos quando necessários, para preservar a capacidade de reconciliar
+upstream sem apagar decisões próprias deste repositório.
+
 ## Project Overview
 
 Sistema operacional de vendas open source com agentes de IA nativos, multi-nicho (e-commerce,
