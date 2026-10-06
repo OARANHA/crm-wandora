@@ -388,9 +388,9 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
 
     const precisaAnaliseCompleta = Boolean(
       input.ultimas_notas ||
-        input.somente_faturados ||
-        input.somente_finalizados ||
-        input.ordenar_por,
+      input.somente_faturados ||
+      input.somente_finalizados ||
+      input.ordenar_por,
     );
 
     const r = precisaAnaliseCompleta
