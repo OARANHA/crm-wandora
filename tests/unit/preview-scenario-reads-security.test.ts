@@ -29,6 +29,7 @@ describe("segurança da prévia: leituras de cenário não podem virar escrita",
     // "vou confirmar e te retorno" para qualquer pergunta de preço ou agenda.
     expect(SCENARIO_READS.has("crm_search_products")).toBe(true);
     expect(SCENARIO_READS.has("crm_search_knowledge")).toBe(true);
+    expect(SCENARIO_READS.has("crm_erp_search_orders")).toBe(true);
   });
 
   it("dado de contato continua exigindo contato real no modo teste", () => {

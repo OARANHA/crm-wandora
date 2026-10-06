@@ -110,6 +110,11 @@ describe("Admin WhatsApp Read-Only V1", () => {
       "crm_erp_read_stock",
     ]);
     expect(filtrarFerramentasErpPorAutoridadeAdminWhatsapp(ids, resolver())).toEqual(ids);
+    expect(filtrarFerramentasErpPorAutoridadeAdminWhatsapp(ids, null, true)).toEqual([
+      "crm_erp_search_products",
+      "crm_erp_read_stock",
+      "crm_erp_search_orders",
+    ]);
   });
 
   it("nenhuma capability administrativa deste V1 escreve no VendaERP", () => {
@@ -205,6 +210,8 @@ describe("Admin WhatsApp Read-Only V1", () => {
     expect(bridge).toContain("ids.conversationId &&");
     expect(bridge).toContain('allowed.includes("crm_erp_get_invoice")');
     expect(bridge).toContain("options?.readOnly !== true");
+    expect(bridge).toContain("options?.readOnly === true");
+    expect(bridge).toContain("erpAdminPreviewAuthorized");
     expect(bridge).toContain("crm_erp_prepare_admin_danfe");
     expect(bridge).toContain(
       "quando o administrador pedir para mandar, enviar, ver, baixar, obter ou receber uma DANFE",

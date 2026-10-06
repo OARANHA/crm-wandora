@@ -13,6 +13,7 @@ export async function testAgentVersion(
     sampleMessage: string;
     sampleContact?: { name?: string; phone?: string };
     channelId: string | null;
+    erpAdminPreviewAuthorized?: boolean;
   },
 ) {
   const agent = await loadAgentVersionConfig(
@@ -41,6 +42,7 @@ export async function testAgentVersion(
     context,
     contactId: null,
     channelId: input.channelId,
+    erpAdminPreviewAuthorized: input.erpAdminPreviewAuthorized === true,
     result,
   });
   return result;
