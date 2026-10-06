@@ -268,9 +268,17 @@ describe("tools ERP READ — comportamento do agente", () => {
         skip: 0,
       },
       ctx,
-    )) as { pedidos: Array<{ numeroNFe: string | null }> };
+    )) as {
+      pedidos: Array<{ numeroNFe: string | null }>;
+      resumo: { quantidade: number; total: number | null; maisRecenteEm: string | null };
+    };
 
     expect(resultado.pedidos.map((p) => p.numeroNFe)).toEqual(["9003", "9002"]);
+    expect(resultado.resumo).toEqual({
+      quantidade: 2,
+      total: 500,
+      maisRecenteEm: "2026-10-04T10:00:00.000Z",
+    });
     expect(service.buscarPedidosErp).toHaveBeenCalledWith(
       ctx.supabase,
       ctx.organizationId,
@@ -282,6 +290,124 @@ describe("tools ERP READ — comportamento do agente", () => {
       }),
     );
     expect(crmErpSearchOrders.description).toMatch(/não prometa verificar depois/i);
+  });
+
+  it("período, sem NFe, finalizados e maior valor compõem uma consulta determinística", async () => {
+    vi.mocked(service.buscarPedidosErp).mockResolvedValue({
+      ok: true,
+      dados: [
+        {
+          id: "p1",
+          codigo: 20,
+          cliente: "Eco Projetos",
+          status: "Aberto",
+          statusSistema: null,
+          total: 100,
+          data: "2026-10-01T09:00:00Z",
+          finalizado: true,
+          numeroNFe: null,
+          dataFaturamento: null,
+          chaveAcessoNFe: null,
+          danfeUrl: null,
+          urlSefaz: null,
+        },
+        {
+          id: "p2",
+          codigo: 21,
+          cliente: "Eco Projetos",
+          status: "Aberto",
+          statusSistema: null,
+          total: 450,
+          data: "2026-10-03T09:00:00Z",
+          finalizado: true,
+          numeroNFe: null,
+          dataFaturamento: null,
+          chaveAcessoNFe: null,
+          danfeUrl: null,
+          urlSefaz: null,
+        },
+        {
+          id: "p3",
+          codigo: 22,
+          cliente: "Eco Projetos",
+          status: "Aberto",
+          statusSistema: null,
+          total: 900,
+          data: "2026-10-04T09:00:00Z",
+          finalizado: false,
+          numeroNFe: null,
+          dataFaturamento: null,
+          chaveAcessoNFe: null,
+          danfeUrl: null,
+          urlSefaz: null,
+        },
+      ],
+    });
+
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: undefined,
+        data_inicial: "2026-10-01",
+        data_final: "2026-10-05",
+        somente_com_nfe: false,
+        somente_sem_nfe: true,
+        somente_faturados: false,
+        somente_finalizados: true,
+        ordenar_por: "maior_valor",
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as {
+      pedidos: Array<{ codigo: number | null; total: number | null }>;
+      resumo: { quantidade: number; total: number | null };
+    };
+
+    expect(resultado.pedidos.map((p) => p.codigo)).toEqual([21, 20]);
+    expect(resultado.resumo).toMatchObject({ quantidade: 2, total: 550 });
+    expect(service.buscarPedidosErp).toHaveBeenCalledWith(
+      ctx.supabase,
+      ctx.organizationId,
+      expect.objectContaining({
+        cliente: "Eco Projetos",
+        possuiNotaFiscal: false,
+        dataInicial: "2026-10-01",
+        dataFinal: "2026-10-05",
+        pageSize: 20,
+        skip: 0,
+      }),
+    );
+  });
+
+  it("recusa filtros incompatíveis antes de consultar o ERP", async () => {
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: undefined,
+        data_inicial: undefined,
+        data_final: undefined,
+        somente_com_nfe: true,
+        somente_sem_nfe: true,
+        somente_faturados: false,
+        somente_finalizados: false,
+        ordenar_por: "recente",
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { erro: string };
+
+    expect(resultado.erro).toBe("filtros_incompativeis");
+    expect(service.buscarPedidosErp).not.toHaveBeenCalled();
   });
 
   it("429 do provider vira orientação ao agente em vez de exceção crua", async () => {
