@@ -242,6 +242,21 @@ const pedidosInputShape = {
     .describe(
       "Use quando pedirem as últimas/mais recentes notas de um cliente. Ex.: 'últimas 2 notas da Eco Projetos' => cliente='Eco Projetos', ultimas_notas=2.",
     ),
+  data_inicial: z
+    .string()
+    .date()
+    .optional()
+    .describe("Data inicial inclusiva no formato YYYY-MM-DD para filtrar pedidos/notas por período."),
+  data_final: z
+    .string()
+    .date()
+    .optional()
+    .describe("Data final inclusiva no formato YYYY-MM-DD para filtrar pedidos/notas por período."),
+  somente_com_nfe: z.boolean().optional().default(false),
+  somente_sem_nfe: z.boolean().optional().default(false),
+  somente_faturados: z.boolean().optional().default(false),
+  somente_finalizados: z.boolean().optional().default(false),
+  ordenar_por: z.enum(["recente", "antigo", "maior_valor"]).optional().default("recente"),
   limite: limiteSchema,
   skip: skipSchema,
 };
@@ -249,7 +264,7 @@ const pedidosInputShape = {
 export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   name: "crm_erp_search_orders",
   description:
-    "Procura pedidos no VendaERP por número, cliente, CPF/CNPJ, status ou número da nota e devolve situação, total e os dados fiscais documentados no pedido. Para perguntas como 'quais as últimas 2 notas da Eco Projetos', CHAME ESTA FERRAMENTA NO MESMO TURNO com cliente='Eco Projetos' e ultimas_notas=2; não prometa verificar depois. Quando ultimas_notas é informado, a ferramenta considera somente pedidos com NFe, ordena os resultados retornados do mais recente para o mais antigo e devolve apenas a quantidade pedida.",
+    "Procura pedidos e notas no VendaERP por cliente, CPF/CNPJ, status, período ou número da nota e devolve situação, total e dados fiscais documentados. Para perguntas como 'quais as últimas 2 notas da Eco Projetos', CHAME ESTA FERRAMENTA NO MESMO TURNO com cliente='Eco Projetos' e ultimas_notas=2; não prometa verificar depois. Também atende perguntas como 'notas deste mês', 'pedidos sem nota', 'pedidos faturados' e 'maiores compras', usando os filtros estruturados. ultimas_notas implica somente pedidos com NFe e ordenação recente.",
   inputSchema: pedidosInputShape,
   category: "read",
   requiresRole: "agent",
@@ -257,7 +272,25 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   redigirParaAuditoria: redigirBusca,
   motivoDoVazio: motivoDoVazio("pedidos"),
   handler: async (input, ctx) => {
-    if (!input.codigo && !input.cliente && !input.cpf_cnpj && !input.status && !input.numero_nfe) {
+    if (
+      input.somente_com_nfe &&
+      input.somente_sem_nfe
+    ) {
+      return {
+        erro: "filtros_incompativeis",
+        mensagem: "não é possível pedir somente pedidos com NFe e somente pedidos sem NFe ao mesmo tempo.",
+      };
+    }
+
+    if (
+      !input.codigo &&
+      !input.cliente &&
+      !input.cpf_cnpj &&
+      !input.status &&
+      !input.numero_nfe &&
+      !input.data_inicial &&
+      !input.data_final
+    ) {
       return {
         erro: "filtro_obrigatorio",
         mensagem:
@@ -270,28 +303,69 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       cpf_cnpj: input.cpf_cnpj,
       status: input.status,
       numeroNFe: input.numero_nfe,
-      ...(input.ultimas_notas ? { possuiNotaFiscal: true } : {}),
-      pageSize: input.ultimas_notas ? 20 : input.limite,
-      skip: input.ultimas_notas ? 0 : input.skip,
+      ...(input.ultimas_notas || input.somente_com_nfe ? { possuiNotaFiscal: true } : {}),
+      ...(input.somente_sem_nfe ? { possuiNotaFiscal: false } : {}),
+      dataInicial: input.data_inicial,
+      dataFinal: input.data_final,
+      pageSize:
+        input.ultimas_notas ||
+        input.somente_faturados ||
+        input.somente_finalizados ||
+        input.ordenar_por !== "recente"
+          ? 20
+          : input.limite,
+      skip:
+        input.ultimas_notas ||
+        input.somente_faturados ||
+        input.somente_finalizados ||
+        input.ordenar_por !== "recente"
+          ? 0
+          : input.skip,
     });
     const saida = resposta(r);
     if (saida.erro) return saida;
-    const pedidos = [...(saida.dados ?? [])];
-    if (input.ultimas_notas) {
-      const instante = (valor: string | null): number => {
-        if (!valor) return Number.NEGATIVE_INFINITY;
-        const t = Date.parse(valor);
-        return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
-      };
-      pedidos.sort((a, b) => {
-        const dataA = Math.max(instante(a.dataFaturamento), instante(a.data));
-        const dataB = Math.max(instante(b.dataFaturamento), instante(b.data));
-        if (dataA !== dataB) return dataB - dataA;
-        return (b.codigo ?? Number.NEGATIVE_INFINITY) - (a.codigo ?? Number.NEGATIVE_INFINITY);
-      });
+    const instante = (valor: string | null): number => {
+      if (!valor) return Number.NEGATIVE_INFINITY;
+      const t = Date.parse(valor);
+      return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
+    };
+    const dataDeNegocio = (pedido: (typeof saida.dados)[number]): number =>
+      Math.max(instante(pedido.dataFaturamento), instante(pedido.data));
+
+    let pedidos = [...(saida.dados ?? [])];
+
+    if (input.somente_faturados) {
+      pedidos = pedidos.filter((pedido) => Boolean(pedido.dataFaturamento || pedido.numeroNFe));
+    }
+    if (input.somente_finalizados) {
+      pedidos = pedidos.filter((pedido) => pedido.finalizado === true);
     }
 
-    const selecionados = input.ultimas_notas ? pedidos.slice(0, input.ultimas_notas) : pedidos;
+    const ordenarPor = input.ultimas_notas ? "recente" : input.ordenar_por;
+    pedidos.sort((a, b) => {
+      if (ordenarPor === "maior_valor") {
+        const valorA = a.total ?? Number.NEGATIVE_INFINITY;
+        const valorB = b.total ?? Number.NEGATIVE_INFINITY;
+        if (valorA !== valorB) return valorB - valorA;
+      } else {
+        const dataA = dataDeNegocio(a);
+        const dataB = dataDeNegocio(b);
+        if (dataA !== dataB) return ordenarPor === "antigo" ? dataA - dataB : dataB - dataA;
+      }
+      return (b.codigo ?? Number.NEGATIVE_INFINITY) - (a.codigo ?? Number.NEGATIVE_INFINITY);
+    });
+
+    const selecionados = input.ultimas_notas
+      ? pedidos.slice(0, input.ultimas_notas)
+      : pedidos.slice(0, input.limite);
+
+    const valoresConhecidos = selecionados
+      .map((pedido) => pedido.total)
+      .filter((valor): valor is number => typeof valor === "number" && Number.isFinite(valor));
+    const datasConhecidas = selecionados
+      .map((pedido) => Math.max(instante(pedido.dataFaturamento), instante(pedido.data)))
+      .filter((valor) => Number.isFinite(valor) && valor !== Number.NEGATIVE_INFINITY);
+
     return {
       pedidos: selecionados.map((pedido) => ({
         id: pedido.id,
@@ -307,6 +381,16 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
         chaveAcessoNFe: pedido.chaveAcessoNFe,
         danfeDisponivel: Boolean(pedido.danfeUrl),
       })),
+      resumo: {
+        quantidade: selecionados.length,
+        total: valoresConhecidos.length === selecionados.length
+          ? valoresConhecidos.reduce((soma, valor) => soma + valor, 0)
+          : null,
+        maisRecenteEm:
+          datasConhecidas.length > 0
+            ? new Date(Math.max(...datasConhecidas)).toISOString()
+            : null,
+      },
     };
   },
 };
