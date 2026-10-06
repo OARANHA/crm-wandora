@@ -79,6 +79,7 @@ function motivoDoVazio(chave: string) {
 }
 
 const CHAVES_DE_BUSCA = new Set([
+  "consulta",
   "codigo",
   "nome",
   "ean",
@@ -231,7 +232,52 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
   },
 };
 
+interface ConsultaPedidosErpInterpretada {
+  cliente?: string;
+  ultimas_notas?: number;
+}
+
+function semAcentos(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+/**
+ * Interpretação determinística e estreita do texto cru.
+ *
+ * Este seam existe para a prova em par: a mesma frase que entra pelo agente
+ * pode ser chamada direto na capability, sem depender do modelo para montar
+ * cliente/quantidade. Fora do padrão explicitamente coberto, não adivinha.
+ */
+export function interpretarConsultaPedidosErp(consulta: string): ConsultaPedidosErpInterpretada {
+  const normalizada = semAcentos(consulta);
+  const ultimas = normalizada.match(
+    /\b(?:ultim(?:a|o)s?\s+(\d{1,2})|(\d{1,2})\s+ultim(?:a|o)s?)\s+(?:notas?|nfes?|nfe)\b/,
+  );
+  const quantidade = Number(ultimas?.[1] ?? ultimas?.[2] ?? "");
+  if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 20) return {};
+
+  const clienteNoFim = consulta.match(/\b(?:da|do|de)\s+(.+?)[?!.,;:]*$/i)?.[1]?.trim();
+  if (!clienteNoFim || clienteNoFim.length > 200) return { ultimas_notas: quantidade };
+
+  return {
+    cliente: clienteNoFim,
+    ultimas_notas: quantidade,
+  };
+}
+
 const pedidosInputShape = {
+  consulta: z
+    .string()
+    .trim()
+    .min(1)
+    .max(500)
+    .optional()
+    .describe(
+      "Pergunta inteira, sem reescrever. Entende de forma determinística 'últimas N notas da/do/de <cliente>'; os demais filtros continuam explícitos.",
+    ),
   codigo: z.number().int().min(1).optional(),
   cliente: z.string().trim().min(1).max(200).optional(),
   cpf_cnpj: z.string().trim().min(3).max(30).optional(),
@@ -318,7 +364,7 @@ async function buscarPedidosParaAnaliseCompleta(
 export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   name: "crm_erp_search_orders",
   description:
-    "Procura pedidos e notas no sistema de gestão conectado por cliente, CPF/CNPJ, status, período ou número da nota e devolve situação, total e dados fiscais documentados. Para perguntas como 'quais as últimas 2 notas da Eco Projetos', CHAME ESTA FERRAMENTA NO MESMO TURNO com cliente='Eco Projetos' e ultimas_notas=2; não prometa verificar depois. Em consultas de nota/faturamento, o período é aplicado à data de faturamento; nas demais, à data de cadastro. Ordenações e filtros locais que exigem visão do conjunto paginam de forma limitada e falham fechado se o conjunto exceder o limite seguro.",
+    "Procura pedidos e notas no sistema de gestão conectado por cliente, CPF/CNPJ, status, período ou número da nota e devolve situação, total e dados fiscais documentados. Quando a pergunta vier da pessoa, passe a frase inteira, sem reescrever, em consulta. O formato 'últimas N notas da/do/de <cliente>' é interpretado dentro da própria capability para que o mesmo texto cru possa ser provado fora do agente; filtros estruturados continuam aceitos e têm precedência. CHAME ESTA FERRAMENTA NO MESMO TURNO; não prometa verificar depois. Em consultas de nota/faturamento, o período é aplicado à data de faturamento; nas demais, à data de cadastro. Ordenações e filtros locais que exigem visão do conjunto paginam de forma limitada e falham fechado se o conjunto exceder o limite seguro.",
   inputSchema: pedidosInputShape,
   category: "read",
   requiresRole: "agent",
@@ -326,7 +372,13 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   redigirParaAuditoria: redigirBusca,
   motivoDoVazio: motivoDoVazio("pedidos"),
   handler: async (input, ctx) => {
-    if ((input.somente_com_nfe || input.ultimas_notas) && input.somente_sem_nfe) {
+    const interpretada = input.consulta ? interpretarConsultaPedidosErp(input.consulta) : {};
+    const efetivo = {
+      ...input,
+      cliente: input.cliente ?? interpretada.cliente,
+      ultimas_notas: input.ultimas_notas ?? interpretada.ultimas_notas,
+    };
+    if ((efetivo.somente_com_nfe || efetivo.ultimas_notas) && efetivo.somente_sem_nfe) {
       return {
         erro: "filtros_incompativeis",
         mensagem:
@@ -334,7 +386,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       };
     }
 
-    if (input.data_inicial && input.data_final && input.data_inicial > input.data_final) {
+    if (efetivo.data_inicial && efetivo.data_final && efetivo.data_inicial > efetivo.data_final) {
       return {
         erro: "periodo_invalido",
         mensagem: "a data inicial não pode ser posterior à data final.",
@@ -342,196 +394,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
     }
 
     const temFiltro =
-      Boolean(input.codigo) ||
-      Boolean(input.cliente) ||
-      Boolean(input.cpf_cnpj) ||
-      Boolean(input.status) ||
-      Boolean(input.numero_nfe) ||
-      Boolean(input.data_inicial) ||
-      Boolean(input.data_final) ||
-      Boolean(input.ultimas_notas) ||
-      input.somente_com_nfe ||
-      input.somente_sem_nfe ||
-      input.somente_faturados ||
-      input.somente_finalizados;
-
-    if (!temFiltro) {
-      return {
-        erro: "filtro_obrigatorio",
-        mensagem:
-          "informe ao menos um identificador, cliente, status, período ou condição de pedido/nota para consultar.",
-      };
-    }
-
-    const consultaPorFaturamento = Boolean(
-      input.ultimas_notas || input.somente_com_nfe || input.somente_faturados || input.numero_nfe,
-    );
-    const temPeriodo = Boolean(input.data_inicial || input.data_final);
-
-    const filtros: FiltrosPedidosErp = {
-      codigo: input.codigo,
-      cliente: input.cliente,
-      cpf_cnpj: input.cpf_cnpj,
-      status: input.status,
-      numeroNFe: input.numero_nfe,
-      ...(input.ultimas_notas || input.somente_com_nfe ? { possuiNotaFiscal: true } : {}),
-      ...(input.somente_sem_nfe ? { possuiNotaFiscal: false } : {}),
-      dataInicial: input.data_inicial,
-      dataFinal: input.data_final,
-      ...(temPeriodo
-        ? { dataReferencia: consultaPorFaturamento ? "faturamento" : "cadastro" }
-        : {}),
-    };
-
-    const precisaAnaliseCompleta = Boolean(
-      input.ultimas_notas ||
-      input.somente_faturados ||
-      input.somente_finalizados ||
-      input.ordenar_por,
-    );
-
-    const r = precisaAnaliseCompleta
-      ? await buscarPedidosParaAnaliseCompleta(ctx, filtros)
-      : await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
-          ...filtros,
-          pageSize: input.limite,
-          skip: input.skip,
-        });
-    const saida = resposta(r);
-    if (saida.erro) return saida;
-
-    const instante = (valor: string | null): number => {
-      if (!valor) return Number.NEGATIVE_INFINITY;
-      const t = Date.parse(valor);
-      return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
-    };
-
-    let pedidos = [...(saida.dados ?? [])];
-
-    if (input.somente_faturados) {
-      pedidos = pedidos.filter((pedido) => Boolean(pedido.dataFaturamento || pedido.numeroNFe));
-    }
-    if (input.somente_finalizados) {
-      pedidos = pedidos.filter((pedido) => pedido.finalizado === true);
-    }
-
-    if (
-      input.ultimas_notas &&
-      pedidos.some((pedido) => !Number.isFinite(Date.parse(pedido.dataFaturamento ?? "")))
-    ) {
-      return {
-        erro: "data_faturamento_indisponivel",
-        mensagem:
-          "há nota sem data de faturamento utilizável; não dá para afirmar quais são as últimas sem adivinhar.",
-      };
-    }
-
-    const ordenarPor = input.ultimas_notas ? "recente" : input.ordenar_por;
-    const dataParaOrdenacao = (pedido: PedidoErp): number =>
-      consultaPorFaturamento ? instante(pedido.dataFaturamento) : instante(pedido.data);
-
-    if (
-      ordenarPor === "maior_valor" &&
-      pedidos.some((pedido) => typeof pedido.total !== "number" || !Number.isFinite(pedido.total))
-    ) {
-      return {
-        erro: "valor_indisponivel_para_ordenacao",
-        mensagem:
-          "há pedido sem valor total utilizável; não dá para afirmar quais são as maiores compras sem adivinhar.",
-      };
-    }
-
-    if (ordenarPor) {
-      pedidos.sort((a, b) => {
-        if (ordenarPor === "maior_valor") {
-          const valorA = a.total ?? Number.NEGATIVE_INFINITY;
-          const valorB = b.total ?? Number.NEGATIVE_INFINITY;
-          if (valorA !== valorB) return valorB - valorA;
-        } else {
-          const dataA = dataParaOrdenacao(a);
-          const dataB = dataParaOrdenacao(b);
-          if (dataA !== dataB) return ordenarPor === "antigo" ? dataA - dataB : dataB - dataA;
-        }
-        return (b.codigo ?? Number.NEGATIVE_INFINITY) - (a.codigo ?? Number.NEGATIVE_INFINITY);
-      });
-    }
-
-    const inicio = input.ultimas_notas ? 0 : precisaAnaliseCompleta ? input.skip : 0;
-    const quantidade = input.ultimas_notas ?? input.limite;
-    const selecionados = pedidos.slice(inicio, inicio + quantidade);
-
-    const valoresConhecidos = pedidos
-      .map((pedido) => pedido.total)
-      .filter((valor): valor is number => typeof valor === "number" && Number.isFinite(valor));
-    const datasConhecidas = pedidos
-      .map(dataParaOrdenacao)
-      .filter((valor) => Number.isFinite(valor) && valor !== Number.NEGATIVE_INFINITY);
-
-    return {
-      pedidos: selecionados.map((pedido) => ({
-        id: pedido.id,
-        codigo: pedido.codigo,
-        cliente: pedido.cliente,
-        status: pedido.status,
-        statusSistema: pedido.statusSistema,
-        total: pedido.total,
-        data: pedido.data,
-        finalizado: pedido.finalizado,
-        numeroNFe: pedido.numeroNFe,
-        dataFaturamento: pedido.dataFaturamento,
-        chaveAcessoNFe: pedido.chaveAcessoNFe,
-        danfeDisponivel: Boolean(pedido.danfeUrl),
-      })),
-      ...(precisaAnaliseCompleta
-        ? {
-            resumo: {
-              quantidadeEncontrada: pedidos.length,
-              quantidadeRetornada: selecionados.length,
-              totalEncontrado:
-                valoresConhecidos.length === pedidos.length
-                  ? valoresConhecidos.reduce((soma, valor) => soma + valor, 0)
-                  : null,
-              maisRecenteEm:
-                datasConhecidas.length > 0
-                  ? new Date(Math.max(...datasConhecidas)).toISOString()
-                  : null,
-              resultadoCompleto: true,
-            },
-          }
-        : {}),
-    };
-  },
-};
-
-const notaInputShape = {
-  codigo_nfe: z.number().int().min(1).max(2_147_483_647),
-};
-
-export const crmErpGetInvoice: McpToolDefinition<typeof notaInputShape> = {
-  name: "crm_erp_get_invoice",
-  description:
-    "Consulta diretamente uma NFe/NFCe já emitida no sistema de gestão conectado pelo número e devolve status de autorização, chave, lote e se há DANFE disponível. O XML fiscal bruto e a URL externa do DANFE não são entregues ao agente.",
-  inputSchema: notaInputShape,
-  category: "read",
-  requiresRole: "agent",
-  requiresScope: "mcp:read",
-  redigirParaAuditoria: redigirBusca,
-  handler: async (input, ctx) => {
-    const r = await obterNotaErp(ctx.supabase, ctx.organizationId, input.codigo_nfe);
-    const saida = resposta(r);
-    if (saida.erro) return saida;
-    const nota = saida.dados;
-    return {
-      nota: nota
-        ? {
-            numero: nota.numero,
-            codigoStatus: nota.codigoStatus,
-            mensagemStatus: nota.mensagemStatus,
-            chave: nota.chave,
-            lote: nota.lote,
-            danfeDisponivel: Boolean(nota.danfeUrl),
-          }
-        : null,
-    };
-  },
-};
+      Boolean(efetivo.codigo) ||
+      Boolean(efetivo.cliente) ||
+      Boolean(efetivo.cpf_cnpj) ||
+      Boolean(efetivo.status) ||
