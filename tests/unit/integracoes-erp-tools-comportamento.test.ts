@@ -384,7 +384,7 @@ describe("tools ERP READ — comportamento do agente", () => {
     );
   });
 
-  it("recusa filtros incompatíveis antes de consultar o ERP", async () => {
+  it("recusa período invertido antes de consultar o ERP", async () => {
     const resultado = (await crmErpSearchOrders.handler(
       {
         codigo: undefined,
@@ -393,9 +393,35 @@ describe("tools ERP READ — comportamento do agente", () => {
         status: undefined,
         numero_nfe: undefined,
         ultimas_notas: undefined,
+        data_inicial: "2026-10-05",
+        data_final: "2026-10-01",
+        somente_com_nfe: false,
+        somente_sem_nfe: false,
+        somente_faturados: false,
+        somente_finalizados: false,
+        ordenar_por: "recente",
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { erro: string };
+
+    expect(resultado.erro).toBe("periodo_invalido");
+    expect(service.buscarPedidosErp).not.toHaveBeenCalled();
+  });
+
+  it("recusa filtros incompatíveis antes de consultar o ERP", async () => {
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
         data_inicial: undefined,
         data_final: undefined,
-        somente_com_nfe: true,
+        somente_com_nfe: false,
         somente_sem_nfe: true,
         somente_faturados: false,
         somente_finalizados: false,
