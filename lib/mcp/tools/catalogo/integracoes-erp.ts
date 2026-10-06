@@ -46,7 +46,7 @@ export const TOOLS_INTEGRACOES_ERP = declararTools([
     category: "read",
     rotulo: "Procurar pedidos no sistema de gestão",
     explicacao:
-      "Procura pedidos e notas no sistema de gestão conectado, inclusive as notas mais recentes de um cliente, e mostra situação, valor e faturamento sem alterar nenhum registro.",
+      "Procura pedidos e notas no sistema de gestão conectado por cliente e período, incluindo últimas notas, com/sem NFe, faturados/finalizados e ordenação por recência ou valor, sem alterar nenhum registro.",
     oQueToca: "Pedidos do sistema de gestão",
     risco: "seguro",
     pacotes: ["organizar"],
