@@ -3,8 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type * as ErpService from "@/lib/integracoes-erp/service";
-import type * as CustomerResolution from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
-import type * as IdentityLinks from "@/lib/integracoes-erp/identidade-externa-cliente";
+import type { PedidoErpComIdentidadeInterna } from "@/lib/integracoes-erp/service";
 import type { McpContext } from "@/lib/mcp/types";
 
 vi.mock("@/lib/integracoes-erp/service", async (original) => {
@@ -295,7 +294,7 @@ describe("tools ERP READ — comportamento do agente", () => {
             dataFaturamento: null, chaveAcessoNFe: null, danfeUrl: null,
           },
           identidadeCliente: { pessoaId: "erp-42", cpfCnpj: null, email: null },
-        } as any,
+        } as PedidoErpComIdentidadeInterna,
         {
           pedido: {
             id: "pedido-outro", codigo: 11, cliente: "Homônimo", status: "Faturado",
@@ -303,7 +302,7 @@ describe("tools ERP READ — comportamento do agente", () => {
             dataFaturamento: null, chaveAcessoNFe: null, danfeUrl: null,
           },
           identidadeCliente: { pessoaId: "erp-outro", cpfCnpj: null, email: null },
-        } as any,
+        } as PedidoErpComIdentidadeInterna,
       ],
     });
 
@@ -344,7 +343,7 @@ describe("tools ERP READ — comportamento do agente", () => {
           dataFaturamento: null, chaveAcessoNFe: null, danfeUrl: null,
         },
         identidadeCliente: { pessoaId: "erp-outro", cpfCnpj: null, email: null },
-      } as any],
+      } as PedidoErpComIdentidadeInterna],
     });
 
     const resultado = (await crmErpSearchOrders.handler(
@@ -356,6 +355,23 @@ describe("tools ERP READ — comportamento do agente", () => {
       ctx,
     )) as { erro: string };
     expect(resultado.erro).toBe("identidade_pedido_nao_confirmada");
+  });
+
+  it("cliente_contact_id não pode ser misturado com novos sinais de identidade", async () => {
+    const resultado = (await crmErpSearchCustomers.handler(
+      {
+        nome: "Outro cliente",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: "11111111-1111-4111-8111-111111111111",
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { erro: string };
+
+    expect(resultado.erro).toBe("sinais_cliente_conflitantes");
+    expect(customerResolution.resolverClienteVendaErp).not.toHaveBeenCalled();
   });
 
 });

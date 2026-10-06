@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { selecionarClientesVendaErpExatos } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import {
+  resolverClienteVendaErp,
+  selecionarClientesVendaErpExatos,
+} from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
 import type { ClienteErp } from "@/lib/integracoes-erp/tipos";
 
 function cliente(overrides: Partial<ClienteErp> = {}): ClienteErp {
@@ -47,5 +52,25 @@ describe("Customer Resolution VendaERP — seleção fail-closed", () => {
     const a = cliente({ id: "erp-a" });
     const b = cliente({ id: "erp-b" });
     expect(selecionarClientesVendaErpExatos({ nome: "Eco Projetos" }, [a, b])).toHaveLength(2);
+  });
+  it("recusa sinais conflitantes antes de tocar no banco/provider", async () => {
+    const resultado = await resolverClienteVendaErp(
+      {} as SupabaseClient,
+      "org-x",
+      {
+        contactId: "11111111-1111-4111-8111-111111111111",
+        nome: "Outro cliente",
+      },
+    );
+    expect(resultado).toEqual({ status: "unresolved", motivo: "sinais_conflitantes" });
+  });
+
+  it("recusa resolução sem nenhum sinal", async () => {
+    const resultado = await resolverClienteVendaErp(
+      {} as SupabaseClient,
+      "org-x",
+      {},
+    );
+    expect(resultado).toEqual({ status: "unresolved", motivo: "sinais_insuficientes" });
   });
 });

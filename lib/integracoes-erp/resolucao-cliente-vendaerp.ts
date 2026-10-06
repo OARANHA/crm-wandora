@@ -62,6 +62,18 @@ export async function resolverClienteVendaErp(
   db: SupabaseClient, organizationId: string, sinais: SinaisResolucaoClienteVendaErp,
   auditoria?: AuditoriaVinculoCliente,
 ): Promise<ResolucaoClienteVendaErp> {
+  const temNome = Boolean(sinais.nome?.trim());
+  const temDocumento = Boolean(sinais.cpfCnpj?.trim());
+  const temEmail = Boolean(sinais.email?.trim());
+  const temSinalDeDescoberta = temNome || temDocumento || temEmail;
+
+  if (sinais.contactId && temSinalDeDescoberta) {
+    return { status: "unresolved", motivo: "sinais_conflitantes" };
+  }
+  if (!sinais.contactId && !temSinalDeDescoberta) {
+    return { status: "unresolved", motivo: "sinais_insuficientes" };
+  }
+
   if (sinais.contactId) {
     const existente = await carregarVinculoClienteExterno(db, {
       organizationId, contactId: sinais.contactId, provider: PROVEDOR_VENDAERP.id,
@@ -74,7 +86,10 @@ export async function resolverClienteVendaErp(
     };
   }
 
-  if (sinais.nome?.trim()) {
+  // Atalho local por rótulo só existe para busca por NOME PURO.
+  // CPF/CNPJ/e-mail são sinais mais fortes e não podem ser ignorados por um
+  // vínculo antigo que por acaso compartilha o mesmo rótulo.
+  if (temNome && !temDocumento && !temEmail) {
     const existentes = await buscarVinculosClientePorRotulo(db, {
       organizationId, provider: PROVEDOR_VENDAERP.id, rotulo: sinais.nome,
     });

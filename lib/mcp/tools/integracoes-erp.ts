@@ -238,6 +238,13 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
     if (!input.nome && !input.cpf_cnpj && !input.email && !input.cliente_contact_id) {
       return { erro: "filtro_obrigatorio", mensagem: "informe nome, CPF/CNPJ, e-mail ou um contact_id já resolvido." };
     }
+    if (input.cliente_contact_id && (input.nome || input.cpf_cnpj || input.email)) {
+      return {
+        erro: "sinais_cliente_conflitantes",
+        mensagem:
+          "use o contact_id já resolvido sozinho; se o cliente mudou, faça uma nova resolução por nome, CPF/CNPJ ou e-mail.",
+      };
+    }
     const resolucao = await resolverClienteVendaErp(
       ctx.supabase,
       ctx.organizationId,

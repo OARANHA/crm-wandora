@@ -119,6 +119,17 @@ Contrato e prova datada: `docs/specs/integracoes-erp-vendaerp-descobertas.md`.
 Mapa vivo: `docs/architecture/integracoes-erp.architecture.json`.
 
 
+### Slice em revisão — Customer Resolution / ERP Identity Link V1
+
+A branch `feat/erp-customer-resolution-v1` adiciona uma autoridade persistida
+`contact ↔ cliente ERP` no módulo opcional. `crm_erp_search_customers` passa a resolver
+cliente com estados explícitos e devolver `contact_id` reutilizável. Consultas de pedido podem
+receber esse `contact_id`; no VendaERP, Nome/Razão Social serve apenas para estreitar
+`Pedidos/Pesquisar` e o backend exige `Pedido.pessoaID === external_id` antes de expor o
+resultado. Ambiguidade e sinais conflitantes falham fechado; erro de provider não vira
+`not_found`. Este parágrafo descreve a branch em revisão, não produção.
+
+
 ### Slice em revisão — DANFE para o cliente vinculado à NFe
 
 A branch `feat/erp-governed-danfe-delivery-v1` compõe a autoridade administrativa já

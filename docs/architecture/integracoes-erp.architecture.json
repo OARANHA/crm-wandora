@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "titulo": "Integrações ERP — VendaERP read-only + DANFE administrativa e entrega governada ao cliente",
-  "descricao": "O módulo continua read-only no ERP. O fluxo de cliente preserva prova de identidade e o WhatsApp administrativo usa binding/membership do Elus. Para uma NFe conhecida, a composição administrativa pode resolver pedido/Pessoa ERP → contato CRM único → conversa destino única, materializar o DANFE no namespace dessa conversa e enfileirar governed_delivery. O worker revalida a service boundary do destino e termina em deliverGovernedMessageToConversation, preservando before_send, send_ledger, sendMessageHandler e adapter. Ambiguidade falha fechado; não há telefone arbitrário, criação automática de contato/conversa ou sender paralelo.",
+  "titulo": "Integrações ERP — VendaERP read-only + identidade estável de cliente + DANFE governada",
+  "descricao": "O módulo continua read-only no ERP. Customer Resolution materializa um vínculo server-only entre contact do Elus e Pessoa externa usando o ID estável do provider; nome/razão social ficam como descoberta/lookup e ambiguidade falha fechado. Em pedidos VendaERP, o rótulo apenas estreita Pedidos/Pesquisar e o retorno é revalidado por pessoaID antes de ser exposto. O fluxo de DANFE preserva prova de identidade, autoridade administrativa e entrega governada pelo sender core, sem sender paralelo nem credencial ERP fora do adapter.",
   "lanes": [
     {
       "id": "instalacao",
@@ -232,6 +232,20 @@
       "type": "database",
       "label": "job_queue: governed_delivery",
       "sublabel": "job derivado com service_boundary do destino e dedupe por origem+operação+NFe"
+    },
+    {
+      "id": "erpcustomeridentity",
+      "lane": "runtime",
+      "type": "database",
+      "label": "erp_customer_identity_links",
+      "sublabel": "contact ↔ external_id estável por tenant/provider; server-only, idempotente e corrigível sem apagar histórico"
+    },
+    {
+      "id": "customerresolver",
+      "lane": "runtime",
+      "type": "service",
+      "label": "resolverClienteVendaErp",
+      "sublabel": "resolved/ambiguous/not_found/unresolved; nome fantasia/razão social na descoberta, sinais fortes concordam e provider error não vira ausência"
     }
   ],
   "edges": [
@@ -516,6 +530,42 @@
       "from": "governeddeliveryjob",
       "to": "governeddelivery",
       "label": "worker revalida destino antes do efeito"
+    },
+    {
+      "id": "e48",
+      "from": "provisionador",
+      "to": "erpcustomeridentity",
+      "label": "cria vínculo opcional junto do módulo instalado"
+    },
+    {
+      "id": "e49",
+      "from": "tools",
+      "to": "customerresolver",
+      "label": "customers.search resolve e devolve contact_id estável"
+    },
+    {
+      "id": "e50",
+      "from": "customerresolver",
+      "to": "service",
+      "label": "descoberta inicial usa a leitura normalizada existente"
+    },
+    {
+      "id": "e51",
+      "from": "customerresolver",
+      "to": "erpcustomeridentity",
+      "label": "persiste/reusa external_id sob tenant e idempotência"
+    },
+    {
+      "id": "e52",
+      "from": "erpcustomeridentity",
+      "to": "tools",
+      "label": "orders.search reutiliza contact_id e rótulo de transporte"
+    },
+    {
+      "id": "e53",
+      "from": "tools",
+      "to": "service",
+      "label": "pedido por vínculo revalida pessoaID antes de expor"
     }
   ]
 }
