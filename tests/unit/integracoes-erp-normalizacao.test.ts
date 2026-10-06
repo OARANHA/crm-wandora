@@ -11,10 +11,7 @@ import {
   normalizarProdutosVendaErp,
   resolverDepositoEstoque,
 } from "@/lib/integracoes-erp/service";
-import {
-  adaptarFiltrosPedidosVendaErp,
-  VENDAERP_ENDPOINTS,
-} from "@/lib/integracoes-erp/vendaerp";
+import { adaptarFiltrosPedidosVendaErp, VENDAERP_ENDPOINTS } from "@/lib/integracoes-erp/vendaerp";
 
 describe("adapter seguro do VendaERP", () => {
   it("mantém os paths e o casing confirmados pelo Swagger", () => {
@@ -274,5 +271,4 @@ describe("adapter seguro do VendaERP", () => {
     });
     expect(filtros).not.toHaveProperty("dataReferencia");
   });
-
 });

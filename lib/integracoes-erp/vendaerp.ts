@@ -50,9 +50,7 @@ export type FiltrosPedidosVendaErp = Omit<FiltrosPedidosErp, "dataReferencia"> &
   filtrarPor?: 0 | 1 | 2 | 3;
 };
 
-export function adaptarFiltrosPedidosVendaErp(
-  filtros: FiltrosPedidosErp,
-): FiltrosPedidosVendaErp {
+export function adaptarFiltrosPedidosVendaErp(filtros: FiltrosPedidosErp): FiltrosPedidosVendaErp {
   const { dataReferencia, ...restante } = filtros;
   return {
     ...restante,

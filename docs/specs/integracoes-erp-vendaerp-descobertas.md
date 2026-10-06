@@ -314,4 +314,3 @@ um ranking incompleto.
 A fronteira continua a mesma: `crm_erp_search_orders` → service ERP →
 adapter do provider. Nenhuma segunda tool, trilha de auditoria ou caminho de
 mensageria foi criado.
-

@@ -297,8 +297,7 @@ async function buscarPedidosParaAnaliseCompleta(
     }
   }
 
-  const limiteAnalisado =
-    TAMANHO_PAGINA_PEDIDOS_ANALITICOS * MAX_PAGINAS_PEDIDOS_ANALITICOS;
+  const limiteAnalisado = TAMANHO_PAGINA_PEDIDOS_ANALITICOS * MAX_PAGINAS_PEDIDOS_ANALITICOS;
   const provaDeFim = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
     ...filtros,
     pageSize: 1,
@@ -365,7 +364,10 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
     }
 
     const consultaPorFaturamento = Boolean(
-      input.ultimas_notas || input.somente_com_nfe || input.somente_faturados || input.numero_nfe,
+      input.ultimas_notas ||
+        input.somente_com_nfe ||
+        input.somente_faturados ||
+        input.numero_nfe,
     );
     const temPeriodo = Boolean(input.data_inicial || input.data_final);
 
