@@ -16,7 +16,8 @@ import {
   type ConsultaErpResultado,
 } from "@/lib/integracoes-erp/service";
 
-import type { McpToolDefinition } from "../types";
+import type { McpContext, McpToolDefinition } from "../types";
+import type { FiltrosPedidosErp, PedidoErp } from "@/lib/integracoes-erp/tipos";
 
 const limiteSchema = z.number().int().min(1).max(20).optional().default(10);
 const skipSchema = z.number().int().min(0).max(10_000).optional().default(0);
@@ -24,29 +25,31 @@ const skipSchema = z.number().int().min(0).max(10_000).optional().default(0);
 function mensagemDeFalha(motivo: string): string {
   switch (motivo) {
     case "nao_encontrada":
-      return "não há uma conexão VendaERP cadastrada para esta empresa.";
+      return "não há uma conexão ERP cadastrada para esta empresa.";
     case "desativada":
-      return "a conexão VendaERP desta empresa está desativada.";
+      return "a conexão ERP desta empresa está desativada.";
     case "cifra_indisponivel":
       return "a conexão existe, mas a instalação não conseguiu abrir as credenciais cifradas.";
     case "banco":
       return "o módulo de integrações não está disponível nesta instalação agora.";
     case "auth_failed":
-      return "o VendaERP recusou as credenciais configuradas.";
+      return "o sistema de gestão conectado recusou as credenciais configuradas.";
     case "rate_limited":
-      return "o VendaERP atingiu o limite de consultas da chave; tente mais tarde.";
+      return "o sistema de gestão conectado atingiu o limite de consultas; tente novamente mais tarde.";
     case "timeout":
-      return "o VendaERP não respondeu dentro do tempo limite.";
+      return "o sistema de gestão conectado não respondeu dentro do tempo limite.";
     case "invalid_response":
-      return "o VendaERP respondeu num formato diferente do contrato esperado.";
+      return "o sistema de gestão conectado respondeu num formato diferente do contrato esperado.";
+    case "consulta_parcial":
+      return "há mais pedidos do que o limite seguro desta consulta; restrinja o cliente ou o período para eu responder sem adivinhar quais são os mais recentes ou os maiores.";
     case "sem_deposito":
-      return "não há depósito cadastrado no VendaERP para consultar o estoque.";
+      return "não há depósito disponível no sistema de gestão conectado para consultar o estoque.";
     case "deposito_ambiguo":
-      return "há mais de um depósito no VendaERP; escolha qual deve ser consultado.";
+      return "há mais de um depósito no sistema de gestão conectado; escolha qual deve ser consultado.";
     case "deposito_sem_nome":
-      return "o único depósito retornado pelo VendaERP não tem nome utilizável.";
+      return "o único depósito retornado pelo sistema de gestão conectado não tem nome utilizável.";
     default:
-      return "não foi possível consultar o VendaERP agora.";
+      return "não foi possível consultar o sistema de gestão conectado agora.";
   }
 }
 
@@ -111,7 +114,7 @@ const produtosInputShape = {
 export const crmErpSearchProducts: McpToolDefinition<typeof produtosInputShape> = {
   name: "crm_erp_search_products",
   description:
-    "Consulta produtos no VendaERP com nome, código, código de barras, marca ou categoria e devolve identificação e preço cadastrado. Use para localizar o produto e descobrir seu código. Para confirmar estoque atual ou reservado, use crm_erp_read_stock com o código encontrado; não trate o saldo resumido do cadastro como substituto da consulta de estoque.",
+    "Consulta produtos no sistema de gestão conectado com nome, código, código de barras, marca ou categoria e devolve identificação e preço cadastrado. Use para localizar o produto e descobrir seu código. Para confirmar estoque atual ou reservado, use crm_erp_read_stock com o código encontrado; não trate o saldo resumido do cadastro como substituto da consulta de estoque.",
   inputSchema: produtosInputShape,
   category: "read",
   requiresRole: "agent",
@@ -160,7 +163,7 @@ const estoqueInputShape = {
 export const crmErpReadStock: McpToolDefinition<typeof estoqueInputShape> = {
   name: "crm_erp_read_stock",
   description:
-    "Consulta o estoque real no VendaERP pelo depósito e, opcionalmente, pelo código exato do produto. Devolve EstoqueAtual e SaldoReservado separados; não derive disponibilidade nem subtraia um do outro sem regra documentada. Se o depósito não for informado e houver mais de um, a resposta traz as opções em vez de escolher por conta própria.",
+    "Consulta o estoque real no sistema de gestão conectado pelo depósito e, opcionalmente, pelo código exato do produto. Devolve EstoqueAtual e SaldoReservado separados; não derive disponibilidade nem subtraia um do outro sem regra documentada. Se o depósito não for informado e houver mais de um, a resposta traz as opções em vez de escolher por conta própria.",
   inputSchema: estoqueInputShape,
   category: "read",
   requiresRole: "agent",
@@ -201,7 +204,7 @@ const clientesInputShape = {
 export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape> = {
   name: "crm_erp_search_customers",
   description:
-    "Procura clientes no VendaERP por nome, CPF/CNPJ ou e-mail e devolve apenas identificação e contato necessários para conferir cadastro. Nunca recebe senha, salt ou outros campos brutos da pessoa.",
+    "Procura clientes no sistema de gestão conectado por nome, CPF/CNPJ ou e-mail e devolve apenas identificação e contato necessários para conferir cadastro. Nunca recebe senha, salt ou outros campos brutos da pessoa.",
   inputSchema: clientesInputShape,
   category: "read",
   requiresRole: "agent",
@@ -228,11 +231,11 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
 };
 
 const pedidosInputShape = {
-  codigo: z.number().int().positive().optional(),
-  cliente: z.string().trim().min(2).max(200).optional(),
+  codigo: z.number().int().min(1).optional(),
+  cliente: z.string().trim().min(1).max(200).optional(),
   cpf_cnpj: z.string().trim().min(3).max(30).optional(),
   status: z.string().trim().min(1).max(100).optional(),
-  numero_nfe: z.string().trim().min(1).max(60).optional(),
+  numero_nfe: z.string().trim().min(1).max(50).optional(),
   ultimas_notas: z
     .number()
     .int()
@@ -240,33 +243,82 @@ const pedidosInputShape = {
     .max(20)
     .optional()
     .describe(
-      "Use quando pedirem as últimas/mais recentes notas de um cliente. Ex.: 'últimas 2 notas da Eco Projetos' => cliente='Eco Projetos', ultimas_notas=2.",
+      "Quando informado, procura somente pedidos com NFe e devolve as N notas mais recentes pela data de faturamento. A consulta falha fechada se o conjunto for grande demais para provar a ordenação.",
     ),
   data_inicial: z
     .string()
     .date()
     .optional()
     .describe(
-      "Data inicial inclusiva no formato YYYY-MM-DD para filtrar pedidos/notas por período.",
+      "Início do período. Em consulta de nota/faturamento o período é aplicado à data de faturamento; nas demais consultas, à data de cadastro do pedido.",
     ),
   data_final: z
     .string()
     .date()
     .optional()
-    .describe("Data final inclusiva no formato YYYY-MM-DD para filtrar pedidos/notas por período."),
+    .describe(
+      "Fim do período. Em consulta de nota/faturamento o período é aplicado à data de faturamento; nas demais consultas, à data de cadastro do pedido.",
+    ),
   somente_com_nfe: z.boolean().optional().default(false),
   somente_sem_nfe: z.boolean().optional().default(false),
   somente_faturados: z.boolean().optional().default(false),
   somente_finalizados: z.boolean().optional().default(false),
-  ordenar_por: z.enum(["recente", "antigo", "maior_valor"]).optional().default("recente"),
+  ordenar_por: z
+    .enum(["recente", "antigo", "maior_valor"])
+    .optional()
+    .describe(
+      "Use somente quando a pessoa pedir ordenação. A capability pagina o conjunto antes de ordenar e falha fechada se não conseguir provar que viu todos os resultados.",
+    ),
   limite: limiteSchema,
   skip: skipSchema,
 };
 
+const TAMANHO_PAGINA_PEDIDOS_ANALITICOS = 100;
+const MAX_PAGINAS_PEDIDOS_ANALITICOS = 5;
+
+async function buscarPedidosParaAnaliseCompleta(
+  ctx: McpContext,
+  filtros: FiltrosPedidosErp,
+): Promise<ConsultaErpResultado<PedidoErp[]>> {
+  const acumulados: PedidoErp[] = [];
+
+  for (let pagina = 0; pagina < MAX_PAGINAS_PEDIDOS_ANALITICOS; pagina += 1) {
+    const lote = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
+      ...filtros,
+      pageSize: TAMANHO_PAGINA_PEDIDOS_ANALITICOS,
+      skip: pagina * TAMANHO_PAGINA_PEDIDOS_ANALITICOS,
+    });
+    if (!lote.ok) return lote;
+
+    acumulados.push(...lote.dados);
+    if (lote.dados.length < TAMANHO_PAGINA_PEDIDOS_ANALITICOS) {
+      return { ok: true, dados: acumulados };
+    }
+  }
+
+  const limiteAnalisado =
+    TAMANHO_PAGINA_PEDIDOS_ANALITICOS * MAX_PAGINAS_PEDIDOS_ANALITICOS;
+  const provaDeFim = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
+    ...filtros,
+    pageSize: 1,
+    skip: limiteAnalisado,
+  });
+  if (!provaDeFim.ok) return provaDeFim;
+  if (provaDeFim.dados.length > 0) {
+    return {
+      ok: false,
+      motivo: "consulta_parcial",
+      detalhes: { limiteAnalisado },
+    };
+  }
+
+  return { ok: true, dados: acumulados };
+}
+
 export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   name: "crm_erp_search_orders",
   description:
-    "Procura pedidos e notas no VendaERP por cliente, CPF/CNPJ, status, período ou número da nota e devolve situação, total e dados fiscais documentados. Para perguntas como 'quais as últimas 2 notas da Eco Projetos', CHAME ESTA FERRAMENTA NO MESMO TURNO com cliente='Eco Projetos' e ultimas_notas=2; não prometa verificar depois. Também atende perguntas como 'notas deste mês', 'pedidos sem nota', 'pedidos faturados' e 'maiores compras', usando os filtros estruturados. ultimas_notas implica somente pedidos com NFe e ordenação recente.",
+    "Procura pedidos e notas no sistema de gestão conectado por cliente, CPF/CNPJ, status, período ou número da nota e devolve situação, total e dados fiscais documentados. Para perguntas como 'quais as últimas 2 notas da Eco Projetos', CHAME ESTA FERRAMENTA NO MESMO TURNO com cliente='Eco Projetos' e ultimas_notas=2; não prometa verificar depois. Em consultas de nota/faturamento, o período é aplicado à data de faturamento; nas demais, à data de cadastro. Ordenações e filtros locais que exigem visão do conjunto paginam de forma limitada e falham fechado se o conjunto exceder o limite seguro.",
   inputSchema: pedidosInputShape,
   category: "read",
   requiresRole: "agent",
@@ -289,24 +341,34 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       };
     }
 
-    if (
-      !input.codigo &&
-      !input.cliente &&
-      !input.cpf_cnpj &&
-      !input.status &&
-      !input.numero_nfe &&
-      !input.data_inicial &&
-      !input.data_final
-    ) {
+    const temFiltro =
+      Boolean(input.codigo) ||
+      Boolean(input.cliente) ||
+      Boolean(input.cpf_cnpj) ||
+      Boolean(input.status) ||
+      Boolean(input.numero_nfe) ||
+      Boolean(input.data_inicial) ||
+      Boolean(input.data_final) ||
+      Boolean(input.ultimas_notas) ||
+      input.somente_com_nfe ||
+      input.somente_sem_nfe ||
+      input.somente_faturados ||
+      input.somente_finalizados;
+
+    if (!temFiltro) {
       return {
         erro: "filtro_obrigatorio",
         mensagem:
-          "informe ao menos um identificador, cliente, status ou número da nota para procurar pedidos.",
+          "informe ao menos um identificador, cliente, status, período ou condição de pedido/nota para consultar.",
       };
     }
-    const ordenarPorSolicitado = input.ordenar_por ?? "recente";
 
-    const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
+    const consultaPorFaturamento = Boolean(
+      input.ultimas_notas || input.somente_com_nfe || input.somente_faturados || input.numero_nfe,
+    );
+    const temPeriodo = Boolean(input.data_inicial || input.data_final);
+
+    const filtros: FiltrosPedidosErp = {
       codigo: input.codigo,
       cliente: input.cliente,
       cpf_cnpj: input.cpf_cnpj,
@@ -316,30 +378,33 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       ...(input.somente_sem_nfe ? { possuiNotaFiscal: false } : {}),
       dataInicial: input.data_inicial,
       dataFinal: input.data_final,
-      pageSize:
-        input.ultimas_notas ||
+      ...(temPeriodo
+        ? { dataReferencia: consultaPorFaturamento ? "faturamento" : "cadastro" }
+        : {}),
+    };
+
+    const precisaAnaliseCompleta = Boolean(
+      input.ultimas_notas ||
         input.somente_faturados ||
         input.somente_finalizados ||
-        ordenarPorSolicitado !== "recente"
-          ? 20
-          : input.limite,
-      skip:
-        input.ultimas_notas ||
-        input.somente_faturados ||
-        input.somente_finalizados ||
-        ordenarPorSolicitado !== "recente"
-          ? 0
-          : input.skip,
-    });
+        input.ordenar_por,
+    );
+
+    const r = precisaAnaliseCompleta
+      ? await buscarPedidosParaAnaliseCompleta(ctx, filtros)
+      : await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
+          ...filtros,
+          pageSize: input.limite,
+          skip: input.skip,
+        });
     const saida = resposta(r);
     if (saida.erro) return saida;
+
     const instante = (valor: string | null): number => {
       if (!valor) return Number.NEGATIVE_INFINITY;
       const t = Date.parse(valor);
       return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
     };
-    const dataDeNegocio = (pedido: NonNullable<typeof saida.dados>[number]): number =>
-      Math.max(instante(pedido.dataFaturamento), instante(pedido.data));
 
     let pedidos = [...(saida.dados ?? [])];
 
@@ -350,29 +415,56 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       pedidos = pedidos.filter((pedido) => pedido.finalizado === true);
     }
 
-    const ordenarPor = input.ultimas_notas ? "recente" : ordenarPorSolicitado;
-    pedidos.sort((a, b) => {
-      if (ordenarPor === "maior_valor") {
-        const valorA = a.total ?? Number.NEGATIVE_INFINITY;
-        const valorB = b.total ?? Number.NEGATIVE_INFINITY;
-        if (valorA !== valorB) return valorB - valorA;
-      } else {
-        const dataA = dataDeNegocio(a);
-        const dataB = dataDeNegocio(b);
-        if (dataA !== dataB) return ordenarPor === "antigo" ? dataA - dataB : dataB - dataA;
-      }
-      return (b.codigo ?? Number.NEGATIVE_INFINITY) - (a.codigo ?? Number.NEGATIVE_INFINITY);
-    });
+    if (
+      input.ultimas_notas &&
+      pedidos.some((pedido) => !Number.isFinite(Date.parse(pedido.dataFaturamento ?? "")))
+    ) {
+      return {
+        erro: "data_faturamento_indisponivel",
+        mensagem:
+          "há nota sem data de faturamento utilizável; não dá para afirmar quais são as últimas sem adivinhar.",
+      };
+    }
 
-    const selecionados = input.ultimas_notas
-      ? pedidos.slice(0, input.ultimas_notas)
-      : pedidos.slice(0, input.limite);
+    const ordenarPor = input.ultimas_notas ? "recente" : input.ordenar_por;
+    const dataParaOrdenacao = (pedido: PedidoErp): number =>
+      consultaPorFaturamento ? instante(pedido.dataFaturamento) : instante(pedido.data);
 
-    const valoresConhecidos = selecionados
+    if (
+      ordenarPor === "maior_valor" &&
+      pedidos.some((pedido) => typeof pedido.total !== "number" || !Number.isFinite(pedido.total))
+    ) {
+      return {
+        erro: "valor_indisponivel_para_ordenacao",
+        mensagem:
+          "há pedido sem valor total utilizável; não dá para afirmar quais são as maiores compras sem adivinhar.",
+      };
+    }
+
+    if (ordenarPor) {
+      pedidos.sort((a, b) => {
+        if (ordenarPor === "maior_valor") {
+          const valorA = a.total ?? Number.NEGATIVE_INFINITY;
+          const valorB = b.total ?? Number.NEGATIVE_INFINITY;
+          if (valorA !== valorB) return valorB - valorA;
+        } else {
+          const dataA = dataParaOrdenacao(a);
+          const dataB = dataParaOrdenacao(b);
+          if (dataA !== dataB) return ordenarPor === "antigo" ? dataA - dataB : dataB - dataA;
+        }
+        return (b.codigo ?? Number.NEGATIVE_INFINITY) - (a.codigo ?? Number.NEGATIVE_INFINITY);
+      });
+    }
+
+    const inicio = input.ultimas_notas ? 0 : precisaAnaliseCompleta ? input.skip : 0;
+    const quantidade = input.ultimas_notas ?? input.limite;
+    const selecionados = pedidos.slice(inicio, inicio + quantidade);
+
+    const valoresConhecidos = pedidos
       .map((pedido) => pedido.total)
       .filter((valor): valor is number => typeof valor === "number" && Number.isFinite(valor));
-    const datasConhecidas = selecionados
-      .map((pedido) => Math.max(instante(pedido.dataFaturamento), instante(pedido.data)))
+    const datasConhecidas = pedidos
+      .map(dataParaOrdenacao)
       .filter((valor) => Number.isFinite(valor) && valor !== Number.NEGATIVE_INFINITY);
 
     return {
@@ -390,15 +482,23 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
         chaveAcessoNFe: pedido.chaveAcessoNFe,
         danfeDisponivel: Boolean(pedido.danfeUrl),
       })),
-      resumo: {
-        quantidade: selecionados.length,
-        total:
-          valoresConhecidos.length === selecionados.length
-            ? valoresConhecidos.reduce((soma, valor) => soma + valor, 0)
-            : null,
-        maisRecenteEm:
-          datasConhecidas.length > 0 ? new Date(Math.max(...datasConhecidas)).toISOString() : null,
-      },
+      ...(precisaAnaliseCompleta
+        ? {
+            resumo: {
+              quantidadeEncontrada: pedidos.length,
+              quantidadeRetornada: selecionados.length,
+              totalEncontrado:
+                valoresConhecidos.length === pedidos.length
+                  ? valoresConhecidos.reduce((soma, valor) => soma + valor, 0)
+                  : null,
+              maisRecenteEm:
+                datasConhecidas.length > 0
+                  ? new Date(Math.max(...datasConhecidas)).toISOString()
+                  : null,
+              resultadoCompleto: true,
+            },
+          }
+        : {}),
     };
   },
 };
@@ -410,7 +510,7 @@ const notaInputShape = {
 export const crmErpGetInvoice: McpToolDefinition<typeof notaInputShape> = {
   name: "crm_erp_get_invoice",
   description:
-    "Consulta diretamente uma NFe/NFCe já emitida no VendaERP pelo número e devolve status de autorização, chave, lote e se há DANFE disponível. O XML fiscal bruto e a URL externa do DANFE não são entregues ao agente.",
+    "Consulta diretamente uma NFe/NFCe já emitida no sistema de gestão conectado pelo número e devolve status de autorização, chave, lote e se há DANFE disponível. O XML fiscal bruto e a URL externa do DANFE não são entregues ao agente.",
   inputSchema: notaInputShape,
   category: "read",
   requiresRole: "agent",

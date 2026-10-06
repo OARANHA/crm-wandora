@@ -96,6 +96,34 @@ export interface ClienteErp {
   uf: string | null;
 }
 
+export type ReferenciaDataPedidoErp = "cadastro" | "faturamento";
+
+export interface FiltrosPedidosErp {
+  codigo?: number;
+  origem?: string;
+  status?: string;
+  statuscliente?: string;
+  categoria?: string;
+  cliente?: string;
+  pageSize?: number;
+  skip?: number;
+  cpf_cnpj?: string;
+  alteradoApos?: string;
+  dataInicial?: string;
+  dataFinal?: string;
+  empresa?: string;
+  numeroNFe?: string;
+  vendedor?: string;
+  transportadora?: string;
+  possuiNotaFiscal?: boolean;
+  incluirImpostos?: boolean;
+  /**
+   * Semântica canônica do período. Cada adapter traduz isto para o contrato
+   * específico do provider; a capability não conhece enums proprietários.
+   */
+  dataReferencia?: ReferenciaDataPedidoErp;
+}
+
 export interface PedidoErp {
   id: string | null;
   codigo: number | null;

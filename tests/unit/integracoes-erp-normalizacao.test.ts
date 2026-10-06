@@ -11,7 +11,10 @@ import {
   normalizarProdutosVendaErp,
   resolverDepositoEstoque,
 } from "@/lib/integracoes-erp/service";
-import { VENDAERP_ENDPOINTS } from "@/lib/integracoes-erp/vendaerp";
+import {
+  adaptarFiltrosPedidosVendaErp,
+  VENDAERP_ENDPOINTS,
+} from "@/lib/integracoes-erp/vendaerp";
 
 describe("adapter seguro do VendaERP", () => {
   it("mantém os paths e o casing confirmados pelo Swagger", () => {
@@ -254,4 +257,22 @@ describe("adapter seguro do VendaERP", () => {
       email: "outro@example.test",
     });
   });
+
+  it("traduz a referência canônica de faturamento para o enum proprietário só no adapter", () => {
+    const filtros = adaptarFiltrosPedidosVendaErp({
+      cliente: "Eco Projetos",
+      dataInicial: "2026-10-01",
+      dataFinal: "2026-10-31",
+      dataReferencia: "faturamento",
+    });
+
+    expect(filtros).toEqual({
+      cliente: "Eco Projetos",
+      dataInicial: "2026-10-01",
+      dataFinal: "2026-10-31",
+      filtrarPor: 3,
+    });
+    expect(filtros).not.toHaveProperty("dataReferencia");
+  });
+
 });
