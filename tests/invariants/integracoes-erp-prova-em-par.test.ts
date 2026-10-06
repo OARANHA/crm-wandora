@@ -10,6 +10,7 @@ const controlados = vi.hoisted(() => ({
   auditMcpToolCall: vi.fn(async () => {}),
   mintEphemeralToken: vi.fn(async () => ({ id: "tok-par-erp" })),
   revokeEphemeralToken: vi.fn(async () => {}),
+  solicitacoesErpDoModelo: [] as Array<{ consulta: string }>,
 }));
 
 vi.mock("@/lib/integracoes-erp/service", async (importOriginal) => {
@@ -198,12 +199,14 @@ function deps() {
               };
         content = [{ type: "text", text: JSON.stringify(valor) }];
       } else if (tem("crm_erp_search_orders") && !viu("crm_erp_search_orders")) {
+        const input = { consulta: TEXTO_CRU };
+        controlados.solicitacoesErpDoModelo.push(input);
         content = [
           {
             type: "tool-call",
             toolCallId: randomUUID(),
             toolName: "crm_erp_search_orders",
-            input: JSON.stringify({ consulta: TEXTO_CRU }),
+            input: JSON.stringify(input),
           },
         ];
       } else if (viu("crm_erp_search_orders") && tem("send_message") && !viu("send_message")) {
@@ -240,6 +243,7 @@ function deps() {
 it("prova em par: agente e capability direta concordam com o mesmo texto cru", async () => {
   controlados.buscarPedidosErp.mockReset();
   controlados.auditMcpToolCall.mockClear();
+  controlados.solicitacoesErpDoModelo.length = 0;
   controlados.buscarPedidosErp.mockResolvedValue({ ok: true, dados: pedidos });
 
   const fixture = await replyFixture(pool);
@@ -257,18 +261,6 @@ it("prova em par: agente e capability direta concordam com o mesmo texto cru", a
 
   const agent = await loadAgentVersionConfig(pool, fixture.org, fixture.agent, draftVersion);
   expect(agent?.toolIds).toEqual(["crm_erp_search_orders"]);
-
-  const chamadasDoAgente: unknown[] = [];
-  const respostasDoAgente: unknown[] = [];
-  const originalHandler = crmErpSearchOrders.handler;
-  const handlerSpy = vi
-    .spyOn(crmErpSearchOrders, "handler")
-    .mockImplementation(async (input, ctx) => {
-      chamadasDoAgente.push(structuredClone(input));
-      const resposta = await originalHandler(input, ctx);
-      respostasDoAgente.push(structuredClone(resposta));
-      return resposta;
-    });
 
   const result = newPreviewResult();
   const preview: TurnPreview = {
@@ -297,17 +289,23 @@ it("prova em par: agente e capability direta concordam com o mesmo texto cru", a
     await runAgentPreview(deps(), pool, preview);
   } finally {
     fetchSpy.mockRestore();
-    handlerSpy.mockRestore();
   }
 
-  expect(chamadasDoAgente).toHaveLength(1);
-  expect(chamadasDoAgente[0]).toMatchObject({ consulta: TEXTO_CRU });
-  expect(respostasDoAgente).toHaveLength(1);
+  expect(controlados.solicitacoesErpDoModelo).toEqual([{ consulta: TEXTO_CRU }]);
+  expect(controlados.buscarPedidosErp).toHaveBeenCalledTimes(1);
+  const chamadaDoAgente = controlados.buscarPedidosErp.mock.calls[0]!;
+  expect(chamadaDoAgente[1]).toBe(fixture.org);
+  expect(chamadaDoAgente[2]).toMatchObject({
+    cliente: "Eco Projetos",
+    possuiNotaFiscal: true,
+    pageSize: 100,
+    skip: 0,
+  });
 
   const directInput = z.object(crmErpSearchOrders.inputSchema).parse({
     consulta: TEXTO_CRU,
   });
-  const directOutput = await originalHandler(directInput, {
+  const directOutput = await crmErpSearchOrders.handler(directInput, {
     organizationId: fixture.org,
     role: "admin",
     actor: { type: "user", id: "proof-pair", role: "admin" },
@@ -316,7 +314,11 @@ it("prova em par: agente e capability direta concordam com o mesmo texto cru", a
     supabase: createClient("http://127.0.0.1:1", "test-key"),
   } as never);
 
-  expect(respostasDoAgente[0]).toEqual(directOutput);
+  expect(controlados.buscarPedidosErp).toHaveBeenCalledTimes(2);
+  const chamadaDireta = controlados.buscarPedidosErp.mock.calls[1]!;
+  expect(chamadaDireta[1]).toBe(fixture.org);
+  expect(chamadaDireta[2]).toEqual(chamadaDoAgente[2]);
+
   expect(directOutput).toMatchObject({
     pedidos: [
       { numeroNFe: "9003", cliente: "Eco Projetos" },
