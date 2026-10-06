@@ -398,3 +398,195 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       Boolean(efetivo.cliente) ||
       Boolean(efetivo.cpf_cnpj) ||
       Boolean(efetivo.status) ||
+      Boolean(efetivo.numero_nfe) ||
+      Boolean(efetivo.data_inicial) ||
+      Boolean(efetivo.data_final) ||
+      Boolean(efetivo.ultimas_notas) ||
+      efetivo.somente_com_nfe ||
+      efetivo.somente_sem_nfe ||
+      efetivo.somente_faturados ||
+      efetivo.somente_finalizados;
+
+    if (!temFiltro) {
+      return {
+        erro: "filtro_obrigatorio",
+        mensagem:
+          "informe ao menos um identificador, cliente, status, período ou condição de pedido/nota para consultar.",
+      };
+    }
+
+    const consultaPorFaturamento = Boolean(
+      efetivo.ultimas_notas ||
+      efetivo.somente_com_nfe ||
+      efetivo.somente_faturados ||
+      efetivo.numero_nfe,
+    );
+    const temPeriodo = Boolean(efetivo.data_inicial || efetivo.data_final);
+
+    const filtros: FiltrosPedidosErp = {
+      codigo: efetivo.codigo,
+      cliente: efetivo.cliente,
+      cpf_cnpj: efetivo.cpf_cnpj,
+      status: efetivo.status,
+      numeroNFe: efetivo.numero_nfe,
+      ...(efetivo.ultimas_notas || efetivo.somente_com_nfe ? { possuiNotaFiscal: true } : {}),
+      ...(efetivo.somente_sem_nfe ? { possuiNotaFiscal: false } : {}),
+      dataInicial: efetivo.data_inicial,
+      dataFinal: efetivo.data_final,
+      ...(temPeriodo
+        ? { dataReferencia: consultaPorFaturamento ? "faturamento" : "cadastro" }
+        : {}),
+    };
+
+    const precisaAnaliseCompleta = Boolean(
+      efetivo.ultimas_notas ||
+      efetivo.somente_faturados ||
+      efetivo.somente_finalizados ||
+      efetivo.ordenar_por,
+    );
+
+    const r = precisaAnaliseCompleta
+      ? await buscarPedidosParaAnaliseCompleta(ctx, filtros)
+      : await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
+          ...filtros,
+          pageSize: efetivo.limite,
+          skip: efetivo.skip,
+        });
+    const saida = resposta(r);
+    if (saida.erro) return saida;
+
+    const instante = (valor: string | null): number => {
+      if (!valor) return Number.NEGATIVE_INFINITY;
+      const t = Date.parse(valor);
+      return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
+    };
+
+    let pedidos = [...(saida.dados ?? [])];
+
+    if (efetivo.somente_faturados) {
+      pedidos = pedidos.filter((pedido) => Boolean(pedido.dataFaturamento || pedido.numeroNFe));
+    }
+    if (efetivo.somente_finalizados) {
+      pedidos = pedidos.filter((pedido) => pedido.finalizado === true);
+    }
+
+    if (
+      efetivo.ultimas_notas &&
+      pedidos.some((pedido) => !Number.isFinite(Date.parse(pedido.dataFaturamento ?? "")))
+    ) {
+      return {
+        erro: "data_faturamento_indisponivel",
+        mensagem:
+          "há nota sem data de faturamento utilizável; não dá para afirmar quais são as últimas sem adivinhar.",
+      };
+    }
+
+    const ordenarPor = efetivo.ultimas_notas ? "recente" : efetivo.ordenar_por;
+    const dataParaOrdenacao = (pedido: PedidoErp): number =>
+      consultaPorFaturamento ? instante(pedido.dataFaturamento) : instante(pedido.data);
+
+    if (
+      ordenarPor === "maior_valor" &&
+      pedidos.some((pedido) => typeof pedido.total !== "number" || !Number.isFinite(pedido.total))
+    ) {
+      return {
+        erro: "valor_indisponivel_para_ordenacao",
+        mensagem:
+          "há pedido sem valor total utilizável; não dá para afirmar quais são as maiores compras sem adivinhar.",
+      };
+    }
+
+    if (ordenarPor) {
+      pedidos.sort((a, b) => {
+        if (ordenarPor === "maior_valor") {
+          const valorA = a.total ?? Number.NEGATIVE_INFINITY;
+          const valorB = b.total ?? Number.NEGATIVE_INFINITY;
+          if (valorA !== valorB) return valorB - valorA;
+        } else {
+          const dataA = dataParaOrdenacao(a);
+          const dataB = dataParaOrdenacao(b);
+          if (dataA !== dataB) return ordenarPor === "antigo" ? dataA - dataB : dataB - dataA;
+        }
+        return (b.codigo ?? Number.NEGATIVE_INFINITY) - (a.codigo ?? Number.NEGATIVE_INFINITY);
+      });
+    }
+
+    const inicio = efetivo.ultimas_notas ? 0 : precisaAnaliseCompleta ? efetivo.skip : 0;
+    const quantidade = efetivo.ultimas_notas ?? efetivo.limite;
+    const selecionados = pedidos.slice(inicio, inicio + quantidade);
+
+    const valoresConhecidos = pedidos
+      .map((pedido) => pedido.total)
+      .filter((valor): valor is number => typeof valor === "number" && Number.isFinite(valor));
+    const datasConhecidas = pedidos
+      .map(dataParaOrdenacao)
+      .filter((valor) => Number.isFinite(valor) && valor !== Number.NEGATIVE_INFINITY);
+
+    return {
+      pedidos: selecionados.map((pedido) => ({
+        id: pedido.id,
+        codigo: pedido.codigo,
+        cliente: pedido.cliente,
+        status: pedido.status,
+        statusSistema: pedido.statusSistema,
+        total: pedido.total,
+        data: pedido.data,
+        finalizado: pedido.finalizado,
+        numeroNFe: pedido.numeroNFe,
+        dataFaturamento: pedido.dataFaturamento,
+        chaveAcessoNFe: pedido.chaveAcessoNFe,
+        danfeDisponivel: Boolean(pedido.danfeUrl),
+      })),
+      ...(precisaAnaliseCompleta
+        ? {
+            resumo: {
+              quantidadeEncontrada: pedidos.length,
+              quantidadeRetornada: selecionados.length,
+              totalEncontrado:
+                valoresConhecidos.length === pedidos.length
+                  ? valoresConhecidos.reduce((soma, valor) => soma + valor, 0)
+                  : null,
+              maisRecenteEm:
+                datasConhecidas.length > 0
+                  ? new Date(Math.max(...datasConhecidas)).toISOString()
+                  : null,
+              resultadoCompleto: true,
+            },
+          }
+        : {}),
+    };
+  },
+};
+
+const notaInputShape = {
+  codigo_nfe: z.number().int().min(1).max(2_147_483_647),
+};
+
+export const crmErpGetInvoice: McpToolDefinition<typeof notaInputShape> = {
+  name: "crm_erp_get_invoice",
+  description:
+    "Consulta diretamente uma NFe/NFCe já emitida no sistema de gestão conectado pelo número e devolve status de autorização, chave, lote e se há DANFE disponível. O XML fiscal bruto e a URL externa do DANFE não são entregues ao agente.",
+  inputSchema: notaInputShape,
+  category: "read",
+  requiresRole: "agent",
+  requiresScope: "mcp:read",
+  redigirParaAuditoria: redigirBusca,
+  handler: async (input, ctx) => {
+    const r = await obterNotaErp(ctx.supabase, ctx.organizationId, input.codigo_nfe);
+    const saida = resposta(r);
+    if (saida.erro) return saida;
+    const nota = saida.dados;
+    return {
+      nota: nota
+        ? {
+            numero: nota.numero,
+            codigoStatus: nota.codigoStatus,
+            mensagemStatus: nota.mensagemStatus,
+            chave: nota.chave,
+            lote: nota.lote,
+            danfeDisponivel: Boolean(nota.danfeUrl),
+          }
+        : null,
+    };
+  },
+};

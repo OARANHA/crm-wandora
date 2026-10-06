@@ -398,3 +398,204 @@ describe("tools ERP READ — comportamento do agente", () => {
   it("período de pedido sem NFe usa data de cadastro e ordenação só depois da varredura", async () => {
     vi.mocked(service.buscarPedidosErp).mockResolvedValue({
       ok: true,
+      dados: [
+        {
+          id: "p1",
+          codigo: 20,
+          cliente: "Eco Projetos",
+          status: "Aberto",
+          statusSistema: null,
+          total: 100,
+          data: "2026-10-01T09:00:00Z",
+          finalizado: true,
+          numeroNFe: null,
+          dataFaturamento: null,
+          chaveAcessoNFe: null,
+          danfeUrl: null,
+          urlSefaz: null,
+        },
+        {
+          id: "p2",
+          codigo: 21,
+          cliente: "Eco Projetos",
+          status: "Aberto",
+          statusSistema: null,
+          total: 450,
+          data: "2026-10-03T09:00:00Z",
+          finalizado: true,
+          numeroNFe: null,
+          dataFaturamento: null,
+          chaveAcessoNFe: null,
+          danfeUrl: null,
+          urlSefaz: null,
+        },
+      ],
+    });
+
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: undefined,
+        data_inicial: "2026-10-01",
+        data_final: "2026-10-05",
+        somente_com_nfe: false,
+        somente_sem_nfe: true,
+        somente_faturados: false,
+        somente_finalizados: true,
+        ordenar_por: "maior_valor",
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as {
+      pedidos: Array<{ codigo: number | null; total: number | null }>;
+      resumo: { quantidadeEncontrada: number; totalEncontrado: number | null };
+    };
+
+    expect(resultado.pedidos.map((p) => p.codigo)).toEqual([21, 20]);
+    expect(resultado.resumo).toMatchObject({ quantidadeEncontrada: 2, totalEncontrado: 550 });
+    expect(service.buscarPedidosErp).toHaveBeenCalledWith(
+      ctx.supabase,
+      ctx.organizationId,
+      expect.objectContaining({
+        cliente: "Eco Projetos",
+        possuiNotaFiscal: false,
+        dataInicial: "2026-10-01",
+        dataFinal: "2026-10-05",
+        dataReferencia: "cadastro",
+        pageSize: 100,
+        skip: 0,
+      }),
+    );
+  });
+
+  it("consulta analítica falha fechada quando ultrapassa o teto paginado", async () => {
+    const paginaCheia = Array.from({ length: 100 }, (_, indice) => ({
+      id: `p-${indice}`,
+      codigo: 3000 + indice,
+      cliente: "Eco Projetos",
+      status: "Faturado",
+      statusSistema: null,
+      total: 100,
+      data: "2026-10-01T10:00:00Z",
+      finalizado: true,
+      numeroNFe: String(7000 + indice),
+      dataFaturamento: "2026-10-01T10:00:00Z",
+      chaveAcessoNFe: null,
+      danfeUrl: null,
+      urlSefaz: null,
+    }));
+    for (let i = 0; i < 5; i += 1) {
+      vi.mocked(service.buscarPedidosErp).mockResolvedValueOnce({
+        ok: true,
+        dados: paginaCheia,
+      });
+    }
+    vi.mocked(service.buscarPedidosErp).mockResolvedValueOnce({
+      ok: true,
+      dados: [paginaCheia[0]!],
+    });
+
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
+        data_inicial: undefined,
+        data_final: undefined,
+        somente_com_nfe: false,
+        somente_sem_nfe: false,
+        somente_faturados: false,
+        somente_finalizados: false,
+        ordenar_por: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { erro: string; mensagem: string };
+
+    expect(resultado.erro).toBe("consulta_parcial");
+    expect(resultado.mensagem).toMatch(/restrinja o cliente ou o período/i);
+    expect(service.buscarPedidosErp).toHaveBeenCalledTimes(6);
+    expect(service.buscarPedidosErp).toHaveBeenLastCalledWith(
+      ctx.supabase,
+      ctx.organizationId,
+      expect.objectContaining({ pageSize: 1, skip: 500 }),
+    );
+  });
+
+  it("recusa período invertido antes de consultar o ERP", async () => {
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: undefined,
+        data_inicial: "2026-10-05",
+        data_final: "2026-10-01",
+        somente_com_nfe: false,
+        somente_sem_nfe: false,
+        somente_faturados: false,
+        somente_finalizados: false,
+        ordenar_por: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { erro: string };
+
+    expect(resultado.erro).toBe("periodo_invalido");
+    expect(service.buscarPedidosErp).not.toHaveBeenCalled();
+  });
+
+  it("recusa filtros incompatíveis antes de consultar o ERP", async () => {
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
+        data_inicial: undefined,
+        data_final: undefined,
+        somente_com_nfe: false,
+        somente_sem_nfe: true,
+        somente_faturados: false,
+        somente_finalizados: false,
+        ordenar_por: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { erro: string };
+
+    expect(resultado.erro).toBe("filtros_incompativeis");
+    expect(service.buscarPedidosErp).not.toHaveBeenCalled();
+  });
+
+  it("429 do provider vira orientação ao agente em vez de exceção crua", async () => {
+    vi.mocked(service.obterNotaErp).mockResolvedValue({
+      ok: false,
+      motivo: "rate_limited",
+      status: 429,
+    });
+
+    const resultado = (await crmErpGetInvoice.handler({ codigo_nfe: 64996396 }, ctx)) as {
+      erro: string;
+      mensagem: string;
+    };
+
+    expect(resultado.erro).toBe("rate_limited");
+    expect(resultado.mensagem).toMatch(/limite de consultas/i);
+  });
+});
