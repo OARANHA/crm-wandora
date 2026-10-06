@@ -102,26 +102,29 @@ begin
   comment on table public.erp_customer_identity_links is
     'Vínculo server-only contato Elus ↔ cliente externo do ERP. external_id é autoridade; rótulos são somente descoberta/lookup.';
 
-  -- D8/ADR-0002: anonimização rompe os ponteiros externos sem apagar a trilha.
-  insert into public.modulo_secoes_lgpd
-    (modulo, tabela, ligacao, colunas, colunas_rotulo)
-  values (
-    'integracoes_erp', 'erp_customer_identity_links',
-    'organization_id = $1 and contact_id = $2',
-    '{}'::text[],
-    '{external_id,external_label,external_label_key,provider_lookup_label}'::text[]
-  )
-  on conflict (modulo, tabela) do update
-    set ligacao = excluded.ligacao,
-        colunas = excluded.colunas,
-        colunas_rotulo = excluded.colunas_rotulo;
-
   perform public.fn_proteger_modulo_provisionado();
 end;
 $f$;
 
 revoke execute on function public.fn_integracoes_erp_provisionar() from public, anon, authenticated;
 grant execute on function public.fn_integracoes_erp_provisionar() to service_role;
+
+-- D8/ADR-0002: a DECLARAÇÃO pertence à migration do módulo, não ao corpo da
+-- provisionadora. O núcleo guarda a receita e to_regclass pula a seção enquanto
+-- o módulo não estiver instalado.
+insert into public.modulo_secoes_lgpd
+  (modulo, tabela, ligacao, colunas, colunas_rotulo)
+values (
+  'integracoes_erp',
+  'erp_customer_identity_links',
+  'organization_id = $1 and contact_id = $2',
+  '{}'::text[],
+  '{external_id,external_label,external_label_key,provider_lookup_label}'::text[]
+)
+on conflict (modulo, tabela) do update
+  set ligacao = excluded.ligacao,
+      colunas = excluded.colunas,
+      colunas_rotulo = excluded.colunas_rotulo;
 
 create or replace function public.fn_integracoes_erp_vincular_cliente(
   p_organization_id uuid,

@@ -62,7 +62,8 @@ export async function resolverClienteVendaErp(
   db: SupabaseClient, organizationId: string, sinais: SinaisResolucaoClienteVendaErp,
   auditoria?: AuditoriaVinculoCliente,
 ): Promise<ResolucaoClienteVendaErp> {
-  const temNome = Boolean(sinais.nome?.trim());
+  const nomeInformado = sinais.nome?.trim();
+  const temNome = Boolean(nomeInformado);
   const temDocumento = Boolean(sinais.cpfCnpj?.trim());
   const temEmail = Boolean(sinais.email?.trim());
   const temSinalDeDescoberta = temNome || temDocumento || temEmail;
@@ -91,7 +92,7 @@ export async function resolverClienteVendaErp(
   // vínculo antigo que por acaso compartilha o mesmo rótulo.
   if (temNome && !temDocumento && !temEmail) {
     const existentes = await buscarVinculosClientePorRotulo(db, {
-      organizationId, provider: PROVEDOR_VENDAERP.id, rotulo: sinais.nome,
+      organizationId, provider: PROVEDOR_VENDAERP.id, rotulo: nomeInformado!,
     });
     if (!existentes.ok) return { status: "unresolved", motivo: "banco" };
     if (existentes.vinculos.length > 1) {
