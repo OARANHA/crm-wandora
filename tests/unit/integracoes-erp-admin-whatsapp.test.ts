@@ -201,6 +201,15 @@ describe("Admin WhatsApp Read-Only V1", () => {
     expect(serializado).not.toContain(telefone);
   });
 
+  it("o preview admin read-only atravessa montagem e execução apenas pela exceção allowlisted", () => {
+    const runtime = readFileSync(join(process.cwd(), "lib/ai/runtime/tools.ts"), "utf8");
+    const ocorrencias =
+      runtime.match(/ferramentaErpPermitePreviewAdminReadOnly\(def\.name\)/g)?.length ?? 0;
+
+    expect(ocorrencias).toBe(2);
+    expect(runtime).toContain("input.autoridadeErpAdminPreview === true");
+  });
+
   it("o bridge administrativo só cria a tool de DANFE para autoridade real e fora de preview", () => {
     const bridge = readFileSync(
       join(process.cwd(), "lib/agent-engine/edge/crm/mcp-tools.ts"),

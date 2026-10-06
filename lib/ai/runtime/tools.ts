@@ -253,7 +253,11 @@ function wrapMcpTool(
         ensureRole(input.auth.role, def.requiresRole);
         if (
           ferramentaErpExigeAutoridadeAdminWhatsapp(def.name) &&
-          !input.autoridadeAdminWhatsapp
+          !input.autoridadeAdminWhatsapp &&
+          !(
+            input.autoridadeErpAdminPreview === true &&
+            ferramentaErpPermitePreviewAdminReadOnly(def.name)
+          )
         ) {
           return {
             permitido: false,
