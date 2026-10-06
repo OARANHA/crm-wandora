@@ -272,13 +272,18 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   redigirParaAuditoria: redigirBusca,
   motivoDoVazio: motivoDoVazio("pedidos"),
   handler: async (input, ctx) => {
-    if (
-      input.somente_com_nfe &&
-      input.somente_sem_nfe
-    ) {
+    if ((input.somente_com_nfe || input.ultimas_notas) && input.somente_sem_nfe) {
       return {
         erro: "filtros_incompativeis",
-        mensagem: "não é possível pedir somente pedidos com NFe e somente pedidos sem NFe ao mesmo tempo.",
+        mensagem:
+          "não é possível pedir notas emitidas/últimas notas e, ao mesmo tempo, somente pedidos sem NFe.",
+      };
+    }
+
+    if (input.data_inicial && input.data_final && input.data_inicial > input.data_final) {
+      return {
+        erro: "periodo_invalido",
+        mensagem: "a data inicial não pode ser posterior à data final.",
       };
     }
 
