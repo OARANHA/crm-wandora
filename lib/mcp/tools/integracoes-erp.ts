@@ -246,7 +246,9 @@ const pedidosInputShape = {
     .string()
     .date()
     .optional()
-    .describe("Data inicial inclusiva no formato YYYY-MM-DD para filtrar pedidos/notas por período."),
+    .describe(
+      "Data inicial inclusiva no formato YYYY-MM-DD para filtrar pedidos/notas por período.",
+    ),
   data_final: z
     .string()
     .date()
@@ -390,13 +392,12 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       })),
       resumo: {
         quantidade: selecionados.length,
-        total: valoresConhecidos.length === selecionados.length
-          ? valoresConhecidos.reduce((soma, valor) => soma + valor, 0)
-          : null,
-        maisRecenteEm:
-          datasConhecidas.length > 0
-            ? new Date(Math.max(...datasConhecidas)).toISOString()
+        total:
+          valoresConhecidos.length === selecionados.length
+            ? valoresConhecidos.reduce((soma, valor) => soma + valor, 0)
             : null,
+        maisRecenteEm:
+          datasConhecidas.length > 0 ? new Date(Math.max(...datasConhecidas)).toISOString() : null,
       },
     };
   },
