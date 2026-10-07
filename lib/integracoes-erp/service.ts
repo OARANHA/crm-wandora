@@ -358,9 +358,11 @@ export function normalizarPedidosVendaErpComIdentidadeInterna(
   return listaDeObjetos(valor).map((p) => ({
     pedido: normalizarPedidoVendaErp(p),
     identidadeCliente: {
-      pessoaId: texto(p.pessoaID),
-      cpfCnpj: texto(p.clienteCNPJ),
-      email: texto(p.clienteEmail),
+      // O provider já respondeu em PascalCase em outros endpoints reais.
+      // O Swagger documenta camelCase; aceitamos ambos sem alterar semântica.
+      pessoaId: texto(p.pessoaID ?? p.PessoaID),
+      cpfCnpj: texto(p.clienteCNPJ ?? p.ClienteCNPJ),
+      email: texto(p.clienteEmail ?? p.ClienteEmail),
     },
   }));
 }

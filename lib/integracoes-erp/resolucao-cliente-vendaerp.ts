@@ -106,11 +106,8 @@ export async function resolverClienteVendaErpPorPedidos(
   if (pedidos.length === 0) return { status: "unresolved", motivo: "pedidos_nao_encontrados" };
 
   const pessoaIds = pedidos.map((item) => item.identidadeCliente.pessoaId?.trim() ?? "");
-  if (pessoaIds.some((id) => !id)) {
-    return { status: "unresolved", motivo: "identidade_pedido_incompleta" };
-  }
-
-  const idsUnicos = [...new Set(pessoaIds)];
+  const idsPreenchidos = pessoaIds.filter((id): id is string => Boolean(id));
+  const idsUnicos = [...new Set(idsPreenchidos)];
   if (idsUnicos.length > 1) {
     const candidatos = idsUnicos.slice(0, 5).map((id) => {
       const pedido = pedidos.find((item) => item.identidadeCliente.pessoaId?.trim() === id);
@@ -129,7 +126,6 @@ export async function resolverClienteVendaErpPorPedidos(
     };
   }
 
-  const externalId = idsUnicos[0]!;
   const documentos = new Map<string, string>();
   const emails = new Map<string, string>();
   for (const item of pedidos) {
@@ -142,22 +138,107 @@ export async function resolverClienteVendaErpPorPedidos(
     if (email && emailOriginal) emails.set(email, emailOriginal);
   }
 
-  if (documentos.size > 1 || emails.size > 1) {
-    return { status: "unresolved", motivo: "identidade_pedido_inconsistente" };
-  }
+  const todosComPessoaId = pessoaIds.every(Boolean) && idsUnicos.length === 1;
+  let clienteDoPedido: ClienteErp;
+  let externalId: string;
+  let externalLabel: string;
+  let providerLookupLabel: string;
+  let origemSemContato: OrigemResolucaoClienteExterno;
+  let identityField: "pessoaID" | "clienteCNPJ" | "clienteEmail";
 
-  const clienteDoPedido: ClienteErp = {
-    id: externalId,
-    nome,
-    nomeFantasia: nome,
-    razaoSocial: null,
-    cpfCnpj: [...documentos.values()][0] ?? null,
-    email: [...emails.values()][0] ?? null,
-    telefone: null,
-    celular: null,
-    cidade: null,
-    uf: null,
-  };
+  if (todosComPessoaId) {
+    externalId = idsUnicos[0]!;
+    clienteDoPedido = {
+      id: externalId,
+      nome,
+      nomeFantasia: nome,
+      razaoSocial: null,
+      cpfCnpj: documentos.size === 1 ? [...documentos.values()][0]! : null,
+      email: emails.size === 1 ? [...emails.values()][0]! : null,
+      telefone: null,
+      celular: null,
+      cidade: null,
+      uf: null,
+    };
+    externalLabel = nome;
+    providerLookupLabel = nome;
+    origemSemContato = "exact_name";
+    identityField = "pessoaID";
+  } else {
+    // Se pessoaID vier ausente em parte ou em todos os pedidos, não voltamos à
+    // varredura ampla por nome. Usamos no máximo uma consulta direta por sinal
+    // forte já contido no próprio Pedido e exigimos correspondência exata local.
+    if (documentos.size > 1 || emails.size > 1) {
+      return { status: "unresolved", motivo: "identidade_pedido_inconsistente" };
+    }
+
+    const cpfCnpj = [...documentos.values()][0] ?? null;
+    const email = [...emails.values()][0] ?? null;
+    if (!cpfCnpj && !email) {
+      return { status: "unresolved", motivo: "identidade_pedido_incompleta" };
+    }
+
+    const sinaisFortes: SinaisResolucaoClienteVendaErp = {
+      ...(cpfCnpj ? { cpfCnpj } : {}),
+      ...(email ? { email } : {}),
+    };
+    const resposta = await buscarClientesErp(db, organizationId, {
+      ...(cpfCnpj ? { cpfcnpj: cpfCnpj } : { email: email! }),
+      pageSize: 20,
+      skip: 0,
+    });
+    if (!resposta.ok) {
+      return {
+        status: "unresolved",
+        motivo: "identidade_pedido_fallback_provider_error",
+        motivoProvider: resposta.motivo,
+      };
+    }
+
+    const exatos = selecionarClientesVendaErpExatos(sinaisFortes, resposta.dados);
+    if (exatos.length === 0) {
+      return {
+        status: "unresolved",
+        motivo:
+          resposta.dados.length === 0
+            ? "identidade_pedido_fallback_nao_encontrado"
+            : "identidade_pedido_fallback_sem_correspondencia_exata",
+        ...(resposta.dados.length > 0
+          ? { candidatos: resposta.dados.slice(0, 5).map(candidatoSeguro) }
+          : {}),
+      };
+    }
+    if (exatos.length > 1) {
+      return {
+        status: "ambiguous",
+        motivo: "mais_de_um_cliente_exato_pelos_sinais_do_pedido",
+        candidatos: exatos.slice(0, 5).map(candidatoSeguro),
+      };
+    }
+
+    const cliente = exatos[0]!;
+    const idResolvido = cliente.id?.trim();
+    const labelResolvido = rotuloExterno(sinaisFortes, cliente);
+    const lookupResolvido = rotuloLookupProvider(cliente);
+    if (!idResolvido || !labelResolvido || !lookupResolvido) {
+      return {
+        status: "unresolved",
+        motivo: "identidade_provider_insuficiente",
+        candidatos: [candidatoSeguro(cliente)],
+      };
+    }
+
+    if (idsUnicos.length === 1 && idsUnicos[0] !== idResolvido) {
+      return { status: "unresolved", motivo: "identidade_pedido_inconsistente" };
+    }
+
+    clienteDoPedido = cliente;
+    externalId = idResolvido;
+    externalLabel = labelResolvido;
+    providerLookupLabel = lookupResolvido;
+    origemSemContato = cpfCnpj ? "exact_document" : "exact_email";
+    identityField = cpfCnpj ? "clienteCNPJ" : "clienteEmail";
+  }
 
   const existente = await carregarVinculoClienteExternoPorIdExterno(db, {
     organizationId,
@@ -196,13 +277,14 @@ export async function resolverClienteVendaErpPorPedidos(
     contactId,
     provider: PROVEDOR_VENDAERP.id,
     externalId,
-    externalLabel: nome,
-    providerLookupLabel: nome,
-    resolutionOrigin: contactId ? "existing_contact" : "exact_name",
+    externalLabel,
+    providerLookupLabel,
+    resolutionOrigin: contactId ? "existing_contact" : origemSemContato,
     evidence: {
       source: "orders_search",
-      identity_field: "pessoaID",
+      identity_field: identityField,
       matched_orders: pedidos.length,
+      pessoa_id_present_count: idsPreenchidos.length,
       has_document: documentos.size === 1,
       has_email: emails.size === 1,
     },

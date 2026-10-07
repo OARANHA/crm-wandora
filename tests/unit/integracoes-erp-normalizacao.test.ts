@@ -253,5 +253,20 @@ describe("adapter seguro do VendaERP", () => {
       cpfCnpj: "98765432100",
       email: "outro@example.test",
     });
+
+    const [internoPascal] = normalizarPedidosVendaErpComIdentidadeInterna([
+      {
+        id: "v3",
+        cliente: "Cliente",
+        PessoaID: "pessoa-erp-3",
+        ClienteCNPJ: "11222333000144",
+        ClienteEmail: "pascal@example.test",
+      },
+    ]);
+    expect(internoPascal?.identidadeCliente).toEqual({
+      pessoaId: "pessoa-erp-3",
+      cpfCnpj: "11222333000144",
+      email: "pascal@example.test",
+    });
   });
 });

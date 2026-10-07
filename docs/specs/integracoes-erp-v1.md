@@ -146,14 +146,21 @@ já presentes no pedido (por exemplo e-mail; nome sozinho não é prova) e, se n
 o contact e grava o vínculo pela mesma RPC transacional `fn_integracoes_erp_vincular_cliente`.
 Esse caminho não chama `Pessoas/Pesquisar` e não cria um segundo contact quando já há vínculo
 externo ou contato local inequivocamente compatível.
-A tool devolve `resolucao_cliente.contact_id` junto dos pedidos.
 
-Uma resolução apenas por esse mesmo nome aguarda a busca se ela estiver em andamento. Só quando a
-identidade dos pedidos já foi resolvida/materializada a resolução redundante é recusada; se os
-pedidos vierem vazios, a `pessoaID` estiver ausente/inconsistente ou a materialização não puder ser
-provada, `crm_erp_search_customers` continua disponível como fallback. Mais de uma `pessoaID` no
-mesmo resultado é ambiguidade e não expõe os pedidos como se fossem de um único cliente. Outro
-cliente, CPF/CNPJ, e-mail e outro turno não são bloqueados.
+Se `pessoaID` vier ausente em parte ou em todos os pedidos, mas os pedidos trouxerem um único
+CPF/CNPJ e/ou e-mail consistente, o backend pode fazer **uma única consulta direta** a
+`Pessoas/Pesquisar` usando o sinal forte (CPF/CNPJ é preferido para estreitar a chamada) e exige
+correspondência exata com todos os sinais fortes presentes. Uma `pessoaID` parcial, quando existe,
+também precisa concordar com o `id` da Pessoa resolvida antes de qualquer materialização. Esse
+fallback nunca faz varredura por nome/razão social. Sem sinal forte, com sinais conflitantes ou com
+identidade divergente, o fluxo falha fechado e não expõe os pedidos.
+
+A tool devolve `resolucao_cliente.contact_id` junto dos pedidos quando a identidade foi provada.
+Uma resolução apenas por esse mesmo nome aguarda a busca se ela estiver em andamento e só é
+bloqueada quando os pedidos já produziram uma identidade resolvida/materializada. Mais de uma
+`pessoaID` no mesmo resultado é ambiguidade. Outro cliente, CPF/CNPJ, e-mail e outro turno não são
+bloqueados. Falhas de identidade preservam no audit um subtipo seguro (sem PII) para distinguir
+ausência de sinal, inconsistência, falha do provider ou ambiguidade.
 
 Criação mínima de contato + vínculo é transacional e idempotente. Uniques parciais protegem o
 mesmo `external_id` e o mesmo `contact/provider`; advisory locks fecham corrida de retries.
