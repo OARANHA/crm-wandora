@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type * as ErpService from "@/lib/integracoes-erp/service";
+import type { PedidoErpComIdentidadeInterna } from "@/lib/integracoes-erp/service";
 import type * as ExternalIdentity from "@/lib/integracoes-erp/identidade-externa-cliente";
 import type * as LocalIdentity from "@/lib/integracoes-erp/identidade-cliente";
 import type { ClienteErp } from "@/lib/integracoes-erp/tipos";
@@ -18,6 +19,7 @@ vi.mock("@/lib/integracoes-erp/identidade-externa-cliente", async (original) => 
     ...real,
     buscarVinculosClientePorRotulo: vi.fn(),
     carregarVinculoClienteExterno: vi.fn(),
+    carregarVinculoClienteExternoPorIdExterno: vi.fn(),
     vincularIdentidadeClienteExterno: vi.fn(),
   };
 });
@@ -30,7 +32,7 @@ vi.mock("@/lib/integracoes-erp/identidade-cliente", async (original) => {
 const service = await import("@/lib/integracoes-erp/service");
 const externalIdentity = await import("@/lib/integracoes-erp/identidade-externa-cliente");
 const localIdentity = await import("@/lib/integracoes-erp/identidade-cliente");
-const { resolverClienteVendaErp } =
+const { resolverClienteVendaErp, resolverClienteVendaErpPorPedidos } =
   await import("@/lib/integracoes-erp/resolucao-cliente-vendaerp");
 
 function cliente(overrides: Partial<ClienteErp> = {}): ClienteErp {
@@ -55,6 +57,10 @@ describe("Customer Resolution VendaERP — descoberta por razão social", () => 
     vi.mocked(externalIdentity.buscarVinculosClientePorRotulo).mockResolvedValue({
       ok: true,
       vinculos: [],
+    });
+    vi.mocked(externalIdentity.carregarVinculoClienteExternoPorIdExterno).mockResolvedValue({
+      ok: true,
+      vinculo: null,
     });
     vi.mocked(localIdentity.localizarContatosCandidatosClienteErp).mockResolvedValue({
       ok: true,
@@ -173,5 +179,239 @@ describe("Customer Resolution VendaERP — descoberta por razão social", () => 
     expect(resultado.status).toBe("ambiguous");
     if (resultado.status === "ambiguous") expect(resultado.candidatos).toHaveLength(2);
     expect(externalIdentity.vincularIdentidadeClienteExterno).not.toHaveBeenCalled();
+  });
+});
+
+describe("Customer Resolution VendaERP — identidade vinda dos pedidos", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(externalIdentity.carregarVinculoClienteExternoPorIdExterno).mockResolvedValue({
+      ok: true,
+      vinculo: null,
+    });
+    vi.mocked(localIdentity.localizarContatosCandidatosClienteErp).mockResolvedValue({
+      ok: true,
+      contatos: [],
+    });
+    vi.mocked(externalIdentity.vincularIdentidadeClienteExterno).mockResolvedValue({
+      ok: true,
+      vinculo: {
+        id: "link-eco",
+        organizationId: "org-x",
+        contactId: "11111111-1111-4111-8111-111111111111",
+        provider: "vendaerp",
+        externalId: "erp-eco",
+        externalLabel: "Eco Projetos",
+        externalLabelKey: "eco projetos",
+        providerLookupLabel: "Eco Projetos",
+        resolutionOrigin: "exact_name",
+      },
+      createdLink: true,
+      createdContact: true,
+    });
+  });
+
+  function pedido(
+    pessoaId: string | null,
+    overrides: Partial<PedidoErpComIdentidadeInterna["identidadeCliente"]> = {},
+  ): PedidoErpComIdentidadeInterna {
+    return {
+      pedido: {
+        id: "pedido-1",
+        codigo: 101,
+        cliente: "Eco Projetos",
+        status: "Faturado",
+        statusSistema: "faturado",
+        total: 100,
+        data: "2026-10-01T12:00:00Z",
+        finalizado: true,
+        numeroNFe: "9001",
+        dataFaturamento: "2026-10-01T13:00:00Z",
+        chaveAcessoNFe: null,
+        danfeUrl: null,
+        urlSefaz: null,
+      },
+      identidadeCliente: {
+        pessoaId,
+        cpfCnpj: "12345678000190",
+        email: "financeiro@eco.test",
+        ...overrides,
+      },
+    };
+  }
+
+  it("materializa contact e vínculo por pessoaID única sem chamar Pessoas/Pesquisar", async () => {
+    const resultado = await resolverClienteVendaErpPorPedidos(
+      {} as SupabaseClient,
+      "org-x",
+      "Eco Projetos",
+      [pedido("erp-eco"), pedido("erp-eco")],
+      { actorApiTokenId: "tok-1", requestId: "req-1" },
+    );
+
+    expect(service.buscarClientesErp).not.toHaveBeenCalled();
+    expect(externalIdentity.vincularIdentidadeClienteExterno).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organizationId: "org-x",
+        contactId: null,
+        provider: "vendaerp",
+        externalId: "erp-eco",
+        externalLabel: "Eco Projetos",
+        providerLookupLabel: "Eco Projetos",
+        resolutionOrigin: "exact_name",
+        evidence: expect.objectContaining({
+          source: "orders_search",
+          identity_field: "pessoaID",
+          matched_orders: 2,
+        }),
+      }),
+    );
+    expect(resultado).toMatchObject({
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      origem: "provider",
+      materialized: true,
+    });
+  });
+
+  it("reutiliza contact local compatível por e-mail em vez de criar duplicado", async () => {
+    vi.mocked(localIdentity.localizarContatosCandidatosClienteErp).mockResolvedValue({
+      ok: true,
+      contatos: [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          phone_number: null,
+          email_normalized: "financeiro@eco.test",
+          cpf_hash: null,
+          is_anonymized: false,
+        },
+      ],
+    });
+    vi.mocked(externalIdentity.vincularIdentidadeClienteExterno).mockResolvedValue({
+      ok: true,
+      vinculo: {
+        id: "link-local",
+        organizationId: "org-x",
+        contactId: "33333333-3333-4333-8333-333333333333",
+        provider: "vendaerp",
+        externalId: "erp-eco",
+        externalLabel: "Eco Projetos",
+        externalLabelKey: "eco projetos",
+        providerLookupLabel: "Eco Projetos",
+        resolutionOrigin: "existing_contact",
+      },
+      createdLink: true,
+      createdContact: false,
+    });
+
+    const resultado = await resolverClienteVendaErpPorPedidos(
+      {} as SupabaseClient,
+      "org-x",
+      "Eco Projetos",
+      [pedido("erp-eco")],
+    );
+
+    expect(externalIdentity.vincularIdentidadeClienteExterno).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        contactId: "33333333-3333-4333-8333-333333333333",
+        externalId: "erp-eco",
+        resolutionOrigin: "existing_contact",
+      }),
+    );
+    expect(resultado).toMatchObject({
+      status: "resolved",
+      contactId: "33333333-3333-4333-8333-333333333333",
+      materialized: false,
+    });
+  });
+
+  it("reutiliza vínculo existente pela pessoaID e não procura candidato local", async () => {
+    vi.mocked(externalIdentity.carregarVinculoClienteExternoPorIdExterno).mockResolvedValue({
+      ok: true,
+      vinculo: {
+        id: "link-existente",
+        organizationId: "org-x",
+        contactId: "22222222-2222-4222-8222-222222222222",
+        provider: "vendaerp",
+        externalId: "erp-eco",
+        externalLabel: "Eco Projetos",
+        externalLabelKey: "eco projetos",
+        providerLookupLabel: "Eco Projetos",
+        resolutionOrigin: "exact_name",
+      },
+    });
+    vi.mocked(externalIdentity.vincularIdentidadeClienteExterno).mockResolvedValue({
+      ok: true,
+      vinculo: {
+        id: "link-existente",
+        organizationId: "org-x",
+        contactId: "22222222-2222-4222-8222-222222222222",
+        provider: "vendaerp",
+        externalId: "erp-eco",
+        externalLabel: "Eco Projetos",
+        externalLabelKey: "eco projetos",
+        providerLookupLabel: "Eco Projetos",
+        resolutionOrigin: "exact_name",
+      },
+      createdLink: false,
+      createdContact: false,
+    });
+
+    const resultado = await resolverClienteVendaErpPorPedidos(
+      {} as SupabaseClient,
+      "org-x",
+      "Eco Projetos",
+      [pedido("erp-eco")],
+    );
+
+    expect(localIdentity.localizarContatosCandidatosClienteErp).not.toHaveBeenCalled();
+    expect(externalIdentity.vincularIdentidadeClienteExterno).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        contactId: "22222222-2222-4222-8222-222222222222",
+        externalId: "erp-eco",
+        resolutionOrigin: "existing_contact",
+      }),
+    );
+    expect(resultado).toMatchObject({
+      status: "resolved",
+      contactId: "22222222-2222-4222-8222-222222222222",
+      origem: "existing_link",
+      materialized: false,
+    });
+  });
+
+  it("múltiplas pessoaID no mesmo resultado são ambíguas e nunca criam vínculo", async () => {
+    const resultado = await resolverClienteVendaErpPorPedidos(
+      {} as SupabaseClient,
+      "org-x",
+      "Eco Projetos",
+      [pedido("erp-a"), pedido("erp-b")],
+    );
+
+    expect(resultado).toMatchObject({
+      status: "ambiguous",
+      motivo: "mais_de_um_cliente_nos_pedidos",
+    });
+    expect(externalIdentity.vincularIdentidadeClienteExterno).not.toHaveBeenCalled();
+    expect(service.buscarClientesErp).not.toHaveBeenCalled();
+  });
+
+  it("pessoaID ausente em qualquer pedido impede materialização e falha fechado", async () => {
+    const resultado = await resolverClienteVendaErpPorPedidos(
+      {} as SupabaseClient,
+      "org-x",
+      "Eco Projetos",
+      [pedido("erp-eco"), pedido(null)],
+    );
+
+    expect(resultado).toEqual({
+      status: "unresolved",
+      motivo: "identidade_pedido_incompleta",
+    });
+    expect(externalIdentity.vincularIdentidadeClienteExterno).not.toHaveBeenCalled();
+    expect(service.buscarClientesErp).not.toHaveBeenCalled();
   });
 });

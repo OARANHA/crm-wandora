@@ -19,6 +19,7 @@ import { carregarVinculoClienteExterno } from "@/lib/integracoes-erp/identidade-
 import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
 import {
   resolverClienteVendaErp,
+  resolverClienteVendaErpPorPedidos,
   type CandidatoClienteSeguro,
 } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
 import type { ClienteErp, PedidoErp } from "@/lib/integracoes-erp/tipos";
@@ -202,6 +203,64 @@ export const crmErpReadStock: McpToolDefinition<typeof estoqueInputShape> = {
   },
 };
 
+const BUSCA_PEDIDOS_TURNO_TTL_MS = 120_000;
+
+interface BuscaPedidosNoTurno {
+  promessa: Promise<boolean>;
+  expiraEm: number;
+}
+
+let buscasPedidosPorTurno = new Map<string, BuscaPedidosNoTurno>();
+
+function chaveNomeClienteTurno(requestId: string, nome: unknown): string | null {
+  if (typeof nome !== "string") return null;
+  const normalizado = nome
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/\s+/g, " ");
+  return normalizado ? `${requestId}:${normalizado}` : null;
+}
+
+function limparBuscasPedidosExpiradas(agora = Date.now()): void {
+  buscasPedidosPorTurno = new Map(
+    [...buscasPedidosPorTurno].filter(([, busca]) => busca.expiraEm > agora),
+  );
+}
+
+function registrarBuscaPedidosNoTurno(
+  requestId: string,
+  nome: unknown,
+): ((encontrou: boolean) => void) | null {
+  const chave = chaveNomeClienteTurno(requestId, nome);
+  if (!chave) return null;
+
+  limparBuscasPedidosExpiradas();
+  let resolver!: (encontrou: boolean) => void;
+  const promessa = new Promise<boolean>((resolve) => {
+    resolver = resolve;
+  });
+  buscasPedidosPorTurno.set(chave, {
+    promessa,
+    expiraEm: Date.now() + BUSCA_PEDIDOS_TURNO_TTL_MS,
+  });
+
+  let resolvida = false;
+  return (encontrou) => {
+    if (resolvida) return;
+    resolvida = true;
+    resolver(encontrou);
+  };
+}
+
+function buscarPedidosNoMesmoTurno(requestId: string, nome: unknown): Promise<boolean> | null {
+  const chave = chaveNomeClienteTurno(requestId, nome);
+  if (!chave) return null;
+  limparBuscasPedidosExpiradas();
+  return buscasPedidosPorTurno.get(chave)?.promessa ?? null;
+}
+
 const clientesInputShape = {
   nome: z.string().trim().min(2).max(200).optional(),
   cpf_cnpj: z.string().trim().min(3).max(30).optional(),
@@ -262,6 +321,25 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
           "use o contact_id já resolvido sozinho; se o cliente mudou, faça uma nova resolução por nome, CPF/CNPJ ou e-mail.",
       };
     }
+
+    if (input.nome && !input.cpf_cnpj && !input.email && !input.cliente_contact_id) {
+      let buscaPedidos = buscarPedidosNoMesmoTurno(ctx.requestId, input.nome);
+      if (!buscaPedidos) {
+        // Tool calls do mesmo step podem ser disparadas em paralelo. Cedemos um
+        // tick para a busca de pedidos registrar sua promessa mesmo quando o
+        // scheduler inicia customers alguns milissegundos antes.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        buscaPedidos = buscarPedidosNoMesmoTurno(ctx.requestId, input.nome);
+      }
+      if (buscaPedidos && (await buscaPedidos)) {
+        return {
+          erro: "resolucao_cliente_desnecessaria_apos_pedidos",
+          mensagem:
+            "A busca de pedidos deste mesmo turno já encontrou pedidos para esse Nome/Razão Social. Use os pedidos já retornados para responder à solicitação; não diga que o cliente não existe e não repita a resolução de cliente apenas para validar o cadastro.",
+        };
+      }
+    }
+
     const resolucao = await resolverClienteVendaErp(
       ctx.supabase,
       ctx.organizationId,
@@ -415,6 +493,79 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
         },
         pedidos: comprovados.map((item) => projetarPedidoParaTool(item.pedido)),
       };
+    }
+
+    if (input.cliente && !input.cpf_cnpj) {
+      const resolverSequenciamento = registrarBuscaPedidosNoTurno(ctx.requestId, input.cliente);
+      try {
+        const r = await buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
+          codigo: input.codigo,
+          cliente: input.cliente,
+          status: input.status,
+          numeroNFe: input.numero_nfe,
+          pageSize: input.limite,
+          skip: input.skip,
+        });
+        if (!r.ok) {
+          resolverSequenciamento?.(false);
+          return resposta(r);
+        }
+
+        const pedidos = r.dados.map((item) => projetarPedidoParaTool(item.pedido));
+        if (pedidos.length === 0) {
+          resolverSequenciamento?.(false);
+          return { pedidos: [] };
+        }
+
+        const resolucao = await resolverClienteVendaErpPorPedidos(
+          ctx.supabase,
+          ctx.organizationId,
+          input.cliente,
+          r.dados,
+          {
+            actorUserId: ctx.actor.type === "user" ? ctx.actor.id : null,
+            actorApiTokenId: ctx.actor.type === "user" ? null : ctx.apiTokenId,
+            requestId: ctx.requestId,
+          },
+        );
+
+        if (resolucao.status === "resolved") {
+          resolverSequenciamento?.(true);
+          return {
+            resolucao_cliente: {
+              status: "resolved",
+              contact_id: resolucao.contactId,
+              origem: resolucao.origem,
+              materializado: resolucao.materialized,
+            },
+            pedidos,
+          };
+        }
+
+        resolverSequenciamento?.(false);
+        if (resolucao.status === "ambiguous") {
+          return {
+            erro: "identidade_pedido_ambigua",
+            mensagem:
+              "o VendaERP retornou pedidos ligados a mais de uma identidade de cliente para esse Nome/Razão Social; informe CPF/CNPJ ou outro identificador forte antes de escolher.",
+            resolucao_cliente: { status: "ambiguous", motivo: resolucao.motivo },
+            candidatos: resolucao.candidatos,
+          };
+        }
+
+        return {
+          erro: "identidade_pedido_nao_confirmada",
+          mensagem:
+            "o VendaERP encontrou pedidos para esse nome, mas a identidade do cliente não pôde ser provada com segurança. Resolva o cliente por CPF/CNPJ, e-mail ou crm_erp_search_customers antes de usar esses pedidos.",
+          resolucao_cliente: {
+            status: "unresolved",
+            motivo: resolucao.status === "not_found" ? "nao_encontrado" : resolucao.motivo,
+          },
+        };
+      } catch (erro) {
+        resolverSequenciamento?.(false);
+        throw erro;
+      }
     }
 
     const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
