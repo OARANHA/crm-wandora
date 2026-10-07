@@ -283,6 +283,9 @@ describe("tools ERP READ — comportamento do agente", () => {
       },
     });
     expect(resultado).not.toHaveProperty("pedidos");
+    expect(crmErpSearchOrders.motivoDoVazio?.(resultado)).toBe(
+      "identidade_pedido_nao_confirmada:identidade_pedido_incompleta",
+    );
   });
 
   it("busca de pedidos vazia libera resolução do mesmo cliente", async () => {
