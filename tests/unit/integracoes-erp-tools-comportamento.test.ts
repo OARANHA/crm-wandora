@@ -428,6 +428,52 @@ describe("tools ERP READ — comportamento do agente", () => {
     expect(customerResolution.resolverClienteVendaErp).not.toHaveBeenCalled();
   });
 
+  it("nome parcial com um candidato orienta refino sem virar cliente ausente", async () => {
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValueOnce({
+      status: "unresolved",
+      motivo: "sem_correspondencia_exata",
+      candidatos: [
+        {
+          nome: "Eco Projetos Engenharia Ltda",
+          nomeFantasia: "Eco Projetos Engenharia",
+          razaoSocial: "ECO PROJETOS ENGENHARIA LTDA",
+          cidade: "Porto Alegre",
+          uf: "RS",
+        },
+      ],
+    });
+
+    const resultado = (await crmErpSearchCustomers.handler(
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as {
+      erro?: string;
+      mensagem: string;
+      resolucao: { status: string; motivo: string };
+      candidatos: unknown[];
+      proxima_acao: { tipo: string; nome?: string };
+    };
+
+    expect(resultado.erro).toBeUndefined();
+    expect(resultado.resolucao).toEqual({
+      status: "unresolved",
+      motivo: "sem_correspondencia_exata",
+    });
+    expect(resultado.candidatos).toHaveLength(1);
+    expect(resultado.proxima_acao).toEqual({
+      tipo: "refinar_nome_exato",
+      nome: "Eco Projetos Engenharia",
+    });
+    expect(resultado.mensagem).toContain("não significa cliente ausente");
+  });
+
   it("ambiguidade, ausência e erro de provider permanecem estados diferentes", async () => {
     vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValueOnce({
       status: "ambiguous",

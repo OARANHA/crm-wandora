@@ -238,10 +238,19 @@ function motivoResolucaoCliente(resultado: unknown): string | null {
   return r.motivo ?? r.status;
 }
 
+function nomePreferidoParaRefino(candidato: CandidatoClienteSeguro): string | null {
+  return (
+    candidato.nomeFantasia?.trim() ||
+    candidato.nome?.trim() ||
+    candidato.razaoSocial?.trim() ||
+    null
+  );
+}
+
 export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape> = {
   name: "crm_erp_search_customers",
   description:
-    "Resolve um cliente no ERP e devolve um contact_id local estável. Reutilize esse contact_id em consultas seguintes; ambiguidade nunca escolhe o primeiro resultado.",
+    "Resolve um cliente no ERP e devolve um contact_id local estável. Reutilize esse contact_id em consultas seguintes; ambiguidade nunca escolhe o primeiro resultado. IMPORTANTE: unresolved/sem_correspondencia_exata com candidatos NÃO significa cliente ausente. Se vier um único candidato e proxima_acao.tipo=refinar_nome_exato, repita esta busca usando exatamente proxima_acao.nome; se vierem vários, peça ao administrador para desambiguar. Só status not_found autoriza dizer que nenhum cliente foi encontrado.",
   inputSchema: clientesInputShape,
   category: "read",
   requiresRole: "agent",
@@ -298,6 +307,30 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
     }
     if (resolucao.status === "not_found")
       return { resolucao: { status: "not_found" }, clientes: [] };
+
+    if (
+      resolucao.status === "unresolved" &&
+      resolucao.motivo === "sem_correspondencia_exata" &&
+      resolucao.candidatos?.length
+    ) {
+      const candidatos = resolucao.candidatos;
+      const nomeParaRefino =
+        candidatos.length === 1 ? nomePreferidoParaRefino(candidatos[0]!) : null;
+
+      return {
+        resolucao: { status: "unresolved", motivo: resolucao.motivo },
+        candidatos,
+        proxima_acao:
+          candidatos.length === 1 && nomeParaRefino
+            ? { tipo: "refinar_nome_exato", nome: nomeParaRefino }
+            : { tipo: "desambiguar" },
+        mensagem:
+          candidatos.length === 1 && nomeParaRefino
+            ? "o VendaERP encontrou um candidato, mas o nome informado não coincide exatamente. Isso não significa cliente ausente. Refaça a busca de clientes usando exatamente proxima_acao.nome e só consulte pedidos depois de obter status resolved."
+            : "o VendaERP encontrou candidatos, mas nenhum coincide exatamente com o nome informado. Isso não é not_found. Peça ao administrador para escolher um candidato ou informar CNPJ/e-mail.",
+      };
+    }
+
     return {
       erro: resolucao.motivoProvider ?? resolucao.motivo,
       mensagem:
