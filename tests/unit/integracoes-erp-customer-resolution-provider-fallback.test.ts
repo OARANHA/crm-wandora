@@ -182,7 +182,6 @@ describe("Customer Resolution VendaERP — descoberta por razão social", () => 
   });
 });
 
-
 describe("Customer Resolution VendaERP — identidade vinda dos pedidos", () => {
   beforeEach(() => {
     vi.clearAllMocks();
