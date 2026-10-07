@@ -303,7 +303,9 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
       mensagem:
         resolucao.motivo === "provider_error" && resolucao.motivoProvider
           ? mensagemDeFalha(resolucao.motivoProvider)
-          : "não foi possível resolver o cliente de forma determinística.",
+          : resolucao.motivo === "sem_correspondencia_exata" && resolucao.candidatos?.length
+            ? "o VendaERP retornou clientes candidatos, mas nenhum pôde ser confirmado com segurança. Não trate isso como cliente inexistente; use os candidatos para desambiguar ou refazer a consulta."
+            : "não foi possível resolver o cliente de forma determinística.",
       resolucao: { status: "unresolved", motivo: resolucao.motivo },
       ...(resolucao.candidatos ? { candidatos: resolucao.candidatos } : {}),
     };

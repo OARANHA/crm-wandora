@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   resolverClienteVendaErp,
+  selecionarClientesVendaErpCompativeisPorNome,
   selecionarClientesVendaErpExatos,
 } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
 import type { ClienteErp } from "@/lib/integracoes-erp/tipos";
@@ -30,6 +31,32 @@ describe("Customer Resolution VendaERP — seleção fail-closed", () => {
     expect(selecionarClientesVendaErpExatos({ nome: "ÉCO PROJETOS" }, [c])).toEqual([c]);
     expect(selecionarClientesVendaErpExatos({ nome: "eco projetos ltda" }, [c])).toEqual([c]);
     expect(selecionarClientesVendaErpExatos({ nome: "Eco Projeto" }, [c])).toEqual([]);
+  });
+
+  it("aceita um único nome compatível do provider, sem aceitar busca genérica", () => {
+    const c = cliente({
+      nome: "Eco Projetos Engenharia",
+      nomeFantasia: "Eco Projetos Engenharia",
+      razaoSocial: "ECO PROJETOS ENGENHARIA E CONSULTORIA LTDA",
+    });
+
+    expect(selecionarClientesVendaErpCompativeisPorNome("Eco Projetos", [c])).toEqual([c]);
+    expect(selecionarClientesVendaErpCompativeisPorNome("Eco", [c])).toEqual([]);
+    expect(selecionarClientesVendaErpCompativeisPorNome("Eco Projeto", [c])).toEqual([]);
+  });
+
+  it("não escolhe o primeiro quando dois clientes são compatíveis", () => {
+    const a = cliente({
+      id: "erp-a",
+      nome: "Eco Projetos Engenharia",
+      nomeFantasia: "Eco Projetos Engenharia",
+    });
+    const b = cliente({
+      id: "erp-b",
+      nome: "Eco Projetos Arquitetura",
+      nomeFantasia: "Eco Projetos Arquitetura",
+    });
+    expect(selecionarClientesVendaErpCompativeisPorNome("Eco Projetos", [a, b])).toHaveLength(2);
   });
 
   it("CPF/CNPJ e e-mail precisam concordar quando ambos foram informados", () => {
