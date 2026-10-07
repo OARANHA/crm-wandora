@@ -202,6 +202,64 @@ export const crmErpReadStock: McpToolDefinition<typeof estoqueInputShape> = {
   },
 };
 
+const BUSCA_PEDIDOS_TURNO_TTL_MS = 120_000;
+
+interface BuscaPedidosNoTurno {
+  promessa: Promise<boolean>;
+  expiraEm: number;
+}
+
+const buscasPedidosPorTurno = new Map<string, BuscaPedidosNoTurno>();
+
+function chaveNomeClienteTurno(requestId: string, nome: unknown): string | null {
+  if (typeof nome !== "string") return null;
+  const normalizado = nome
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/\s+/g, " ");
+  return normalizado ? `${requestId}:${normalizado}` : null;
+}
+
+function limparBuscasPedidosExpiradas(agora = Date.now()): void {
+  for (const [chave, busca] of buscasPedidosPorTurno) {
+    if (busca.expiraEm <= agora) buscasPedidosPorTurno.delete(chave);
+  }
+}
+
+function registrarBuscaPedidosNoTurno(
+  requestId: string,
+  nome: unknown,
+): ((encontrou: boolean) => void) | null {
+  const chave = chaveNomeClienteTurno(requestId, nome);
+  if (!chave) return null;
+
+  limparBuscasPedidosExpiradas();
+  let resolver!: (encontrou: boolean) => void;
+  const promessa = new Promise<boolean>((resolve) => {
+    resolver = resolve;
+  });
+  buscasPedidosPorTurno.set(chave, {
+    promessa,
+    expiraEm: Date.now() + BUSCA_PEDIDOS_TURNO_TTL_MS,
+  });
+
+  let resolvida = false;
+  return (encontrou) => {
+    if (resolvida) return;
+    resolvida = true;
+    resolver(encontrou);
+  };
+}
+
+function buscarPedidosNoMesmoTurno(requestId: string, nome: unknown): Promise<boolean> | null {
+  const chave = chaveNomeClienteTurno(requestId, nome);
+  if (!chave) return null;
+  limparBuscasPedidosExpiradas();
+  return buscasPedidosPorTurno.get(chave)?.promessa ?? null;
+}
+
 const clientesInputShape = {
   nome: z.string().trim().min(2).max(200).optional(),
   cpf_cnpj: z.string().trim().min(3).max(30).optional(),
@@ -262,6 +320,18 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
           "use o contact_id já resolvido sozinho; se o cliente mudou, faça uma nova resolução por nome, CPF/CNPJ ou e-mail.",
       };
     }
+
+    if (input.nome && !input.cpf_cnpj && !input.email && !input.cliente_contact_id) {
+      const buscaPedidos = buscarPedidosNoMesmoTurno(ctx.requestId, input.nome);
+      if (buscaPedidos && (await buscaPedidos)) {
+        return {
+          erro: "resolucao_cliente_desnecessaria_apos_pedidos",
+          mensagem:
+            "A busca de pedidos deste mesmo turno já encontrou pedidos para esse Nome/Razão Social. Use os pedidos já retornados para responder à solicitação; não diga que o cliente não existe e não repita a resolução de cliente apenas para validar o cadastro.",
+        };
+      }
+    }
+
     const resolucao = await resolverClienteVendaErp(
       ctx.supabase,
       ctx.organizationId,
@@ -417,18 +487,29 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       };
     }
 
-    const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
-      codigo: input.codigo,
-      cliente: input.cliente,
-      cpf_cnpj: input.cpf_cnpj,
-      status: input.status,
-      numeroNFe: input.numero_nfe,
-      pageSize: input.limite,
-      skip: input.skip,
-    });
-    const saida = resposta(r);
-    if (saida.erro) return saida;
-    return { pedidos: saida.dados?.map((pedido) => projetarPedidoParaTool(pedido)) };
+    const resolverSequenciamento = registrarBuscaPedidosNoTurno(ctx.requestId, input.cliente);
+    try {
+      const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
+        codigo: input.codigo,
+        cliente: input.cliente,
+        cpf_cnpj: input.cpf_cnpj,
+        status: input.status,
+        numeroNFe: input.numero_nfe,
+        pageSize: input.limite,
+        skip: input.skip,
+      });
+      const saida = resposta(r);
+      if (saida.erro) {
+        resolverSequenciamento?.(false);
+        return saida;
+      }
+      const pedidos = saida.dados?.map((pedido) => projetarPedidoParaTool(pedido)) ?? [];
+      resolverSequenciamento?.(pedidos.length > 0);
+      return { pedidos };
+    } catch (erro) {
+      resolverSequenciamento?.(false);
+      throw erro;
+    }
   },
 };
 
