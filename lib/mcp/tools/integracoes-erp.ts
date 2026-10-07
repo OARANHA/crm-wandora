@@ -19,6 +19,7 @@ import { carregarVinculoClienteExterno } from "@/lib/integracoes-erp/identidade-
 import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
 import {
   resolverClienteVendaErp,
+  resolverClienteVendaErpPorPedidos,
   type CandidatoClienteSeguro,
 } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
 import type { ClienteErp, PedidoErp } from "@/lib/integracoes-erp/tipos";
@@ -487,29 +488,89 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       };
     }
 
-    const resolverSequenciamento = registrarBuscaPedidosNoTurno(ctx.requestId, input.cliente);
-    try {
-      const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
-        codigo: input.codigo,
-        cliente: input.cliente,
-        cpf_cnpj: input.cpf_cnpj,
-        status: input.status,
-        numeroNFe: input.numero_nfe,
-        pageSize: input.limite,
-        skip: input.skip,
-      });
-      const saida = resposta(r);
-      if (saida.erro) {
+    if (input.cliente && !input.cpf_cnpj) {
+      const resolverSequenciamento = registrarBuscaPedidosNoTurno(ctx.requestId, input.cliente);
+      try {
+        const r = await buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
+          codigo: input.codigo,
+          cliente: input.cliente,
+          status: input.status,
+          numeroNFe: input.numero_nfe,
+          pageSize: input.limite,
+          skip: input.skip,
+        });
+        if (!r.ok) {
+          resolverSequenciamento?.(false);
+          return resposta(r);
+        }
+
+        const pedidos = r.dados.map((item) => projetarPedidoParaTool(item.pedido));
+        if (pedidos.length === 0) {
+          resolverSequenciamento?.(false);
+          return { pedidos: [] };
+        }
+
+        const resolucao = await resolverClienteVendaErpPorPedidos(
+          ctx.supabase,
+          ctx.organizationId,
+          input.cliente,
+          r.dados,
+          {
+            actorUserId: ctx.actor.type === "user" ? ctx.actor.id : null,
+            actorApiTokenId: ctx.actor.type === "user" ? null : ctx.apiTokenId,
+            requestId: ctx.requestId,
+          },
+        );
+
+        if (resolucao.status === "resolved") {
+          resolverSequenciamento?.(true);
+          return {
+            resolucao_cliente: {
+              status: "resolved",
+              contact_id: resolucao.contactId,
+              origem: resolucao.origem,
+              materializado: resolucao.materialized,
+            },
+            pedidos,
+          };
+        }
+
         resolverSequenciamento?.(false);
-        return saida;
+        if (resolucao.status === "ambiguous") {
+          return {
+            erro: "identidade_pedido_ambigua",
+            mensagem:
+              "o VendaERP retornou pedidos ligados a mais de uma identidade de cliente para esse Nome/Razão Social; informe CPF/CNPJ ou outro identificador forte antes de escolher.",
+            resolucao_cliente: { status: "ambiguous", motivo: resolucao.motivo },
+            candidatos: resolucao.candidatos,
+          };
+        }
+
+        return {
+          resolucao_cliente: {
+            status: "unresolved",
+            motivo: resolucao.status === "not_found" ? "nao_encontrado" : resolucao.motivo,
+          },
+          pedidos,
+        };
+      } catch (erro) {
+        resolverSequenciamento?.(false);
+        throw erro;
       }
-      const pedidos = saida.dados?.map((pedido) => projetarPedidoParaTool(pedido)) ?? [];
-      resolverSequenciamento?.(pedidos.length > 0);
-      return { pedidos };
-    } catch (erro) {
-      resolverSequenciamento?.(false);
-      throw erro;
     }
+
+    const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
+      codigo: input.codigo,
+      cliente: input.cliente,
+      cpf_cnpj: input.cpf_cnpj,
+      status: input.status,
+      numeroNFe: input.numero_nfe,
+      pageSize: input.limite,
+      skip: input.skip,
+    });
+    const saida = resposta(r);
+    if (saida.erro) return saida;
+    return { pedidos: saida.dados?.map((pedido) => projetarPedidoParaTool(pedido)) };
   },
 };
 
