@@ -32,18 +32,28 @@ export async function localizarContatosCandidatosClienteErp(
 
   const doc = documentoNormalizado(cliente.cpfCnpj);
   if (doc?.length === 11) {
-    const { data, error } = await db.from("contacts").select(select)
-      .eq("organization_id", organizationId).eq("cpf_hash", hashCpf(doc))
-      .eq("is_anonymized", false).is("is_merged_into", null).limit(3);
+    const { data, error } = await db
+      .from("contacts")
+      .select(select)
+      .eq("organization_id", organizationId)
+      .eq("cpf_hash", hashCpf(doc))
+      .eq("is_anonymized", false)
+      .is("is_merged_into", null)
+      .limit(3);
     if (error) return { ok: false };
     for (const row of data ?? []) achados.set(row.id, row as IdentidadeContatoCandidato);
   }
 
   const email = emailNormalizado(cliente.email);
   if (email) {
-    const { data, error } = await db.from("contacts").select(select)
-      .eq("organization_id", organizationId).eq("email_normalized", email)
-      .eq("is_anonymized", false).is("is_merged_into", null).limit(3);
+    const { data, error } = await db
+      .from("contacts")
+      .select(select)
+      .eq("organization_id", organizationId)
+      .eq("email_normalized", email)
+      .eq("is_anonymized", false)
+      .is("is_merged_into", null)
+      .limit(3);
     if (error) return { ok: false };
     for (const row of data ?? []) achados.set(row.id, row as IdentidadeContatoCandidato);
   }
@@ -54,9 +64,14 @@ export async function localizarContatosCandidatosClienteErp(
     const e164 = digits.startsWith("55") ? `+${digits}` : `+55${digits}`;
     const variantes = phoneLookupVariants(e164);
     if (variantes.length === 0) continue;
-    const { data, error } = await db.from("contacts").select(select)
-      .eq("organization_id", organizationId).in("phone_number", variantes)
-      .eq("is_anonymized", false).is("is_merged_into", null).limit(3);
+    const { data, error } = await db
+      .from("contacts")
+      .select(select)
+      .eq("organization_id", organizationId)
+      .in("phone_number", variantes)
+      .eq("is_anonymized", false)
+      .is("is_merged_into", null)
+      .limit(3);
     if (error) return { ok: false };
     for (const row of data ?? []) achados.set(row.id, row as IdentidadeContatoCandidato);
   }

@@ -6,7 +6,11 @@ import { sql } from "./gov-helpers";
 moldeDeProvisionadora({
   modulo: "integracoes_erp",
   tabelas: ["erp_connections", "erp_admin_whatsapp_bindings", "erp_customer_identity_links"],
-  protecaoPropria: ["erp_connections", "erp_admin_whatsapp_bindings", "erp_customer_identity_links"],
+  protecaoPropria: [
+    "erp_connections",
+    "erp_admin_whatsapp_bindings",
+    "erp_customer_identity_links",
+  ],
 });
 
 describe("credenciais de ERP ficam fechadas aos papéis de sessão", () => {
@@ -102,7 +106,12 @@ describe("Customer Resolution ERP — vínculo persistido e fail-closed", () => 
       on conflict (id) do nothing;
     `);
 
-    const chamada = (org: string, contact: string | null, externalId: string, origem = "exact_name") =>
+    const chamada = (
+      org: string,
+      contact: string | null,
+      externalId: string,
+      origem = "exact_name",
+    ) =>
       sql(`
         select public.fn_integracoes_erp_vincular_cliente(
           '${org}'::uuid,
@@ -133,19 +142,19 @@ describe("Customer Resolution ERP — vínculo persistido e fail-closed", () => 
 
     const outroTenant = JSON.parse(chamada(ORG_B, null, "pessoa-42"));
     expect(outroTenant.contact_id).not.toBe(primeira.contact_id);
-    expect(
-      () => chamada(ORG_A, CONTATO_B, "pessoa-cross-tenant"),
-    ).toThrow(/erp_customer_contact_invalid/);
+    expect(() => chamada(ORG_A, CONTATO_B, "pessoa-cross-tenant")).toThrow(
+      /erp_customer_contact_invalid/,
+    );
 
-    expect(
-      () => chamada(ORG_A, CONTATO_2, "pessoa-42"),
-    ).toThrow(/erp_customer_identity_conflict/);
+    expect(() => chamada(ORG_A, CONTATO_2, "pessoa-42")).toThrow(/erp_customer_identity_conflict/);
 
     const linkId = sql(`select id from public.erp_customer_identity_links
       where organization_id='${ORG_A}' and external_id='pessoa-42' and status='active';`);
     expect(
-      JSON.parse(sql(`select public.fn_integracoes_erp_invalidar_vinculo_cliente(
-        '${ORG_A}'::uuid, '${linkId}'::uuid, 'correction')::text;`)).invalidated,
+      JSON.parse(
+        sql(`select public.fn_integracoes_erp_invalidar_vinculo_cliente(
+        '${ORG_A}'::uuid, '${linkId}'::uuid, 'correction')::text;`),
+      ).invalidated,
     ).toBe(true);
 
     const corrigido = JSON.parse(chamada(ORG_A, CONTATO_2, "pessoa-42", "corrected"));
@@ -162,7 +171,8 @@ describe("Customer Resolution ERP — vínculo persistido e fail-closed", () => 
 
   it("o banco contém as duas cercas que tornam concorrência idempotente", () => {
     sql(`select public.fn_integracoes_erp_provisionar();`);
-    expect(sql(`
+    expect(
+      sql(`
       select count(*) from pg_indexes
        where schemaname='public'
          and indexname in (
@@ -170,17 +180,21 @@ describe("Customer Resolution ERP — vínculo persistido e fail-closed", () => 
            'erp_customer_identity_active_contact_unique'
          )
          and indexdef ilike '%unique%where (status = ''active''::text)%';
-    `)).toBe("2");
-    expect(sql(`
+    `),
+    ).toBe("2");
+    expect(
+      sql(`
       select pg_get_functiondef(p.oid)
         from pg_proc p
        where p.proname='fn_integracoes_erp_vincular_cliente'
          and p.pronamespace='public'::regnamespace;
-    `)).toContain("pg_advisory_xact_lock");
+    `),
+    ).toContain("pg_advisory_xact_lock");
   });
 
   it("as funções de vínculo não são executáveis por sessão", () => {
-    expect(sql(`
+    expect(
+      sql(`
       select
         has_function_privilege('anon',
           'public.fn_integracoes_erp_vincular_cliente(uuid,uuid,text,text,text,text,text,text,jsonb)', 'EXECUTE')::text
@@ -190,16 +204,19 @@ describe("Customer Resolution ERP — vínculo persistido e fail-closed", () => 
         || '|' ||
         has_function_privilege('service_role',
           'public.fn_integracoes_erp_vincular_cliente(uuid,uuid,text,text,text,text,text,text,jsonb)', 'EXECUTE')::text;
-    `)).toBe("false|false|true");
+    `),
+    ).toBe("false|false|true");
   });
 
   it("declara LGPD para romper external_id e rótulos ao anonimizar o contato", () => {
     sql(`select public.fn_integracoes_erp_provisionar();`);
-    expect(sql(`
+    expect(
+      sql(`
       select ligacao || '|' || array_to_string(colunas_rotulo, ',')
         from public.modulo_secoes_lgpd
        where modulo='integracoes_erp' and tabela='erp_customer_identity_links';
-    `)).toBe(
+    `),
+    ).toBe(
       "organization_id = $1 and contact_id = $2|external_id,external_label,external_label_key,provider_lookup_label",
     );
   });

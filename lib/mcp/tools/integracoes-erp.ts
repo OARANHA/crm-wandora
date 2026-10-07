@@ -211,9 +211,18 @@ const clientesInputShape = {
   skip: skipSchema,
 };
 
-function clienteSeguroParaTool(cliente: ClienteErp | undefined, fallback: string): CandidatoClienteSeguro {
+function clienteSeguroParaTool(
+  cliente: ClienteErp | undefined,
+  fallback: string,
+): CandidatoClienteSeguro {
   return cliente
-    ? { nome: cliente.nome, nomeFantasia: cliente.nomeFantasia, razaoSocial: cliente.razaoSocial, cidade: cliente.cidade, uf: cliente.uf }
+    ? {
+        nome: cliente.nome,
+        nomeFantasia: cliente.nomeFantasia,
+        razaoSocial: cliente.razaoSocial,
+        cidade: cliente.cidade,
+        uf: cliente.uf,
+      }
     : { nome: fallback, nomeFantasia: null, razaoSocial: null, cidade: null, uf: null };
 }
 
@@ -241,7 +250,10 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
   motivoDoVazio: motivoResolucaoCliente,
   handler: async (input, ctx) => {
     if (!input.nome && !input.cpf_cnpj && !input.email && !input.cliente_contact_id) {
-      return { erro: "filtro_obrigatorio", mensagem: "informe nome, CPF/CNPJ, e-mail ou um contact_id já resolvido." };
+      return {
+        erro: "filtro_obrigatorio",
+        mensagem: "informe nome, CPF/CNPJ, e-mail ou um contact_id já resolvido.",
+      };
     }
     if (input.cliente_contact_id && (input.nome || input.cpf_cnpj || input.email)) {
       return {
@@ -253,7 +265,14 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
     const resolucao = await resolverClienteVendaErp(
       ctx.supabase,
       ctx.organizationId,
-      { nome: input.nome, cpfCnpj: input.cpf_cnpj, email: input.email, contactId: input.cliente_contact_id, limite: input.limite, skip: input.skip },
+      {
+        nome: input.nome,
+        cpfCnpj: input.cpf_cnpj,
+        email: input.email,
+        contactId: input.cliente_contact_id,
+        limite: input.limite,
+        skip: input.skip,
+      },
       {
         actorUserId: ctx.actor.type === "user" ? ctx.actor.id : null,
         actorApiTokenId: ctx.actor.type === "user" ? null : ctx.apiTokenId,
@@ -262,14 +281,23 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
     );
     if (resolucao.status === "resolved") {
       return {
-        resolucao: { status: "resolved", contact_id: resolucao.contactId, origem: resolucao.origem, materializado: resolucao.materialized },
+        resolucao: {
+          status: "resolved",
+          contact_id: resolucao.contactId,
+          origem: resolucao.origem,
+          materializado: resolucao.materialized,
+        },
         clientes: [clienteSeguroParaTool(resolucao.cliente, resolucao.externalLabel)],
       };
     }
     if (resolucao.status === "ambiguous") {
-      return { resolucao: { status: "ambiguous", motivo: resolucao.motivo }, candidatos: resolucao.candidatos };
+      return {
+        resolucao: { status: "ambiguous", motivo: resolucao.motivo },
+        candidatos: resolucao.candidatos,
+      };
     }
-    if (resolucao.status === "not_found") return { resolucao: { status: "not_found" }, clientes: [] };
+    if (resolucao.status === "not_found")
+      return { resolucao: { status: "not_found" }, clientes: [] };
     return {
       erro: resolucao.motivoProvider ?? resolucao.motivo,
       mensagem:
@@ -321,15 +349,27 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   redigirParaAuditoria: redigirBusca,
   motivoDoVazio: motivoDoVazio("pedidos"),
   handler: async (input, ctx) => {
-    if (!input.codigo && !input.cliente && !input.cpf_cnpj && !input.cliente_contact_id && !input.status && !input.numero_nfe) {
-      return { erro: "filtro_obrigatorio", mensagem: "informe ao menos um identificador, cliente resolvido, status ou número da nota para procurar pedidos." };
+    if (
+      !input.codigo &&
+      !input.cliente &&
+      !input.cpf_cnpj &&
+      !input.cliente_contact_id &&
+      !input.status &&
+      !input.numero_nfe
+    ) {
+      return {
+        erro: "filtro_obrigatorio",
+        mensagem:
+          "informe ao menos um identificador, cliente resolvido, status ou número da nota para procurar pedidos.",
+      };
     }
 
     if (input.cliente_contact_id) {
       if (input.cliente || input.cpf_cnpj) {
         return {
           erro: "filtros_cliente_conflitantes",
-          mensagem: "use o cliente já resolvido sem misturar nome/CPF; resolva outra entidade explicitamente se o alvo mudou.",
+          mensagem:
+            "use o cliente já resolvido sem misturar nome/CPF; resolva outra entidade explicitamente se o alvo mudou.",
         };
       }
       const leitura = await carregarVinculoClienteExterno(ctx.supabase, {
@@ -338,7 +378,11 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
         provider: PROVEDOR_VENDAERP.id,
       });
       if (!leitura.ok) return resposta({ ok: false, motivo: "banco" });
-      if (!leitura.vinculo) return { erro: "cliente_nao_resolvido", mensagem: mensagemDeFalha("cliente_nao_resolvido") };
+      if (!leitura.vinculo)
+        return {
+          erro: "cliente_nao_resolvido",
+          mensagem: mensagemDeFalha("cliente_nao_resolvido"),
+        };
 
       const r = await buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
         codigo: input.codigo,
@@ -349,7 +393,9 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
         skip: input.skip,
       });
       if (!r.ok) return resposta(r);
-      const comprovados = r.dados.filter((p) => p.identidadeCliente.pessoaId === leitura.vinculo!.externalId);
+      const comprovados = r.dados.filter(
+        (p) => p.identidadeCliente.pessoaId === leitura.vinculo!.externalId,
+      );
       if (r.dados.length > 0 && comprovados.length === 0) {
         return {
           erro: "identidade_pedido_nao_confirmada",
@@ -358,14 +404,23 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
         };
       }
       return {
-        resolucao_cliente: { status: "resolved", contact_id: input.cliente_contact_id, origem: "external_identity_link" },
+        resolucao_cliente: {
+          status: "resolved",
+          contact_id: input.cliente_contact_id,
+          origem: "external_identity_link",
+        },
         pedidos: comprovados.map((item) => projetarPedidoParaTool(item.pedido)),
       };
     }
 
     const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
-      codigo: input.codigo, cliente: input.cliente, cpf_cnpj: input.cpf_cnpj,
-      status: input.status, numeroNFe: input.numero_nfe, pageSize: input.limite, skip: input.skip,
+      codigo: input.codigo,
+      cliente: input.cliente,
+      cpf_cnpj: input.cpf_cnpj,
+      status: input.status,
+      numeroNFe: input.numero_nfe,
+      pageSize: input.limite,
+      skip: input.skip,
     });
     const saida = resposta(r);
     if (saida.erro) return saida;

@@ -252,7 +252,14 @@ describe("tools ERP READ — comportamento do agente", () => {
     });
 
     const resultado = (await crmErpSearchCustomers.handler(
-      { nome: "Eco Projetos", cpf_cnpj: undefined, email: undefined, cliente_contact_id: undefined, limite: 10, skip: 0 },
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
       ctx,
     )) as {
       resolucao: { status: string; contact_id: string };
@@ -289,17 +296,37 @@ describe("tools ERP READ — comportamento do agente", () => {
       dados: [
         {
           pedido: {
-            id: "pedido-certo", codigo: 10, cliente: "Eco Projetos", status: "Faturado",
-            statusSistema: null, total: 100, data: null, finalizado: true, numeroNFe: "55",
-            dataFaturamento: null, chaveAcessoNFe: null, danfeUrl: null, urlSefaz: null,
+            id: "pedido-certo",
+            codigo: 10,
+            cliente: "Eco Projetos",
+            status: "Faturado",
+            statusSistema: null,
+            total: 100,
+            data: null,
+            finalizado: true,
+            numeroNFe: "55",
+            dataFaturamento: null,
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
           },
           identidadeCliente: { pessoaId: "erp-42", cpfCnpj: null, email: null },
         } as PedidoErpComIdentidadeInterna,
         {
           pedido: {
-            id: "pedido-outro", codigo: 11, cliente: "Homônimo", status: "Faturado",
-            statusSistema: null, total: 200, data: null, finalizado: true, numeroNFe: "56",
-            dataFaturamento: null, chaveAcessoNFe: null, danfeUrl: null, urlSefaz: null,
+            id: "pedido-outro",
+            codigo: 11,
+            cliente: "Homônimo",
+            status: "Faturado",
+            statusSistema: null,
+            total: 200,
+            data: null,
+            finalizado: true,
+            numeroNFe: "56",
+            dataFaturamento: null,
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
           },
           identidadeCliente: { pessoaId: "erp-outro", cpfCnpj: null, email: null },
         } as PedidoErpComIdentidadeInterna,
@@ -308,9 +335,14 @@ describe("tools ERP READ — comportamento do agente", () => {
 
     const resultado = (await crmErpSearchOrders.handler(
       {
-        codigo: undefined, cliente: undefined, cpf_cnpj: undefined,
+        codigo: undefined,
+        cliente: undefined,
+        cpf_cnpj: undefined,
         cliente_contact_id: "11111111-1111-4111-8111-111111111111",
-        status: undefined, numero_nfe: undefined, limite: 10, skip: 0,
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 10,
+        skip: 0,
       },
       ctx,
     )) as { pedidos: Array<{ id: string }>; resolucao_cliente: { status: string } };
@@ -328,29 +360,51 @@ describe("tools ERP READ — comportamento do agente", () => {
     vi.mocked(identityLinks.carregarVinculoClienteExterno).mockResolvedValue({
       ok: true,
       vinculo: {
-        id: "link-1", organizationId: ctx.organizationId,
-        contactId: "11111111-1111-4111-8111-111111111111", provider: "vendaerp",
-        externalId: "erp-42", externalLabel: "Eco Projetos", externalLabelKey: "eco projetos",
-        providerLookupLabel: "ECO PROJETOS LTDA", resolutionOrigin: "exact_name",
+        id: "link-1",
+        organizationId: ctx.organizationId,
+        contactId: "11111111-1111-4111-8111-111111111111",
+        provider: "vendaerp",
+        externalId: "erp-42",
+        externalLabel: "Eco Projetos",
+        externalLabelKey: "eco projetos",
+        providerLookupLabel: "ECO PROJETOS LTDA",
+        resolutionOrigin: "exact_name",
       },
     });
     vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
       ok: true,
-      dados: [{
-        pedido: {
-          id: "pedido-outro", codigo: 11, cliente: "Eco Projetos", status: "Faturado",
-          statusSistema: null, total: 200, data: null, finalizado: true, numeroNFe: null,
-          dataFaturamento: null, chaveAcessoNFe: null, danfeUrl: null, urlSefaz: null,
-        },
-        identidadeCliente: { pessoaId: "erp-outro", cpfCnpj: null, email: null },
-      } as PedidoErpComIdentidadeInterna],
+      dados: [
+        {
+          pedido: {
+            id: "pedido-outro",
+            codigo: 11,
+            cliente: "Eco Projetos",
+            status: "Faturado",
+            statusSistema: null,
+            total: 200,
+            data: null,
+            finalizado: true,
+            numeroNFe: null,
+            dataFaturamento: null,
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
+          },
+          identidadeCliente: { pessoaId: "erp-outro", cpfCnpj: null, email: null },
+        } as PedidoErpComIdentidadeInterna,
+      ],
     });
 
     const resultado = (await crmErpSearchOrders.handler(
       {
-        codigo: undefined, cliente: undefined, cpf_cnpj: undefined,
+        codigo: undefined,
+        cliente: undefined,
+        cpf_cnpj: undefined,
         cliente_contact_id: "11111111-1111-4111-8111-111111111111",
-        status: undefined, numero_nfe: undefined, limite: 10, skip: 0,
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 10,
+        skip: 0,
       },
       ctx,
     )) as { erro: string };
@@ -379,20 +433,48 @@ describe("tools ERP READ — comportamento do agente", () => {
       status: "ambiguous",
       motivo: "mais_de_um_cliente_exato",
       candidatos: [
-        { nome: "Eco Projetos", nomeFantasia: "Eco Projetos", razaoSocial: "ECO A LTDA", cidade: "POA", uf: "RS" },
-        { nome: "Eco Projetos", nomeFantasia: "Eco Projetos", razaoSocial: "ECO B LTDA", cidade: "POA", uf: "RS" },
+        {
+          nome: "Eco Projetos",
+          nomeFantasia: "Eco Projetos",
+          razaoSocial: "ECO A LTDA",
+          cidade: "POA",
+          uf: "RS",
+        },
+        {
+          nome: "Eco Projetos",
+          nomeFantasia: "Eco Projetos",
+          razaoSocial: "ECO B LTDA",
+          cidade: "POA",
+          uf: "RS",
+        },
       ],
     });
     const ambiguo = (await crmErpSearchCustomers.handler(
-      { nome: "Eco Projetos", cpf_cnpj: undefined, email: undefined, cliente_contact_id: undefined, limite: 10, skip: 0 },
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
       ctx,
     )) as { resolucao: { status: string }; candidatos: unknown[] };
     expect(ambiguo.resolucao.status).toBe("ambiguous");
     expect(ambiguo.candidatos).toHaveLength(2);
 
-    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValueOnce({ status: "not_found" });
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValueOnce({
+      status: "not_found",
+    });
     const ausente = (await crmErpSearchCustomers.handler(
-      { nome: "Inexistente", cpf_cnpj: undefined, email: undefined, cliente_contact_id: undefined, limite: 10, skip: 0 },
+      {
+        nome: "Inexistente",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
       ctx,
     )) as { resolucao: { status: string }; clientes: unknown[] };
     expect(ausente.resolucao.status).toBe("not_found");
@@ -404,11 +486,17 @@ describe("tools ERP READ — comportamento do agente", () => {
       motivoProvider: "timeout",
     });
     const falhou = (await crmErpSearchCustomers.handler(
-      { nome: "Eco Projetos", cpf_cnpj: undefined, email: undefined, cliente_contact_id: undefined, limite: 10, skip: 0 },
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
       ctx,
     )) as { erro: string; resolucao: { status: string; motivo: string } };
     expect(falhou.erro).toBe("timeout");
     expect(falhou.resolucao).toEqual({ status: "unresolved", motivo: "provider_error" });
   });
-
 });

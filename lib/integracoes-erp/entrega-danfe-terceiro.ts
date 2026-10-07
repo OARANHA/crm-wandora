@@ -5,10 +5,7 @@ import { parseServiceBoundary, type ServiceBoundary } from "@/lib/atendimento/fr
 import { beginDerivedServiceFromCurrentOrigin } from "@/lib/atendimento/origem";
 import { parseDialablePhone } from "@/lib/messaging/contact-card";
 
-import {
-  conferirContatoComClienteErp,
-  selecionarClienteDoPedido,
-} from "./autoridade-documento";
+import { conferirContatoComClienteErp, selecionarClienteDoPedido } from "./autoridade-documento";
 import {
   resolverAutoridadeAdminWhatsapp,
   type AutoridadeAdminWhatsapp,
@@ -98,7 +95,11 @@ export async function resolverDestinoDanfeDaNota(
   const cliente = await resolverClienteErp(db, organizationId, pedido);
   if (!cliente.ok) return cliente;
 
-  const candidatos = await localizarContatosCandidatosClienteErp(db, organizationId, cliente.cliente);
+  const candidatos = await localizarContatosCandidatosClienteErp(
+    db,
+    organizationId,
+    cliente.cliente,
+  );
   if (!candidatos.ok) return { ok: false, motivo: "banco" };
 
   const confirmados = candidatos.contatos.filter(

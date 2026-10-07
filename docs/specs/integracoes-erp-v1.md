@@ -131,7 +131,6 @@ mesmo `external_id` e o mesmo `contact/provider`; advisory locks fecham corrida 
 Correção invalida o vínculo antigo sem apagar o histórico. A tabela é server-only e declara sua
 seção de LGPD pelo mecanismo D8 da ADR-0002.
 
-
 ### Evidência complementar e lacunas do Swagger
 
 O Swagger recebido não declara schema de resposta para Estoque/BuscarQuantidades nem para Fiscal/ConsultarNFE. A V1 não inventa esses corpos.
