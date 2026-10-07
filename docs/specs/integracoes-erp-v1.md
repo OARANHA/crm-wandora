@@ -139,9 +139,18 @@ ele continua preferível por permitir a revalidação forte por `pessoaID`. Para
 o número localizado nos pedidos alimenta `crm_erp_get_invoice`.
 
 A coordenação do mesmo turno é determinística: uma busca de pedidos por Nome/Razão Social registra
-seu resultado pelo `requestId`. Uma resolução apenas por esse mesmo nome aguarda a busca se ela
-estiver em andamento. Se houver pedidos, a resolução redundante é recusada e o agente deve usar os
-pedidos já retornados; se vier vazio ou falha, a resolução de cliente continua disponível. Outro
+seu resultado pelo `requestId`. Quando todos os pedidos encontrados carregam a mesma `pessoaID`,
+o backend reutiliza a autoridade de identidade da PR #45: procura vínculo ativo por
+`organization/provider/external_id`, tenta localizar um contato local compatível pelos sinais
+mínimos do pedido e, se não houver, materializa o contact e grava o vínculo pela mesma RPC
+transacional `fn_integracoes_erp_vincular_cliente`. Esse caminho não chama `Pessoas/Pesquisar`.
+A tool devolve `resolucao_cliente.contact_id` junto dos pedidos.
+
+Uma resolução apenas por esse mesmo nome aguarda a busca se ela estiver em andamento. Só quando a
+identidade dos pedidos já foi resolvida/materializada a resolução redundante é recusada; se os
+pedidos vierem vazios, a `pessoaID` estiver ausente/inconsistente ou a materialização não puder ser
+provada, `crm_erp_search_customers` continua disponível como fallback. Mais de uma `pessoaID` no
+mesmo resultado é ambiguidade e não expõe os pedidos como se fossem de um único cliente. Outro
 cliente, CPF/CNPJ, e-mail e outro turno não são bloqueados.
 
 Criação mínima de contato + vínculo é transacional e idempotente. Uniques parciais protegem o
