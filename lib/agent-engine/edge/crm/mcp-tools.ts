@@ -187,11 +187,11 @@ export async function buildMcpTurnTools(
     tools.crm_erp_prepare_admin_danfe = tool({
       description:
         "Prepara uma DANFE já emitida para ESTA conversa administrativa. " +
-        "Use quando o administrador quiser ver, baixar, obter ou receber a DANFE no próprio WhatsApp. " +
+        "Use quando o administrador quiser ver, baixar, obter ou receber a DANFE no próprio WhatsApp. Pedidos como 'última nota' ou 'últimas N notas' também implicam receber as DANFEs das NFes selecionadas. " +
         "Se ele pedir para enviar ao cliente vinculado à nota, use crm_erp_send_danfe_to_invoice_customer em vez desta ferramenta. " +
-        "REGRA DE USO: quando o administrador pedir para mandar, enviar, ver, baixar, obter ou receber uma DANFE PARA O PRÓPRIO ADMIN e informar o número da NFe/NFCe, chame esta ferramenta ANTES de qualquer send_message ou resposta textual; use esse número em codigo_nfe. " +
-        "Não diga que não consegue e não responda apenas em texto antes de tentar esta ferramenta. " +
-        "Depois de preparar com sucesso, chame send_message UMA vez com a legenda curta: o runtime anexará o PDF automaticamente como documento. " +
+        "REGRA DE USO: depois que crm_erp_search_orders retornar uma ou mais NFes para o próprio administrador, chame esta ferramenta para UMA NFe e logo em seguida chame send_message; só depois prepare a próxima NFe. " +
+        "Não prepare duas DANFEs consecutivas sem enviar a primeira. Não diga que não consegue e não responda apenas em texto antes de tentar esta ferramenta. " +
+        "Depois de preparar com sucesso, chame send_message UMA vez com uma legenda curta: o runtime anexará o PDF automaticamente como documento. " +
         "Não copie nem envie preview_url ao administrador. Nunca use esta capacidade em conversa comum de cliente.",
       inputSchema: z.object({
         codigo_nfe: z.number().int().min(1).max(2_147_483_647),
