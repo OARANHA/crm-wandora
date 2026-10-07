@@ -121,14 +121,22 @@ inventa esse parâmetro. A resolução por nome tenta primeiro `nomefantasia`; s
 trouxer correspondência exata, faz uma varredura paginada e limitada somente de clientes,
 comparando `nomeFantasia` e `razaoSocial` no backend. Se o limite for atingido sem provar
 unicidade, o estado permanece `unresolved` e pede um identificador mais forte, em vez de
-declarar `not_found`. Razão social também é preservada como rótulo de lookup quando um endpoint
-downstream documenta Nome/Razão Social.
+declarar `not_found`. Se a busca direta respondeu mas essa varredura opcional expirar, o estado
+também permanece `unresolved/busca_nome_incompleta`: o timeout do fallback não vira indisponibilidade
+do cadastro e candidatos seguros da busca direta podem ser preservados para confirmação. Razão social
+também é preservada como rótulo de lookup quando um endpoint downstream documenta Nome/Razão Social.
 
 Para `Pedidos/Pesquisar`, o Swagger documenta o filtro `cliente` como **Nome/Razão Social**
 e o schema do pedido contém `pessoaID`. Não há filtro comprovado por `pessoaID`. Assim,
 `crm_erp_search_orders(cliente_contact_id=...)` usa o rótulo persistido apenas para estreitar
 a chamada e, antes de expor qualquer pedido, filtra novamente o retorno por
 `Pedido.pessoaID === external_id`. Se nada do retorno confirma essa identidade, falha fechado.
+
+Quando a pergunta já é sobre pedidos, compras, notas ou NFes e o administrador informou apenas
+Nome/Razão Social, `crm_erp_search_orders(cliente=...)` é o caminho direto documentado e
+`crm_erp_search_customers` não é pré-requisito. Se um `cliente_contact_id` já foi resolvido,
+ele continua preferível por permitir a revalidação forte por `pessoaID`. Para uma NFe específica,
+o número localizado nos pedidos alimenta `crm_erp_get_invoice`.
 
 Criação mínima de contato + vínculo é transacional e idempotente. Uniques parciais protegem o
 mesmo `external_id` e o mesmo `contact/provider`; advisory locks fecham corrida de retries.

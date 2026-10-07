@@ -36,6 +36,7 @@ const {
   crmErpSearchOrders,
   crmErpSearchProducts,
 } = await import("@/lib/mcp/tools/integracoes-erp");
+const { blocosErpResidentes } = await import("@/lib/agent-engine/agent/inbound-turn");
 
 const ctx: McpContext = {
   organizationId: "org-erp",
@@ -48,6 +49,32 @@ const ctx: McpContext = {
 
 describe("tools ERP READ — comportamento do agente", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("pedido ou nota por nome usa pedidos diretamente sem exigir resolução prévia do cliente", () => {
+    const [bloco] = blocosErpResidentes([
+      "crm_erp_search_customers",
+      "crm_erp_search_orders",
+      "crm_erp_get_invoice",
+    ]);
+
+    expect(bloco).toContain("crm_erp_search_orders");
+    expect(bloco).toContain("DIRETAMENTE");
+    expect(bloco).toContain("nome");
+    expect(bloco).toContain("razão social");
+    expect(bloco).toContain("crm_erp_search_customers");
+    expect(bloco).toMatch(/não .*pré-requisito/i);
+    expect(crmErpSearchOrders.description).toMatch(/DIRETAMENTE/);
+    expect(crmErpSearchOrders.description).toMatch(/NÃO é pré-requisito/);
+  });
+
+  it("bloco ERP só nomeia ferramentas realmente presentes no turno", () => {
+    expect(blocosErpResidentes(["crm_erp_search_customers", "crm_erp_get_invoice"])).toEqual([]);
+
+    const [bloco] = blocosErpResidentes(["crm_erp_search_orders"]);
+    if (bloco === undefined) throw new Error("bloco ERP ausente");
+    const nomeadas = [...bloco.matchAll(/crm_erp_[a-z_]+/g)].map((m) => m[0]);
+    expect(new Set(nomeadas)).toEqual(new Set(["crm_erp_search_orders"]));
+  });
 
   it("produto localiza código/preço e preserva a fronteira com a consulta de estoque", async () => {
     vi.mocked(service.buscarProdutosErp).mockResolvedValue({

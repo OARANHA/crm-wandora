@@ -193,6 +193,19 @@ export async function resolverClienteVendaErp(
         skip: pagina * pageSize,
       });
       if (!paginaErp.ok) {
+        // A busca direta por nome já respondeu. A varredura ampla é um fallback
+        // opcional para alcançar razão social, e não pode transformar um timeout
+        // dessa segunda etapa em "o cadastro está indisponível". Falhamos fechado:
+        // identidade continua NÃO resolvida, mas preservamos os candidatos seguros
+        // da busca direta para o agente pedir confirmação/identificador forte.
+        if (paginaErp.motivo === "timeout") {
+          const candidatos = resposta.dados.slice(0, 5).map(candidatoSeguro);
+          return {
+            status: "unresolved",
+            motivo: "busca_nome_incompleta",
+            ...(candidatos.length > 0 ? { candidatos } : {}),
+          };
+        }
         return {
           status: "unresolved",
           motivo: "provider_error",

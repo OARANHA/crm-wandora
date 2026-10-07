@@ -127,6 +127,37 @@ describe("Customer Resolution VendaERP — descoberta por razão social", () => 
     expect(service.buscarClientesErp).toHaveBeenCalledTimes(6);
   });
 
+  it("timeout na varredura opcional falha fechado como busca incompleta e preserva candidatos seguros", async () => {
+    const parecido = cliente({
+      id: "erp-parecido",
+      nome: "Eco Projetos Engenharia Ltda",
+      nomeFantasia: "Eco Projetos Engenharia",
+      razaoSocial: "ECO PROJETOS ENGENHARIA LTDA",
+    });
+
+    vi.mocked(service.buscarClientesErp)
+      .mockResolvedValueOnce({ ok: true, dados: [parecido] })
+      .mockResolvedValueOnce({ ok: false, motivo: "timeout" });
+
+    const resultado = await resolverClienteVendaErp({} as SupabaseClient, "org-x", {
+      nome: "Eco Projetos",
+    });
+
+    expect(resultado).toEqual({
+      status: "unresolved",
+      motivo: "busca_nome_incompleta",
+      candidatos: [
+        {
+          nome: "Eco Projetos Engenharia Ltda",
+          nomeFantasia: "Eco Projetos Engenharia",
+          razaoSocial: "ECO PROJETOS ENGENHARIA LTDA",
+          cidade: "Porto Alegre",
+          uf: "RS",
+        },
+      ],
+    });
+  });
+
   it("mantém ambiguidade quando duas Pessoas têm a mesma razão social exata", async () => {
     vi.mocked(service.buscarClientesErp)
       .mockResolvedValueOnce({ ok: true, dados: [] })
