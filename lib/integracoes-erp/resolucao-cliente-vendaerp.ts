@@ -173,15 +173,65 @@ export async function resolverClienteVendaErp(
   });
   if (!resposta.ok)
     return { status: "unresolved", motivo: "provider_error", motivoProvider: resposta.motivo };
-  if (resposta.dados.length === 0) return { status: "not_found" };
 
-  const exatos = selecionarClientesVendaErpExatos(sinais, resposta.dados);
-  if (exatos.length === 0)
+  let exatos = selecionarClientesVendaErpExatos(sinais, resposta.dados);
+  const buscaSomentePorNome = temNome && !temDocumento && !temEmail;
+  let varreduraNomeCompleta = false;
+
+  // Pessoas/Pesquisar não documenta filtro por razão social. Se a busca direta
+  // por nome fantasia não encontra correspondência exata, fazemos uma varredura
+  // paginada e LIMITADA só de clientes, comparando nomeFantasia e razaoSocial
+  // no backend. Nunca inventamos um parâmetro provider-side.
+  if (buscaSomentePorNome && exatos.length === 0) {
+    const pageSize = 100;
+    const maxPages = 5;
+    const encontrados = new Map<string, ClienteErp>();
+
+    for (let pagina = 0; pagina < maxPages; pagina += 1) {
+      const paginaErp = await buscarClientesErp(db, organizationId, {
+        pageSize,
+        skip: pagina * pageSize,
+      });
+      if (!paginaErp.ok) {
+        return {
+          status: "unresolved",
+          motivo: "provider_error",
+          motivoProvider: paginaErp.motivo,
+        };
+      }
+
+      const destaPagina = selecionarClientesVendaErpExatos(sinais, paginaErp.dados);
+      destaPagina.forEach((cliente, indice) => {
+        const chave = cliente.id?.trim() || `sem-id:${pagina}:${indice}`;
+        encontrados.set(chave, cliente);
+      });
+
+      if (paginaErp.dados.length < pageSize) {
+        varreduraNomeCompleta = true;
+        break;
+      }
+    }
+
+    exatos = [...encontrados.values()];
+
+    if (!varreduraNomeCompleta && exatos.length <= 1) {
+      return {
+        status: "unresolved",
+        motivo: "busca_nome_incompleta",
+        ...(exatos.length === 1 ? { candidatos: [candidatoSeguro(exatos[0]!)] } : {}),
+      };
+    }
+  }
+
+  if (exatos.length === 0) {
+    if (buscaSomentePorNome && varreduraNomeCompleta) return { status: "not_found" };
+    if (!buscaSomentePorNome && resposta.dados.length === 0) return { status: "not_found" };
     return {
       status: "unresolved",
       motivo: "sem_correspondencia_exata",
       candidatos: resposta.dados.slice(0, 5).map(candidatoSeguro),
     };
+  }
   if (exatos.length > 1)
     return {
       status: "ambiguous",

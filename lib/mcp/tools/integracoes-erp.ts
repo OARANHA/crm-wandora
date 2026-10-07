@@ -241,7 +241,7 @@ function motivoResolucaoCliente(resultado: unknown): string | null {
 export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape> = {
   name: "crm_erp_search_customers",
   description:
-    "Resolve um cliente no ERP e devolve um contact_id local estável. Reutilize esse contact_id em consultas seguintes; ambiguidade nunca escolhe o primeiro resultado.",
+    "Resolve um cliente no ERP e devolve um contact_id local estável. Reutilize esse contact_id em consultas seguintes; ambiguidade nunca escolhe o primeiro resultado. Se houver candidatos parecidos sem correspondência exata, apresente os candidatos e peça confirmação — nunca diga que o cliente não existe.",
   inputSchema: clientesInputShape,
   category: "read",
   requiresRole: "agent",
@@ -303,7 +303,11 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
       mensagem:
         resolucao.motivo === "provider_error" && resolucao.motivoProvider
           ? mensagemDeFalha(resolucao.motivoProvider)
-          : "não foi possível resolver o cliente de forma determinística.",
+          : resolucao.motivo === "busca_nome_incompleta"
+            ? "a busca por nome não conseguiu provar uma identidade única; informe CPF/CNPJ ou e-mail para confirmar o cliente."
+            : resolucao.motivo === "sem_correspondencia_exata"
+              ? "o VendaERP retornou cadastros parecidos, mas nenhum coincide exatamente com o nome informado; não diga que o cliente não existe. Mostre os candidatos retornados e peça confirmação do nome exato ou CPF/CNPJ."
+              : "não foi possível resolver o cliente de forma determinística.",
       resolucao: { status: "unresolved", motivo: resolucao.motivo },
       ...(resolucao.candidatos ? { candidatos: resolucao.candidatos } : {}),
     };
