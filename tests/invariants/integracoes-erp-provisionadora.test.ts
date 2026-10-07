@@ -192,6 +192,28 @@ describe("Customer Resolution ERP — vínculo persistido e fail-closed", () => 
     ).toContain("pg_advisory_xact_lock");
   });
 
+  it("nome único do provider é uma origem explícita no schema e na RPC", () => {
+    sql(`select public.fn_integracoes_erp_provisionar();`);
+
+    expect(
+      sql(`
+        select pg_get_constraintdef(oid)
+          from pg_constraint
+         where conrelid = 'public.erp_customer_identity_links'::regclass
+           and conname = 'erp_customer_identity_links_resolution_origin_check';
+      `),
+    ).toContain("provider_unique_name");
+
+    expect(
+      sql(`
+        select pg_get_functiondef(p.oid)
+          from pg_proc p
+         where p.proname = 'fn_integracoes_erp_vincular_cliente'
+           and p.pronamespace = 'public'::regnamespace;
+      `),
+    ).toContain("provider_unique_name");
+  });
+
   it("as funções de vínculo não são executáveis por sessão", () => {
     expect(
       sql(`

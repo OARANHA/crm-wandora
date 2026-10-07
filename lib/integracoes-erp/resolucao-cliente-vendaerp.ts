@@ -55,6 +55,18 @@ function nomesDoCliente(c: ClienteErp) {
     .map(nomeKey)
     .filter((v, i, all) => Boolean(v) && all.indexOf(v) === i);
 }
+function tokensDoNome(v: string | null | undefined): string[] {
+  return nomeKey(v)
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+function contemSequenciaDeTokens(haystack: readonly string[], needle: readonly string[]): boolean {
+  if (needle.length === 0 || needle.length > haystack.length) return false;
+  for (let inicio = 0; inicio <= haystack.length - needle.length; inicio += 1) {
+    if (needle.every((token, offset) => haystack[inicio + offset] === token)) return true;
+  }
+  return false;
+}
 function candidatoSeguro(c: ClienteErp): CandidatoClienteSeguro {
   return {
     nome: c.nome,
@@ -78,15 +90,40 @@ export function selecionarClientesVendaErpExatos(
     return true;
   });
 }
+
+/**
+ * Fallback seguro para busca SOMENTE por nome.
+ *
+ * O VendaERP pode devolver "ECO PROJETOS ENGENHARIA LTDA" para a busca
+ * "Eco Projetos". Isso só autoriza resolução quando a busca tem pelo menos
+ * dois tokens e UM único candidato contém a sequência inteira.
+ */
+export function selecionarClientesVendaErpCompativeisPorNome(
+  nome: string,
+  clientes: readonly ClienteErp[],
+): ClienteErp[] {
+  const procurados = tokensDoNome(nome);
+  if (procurados.length < 2) return [];
+
+  return clientes.filter((cliente) =>
+    [cliente.nome, cliente.nomeFantasia, cliente.razaoSocial].some((rotulo) =>
+      contemSequenciaDeTokens(tokensDoNome(rotulo), procurados),
+    ),
+  );
+}
 function origemDosSinais(s: SinaisResolucaoClienteVendaErp): OrigemResolucaoClienteExterno {
   if (s.cpfCnpj) return "exact_document";
   if (s.email) return "exact_email";
   return "exact_name";
 }
-function rotuloExterno(s: SinaisResolucaoClienteVendaErp, c: ClienteErp) {
-  return (
-    s.nome?.trim() || c.nome?.trim() || c.nomeFantasia?.trim() || c.razaoSocial?.trim() || null
-  );
+function rotuloExterno(
+  s: SinaisResolucaoClienteVendaErp,
+  c: ClienteErp,
+  origem: OrigemResolucaoClienteExterno,
+) {
+  const rotuloProvider =
+    c.nomeFantasia?.trim() || c.razaoSocial?.trim() || c.nome?.trim() || null;
+  return origem === "provider_unique_name" ? rotuloProvider : s.nome?.trim() || rotuloProvider;
 }
 function rotuloLookupProvider(c: ClienteErp) {
   // Pedidos/Pesquisar aceita Nome/Razão Social; pessoaID ainda revalida o retorno.
@@ -176,12 +213,6 @@ export async function resolverClienteVendaErp(
   if (resposta.dados.length === 0) return { status: "not_found" };
 
   const exatos = selecionarClientesVendaErpExatos(sinais, resposta.dados);
-  if (exatos.length === 0)
-    return {
-      status: "unresolved",
-      motivo: "sem_correspondencia_exata",
-      candidatos: resposta.dados.slice(0, 5).map(candidatoSeguro),
-    };
   if (exatos.length > 1)
     return {
       status: "ambiguous",
@@ -189,9 +220,37 @@ export async function resolverClienteVendaErp(
       candidatos: exatos.slice(0, 5).map(candidatoSeguro),
     };
 
-  const cliente = exatos[0]!;
+  let resolvidos = exatos;
+  let origem = origemDosSinais(sinais);
+
+  // CPF/CNPJ e e-mail continuam exatos. O fallback vale só para nome puro.
+  if (resolvidos.length === 0 && temNome && !temDocumento && !temEmail) {
+    const compativeis = selecionarClientesVendaErpCompativeisPorNome(
+      nomeInformado!,
+      resposta.dados,
+    );
+    if (compativeis.length > 1)
+      return {
+        status: "ambiguous",
+        motivo: "mais_de_um_cliente_compativel",
+        candidatos: compativeis.slice(0, 5).map(candidatoSeguro),
+      };
+    if (compativeis.length === 1) {
+      resolvidos = compativeis;
+      origem = "provider_unique_name";
+    }
+  }
+
+  if (resolvidos.length === 0)
+    return {
+      status: "unresolved",
+      motivo: "sem_correspondencia_exata",
+      candidatos: resposta.dados.slice(0, 5).map(candidatoSeguro),
+    };
+
+  const cliente = resolvidos[0]!;
   const externalId = cliente.id?.trim();
-  const externalLabel = rotuloExterno(sinais, cliente);
+  const externalLabel = rotuloExterno(sinais, cliente, origem);
   const providerLookupLabel = rotuloLookupProvider(cliente);
   if (!externalId || !externalLabel || !providerLookupLabel)
     return {
@@ -218,7 +277,6 @@ export async function resolverClienteVendaErp(
       candidatos: [candidatoSeguro(cliente)],
     };
 
-  const origem = origemDosSinais(sinais);
   const vinculo = await vincularIdentidadeClienteExterno(db, {
     organizationId,
     contactId: confirmados[0]?.id ?? null,
@@ -233,6 +291,7 @@ export async function resolverClienteVendaErp(
         ...(sinais.email ? ["email"] : []),
         ...(sinais.nome ? ["name"] : []),
       ],
+      match_strategy: origem,
     },
     auditoria,
   });

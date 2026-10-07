@@ -2,7 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { audit } from "@/lib/audit";
 
 export type OrigemResolucaoClienteExterno =
-  "exact_document" | "exact_email" | "exact_name" | "existing_contact" | "corrected";
+  | "exact_document"
+  | "exact_email"
+  | "exact_name"
+  | "provider_unique_name"
+  | "existing_contact"
+  | "corrected";
 
 export interface VinculoIdentidadeClienteExterno {
   id: string;

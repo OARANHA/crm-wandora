@@ -119,15 +119,20 @@ Contrato e prova datada: `docs/specs/integracoes-erp-vendaerp-descobertas.md`.
 Mapa vivo: `docs/architecture/integracoes-erp.architecture.json`.
 
 
-### Slice em revisão — Customer Resolution / ERP Identity Link V1
+### Customer Resolution / ERP Identity Link V1 — na main
 
-A branch `feat/erp-customer-resolution-v1` adiciona uma autoridade persistida
-`contact ↔ cliente ERP` no módulo opcional. `crm_erp_search_customers` passa a resolver
-cliente com estados explícitos e devolver `contact_id` reutilizável. Consultas de pedido podem
-receber esse `contact_id`; no VendaERP, Nome/Razão Social serve apenas para estreitar
+A autoridade persistida `contact ↔ cliente ERP` já está na `main`. `crm_erp_search_customers`
+resolve cliente com estados explícitos e devolve `contact_id` reutilizável. Consultas de pedido
+podem receber esse `contact_id`; no VendaERP, Nome/Razão Social serve apenas para estreitar
 `Pedidos/Pesquisar` e o backend exige `Pedido.pessoaID === external_id` antes de expor o
 resultado. Ambiguidade e sinais conflitantes falham fechado; erro de provider não vira
-`not_found`. Este parágrafo descreve a branch em revisão, não produção.
+`not_found`.
+
+Canário real de WhatsApp em 2026-10-06 encontrou uma lacuna: `Pessoas/Pesquisar` devolveu
+candidatos para "Eco Projetos", mas a V1 recusou todos porque exigia igualdade textual
+normalizada. A continuação 0506 mantém a igualdade exata como prioridade e aceita somente um
+candidato único que contenha a sequência inteira de pelo menos dois tokens; busca genérica e
+múltiplos candidatos continuam sem materialização automática.
 
 
 ### Slice em revisão — DANFE para o cliente vinculado à NFe

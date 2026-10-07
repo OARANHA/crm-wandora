@@ -112,8 +112,13 @@ O contrato separa duas coisas que não podem ser confundidas:
 A resolução pública distingue `resolved`, `ambiguous`, `not_found` e `unresolved`.
 Erro do provider nunca vira `not_found`, e ambiguidade nunca seleciona o primeiro resultado.
 Uma resolução por nome compara de forma normalizada `nome`, `nomeFantasia` e
-`razaoSocial` retornados pela Pessoa. Quando CPF/CNPJ ou e-mail também são informados, esses
-sinais precisam concordar; um vínculo antigo por rótulo não pode ignorá-los.
+`razaoSocial` retornados pela Pessoa. Igualdade exata continua sendo a primeira regra. Como o
+VendaERP pode retornar um nome mais completo do que o texto pesquisado, uma busca **somente por
+nome** com pelo menos dois tokens também pode resolver quando **exatamente um** candidato devolvido
+contém a sequência inteira de tokens (ex.: "Eco Projetos" → "Eco Projetos Engenharia Ltda").
+Uma palavra isolada nunca materializa contato por essa regra, e dois candidatos compatíveis viram
+`ambiguous`. CPF/CNPJ e e-mail continuam exigindo igualdade exata; um vínculo antigo por rótulo
+não pode ignorá-los. O vínculo grava `provider_unique_name` como origem quando usa esse fallback.
 
 O Swagger de `Pessoas/Pesquisar` expõe `nomefantasia`, CPF/CNPJ, e-mail e Identificador
 Único como filtros, mas não documenta um filtro separado `razaoSocial`. Por isso a V1 não
