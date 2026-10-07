@@ -89,10 +89,7 @@ function motivoDoVazio(chave: string) {
 function motivoBuscaPedidos(resultado: unknown): string | null {
   if (resultado === null || typeof resultado !== "object") return null;
   const r = resultado as Record<string, unknown>;
-  if (
-    r.erro === "identidade_pedido_nao_confirmada" ||
-    r.erro === "identidade_pedido_ambigua"
-  ) {
+  if (r.erro === "identidade_pedido_nao_confirmada" || r.erro === "identidade_pedido_ambigua") {
     const resolucao = r.resolucao_cliente;
     if (resolucao && typeof resolucao === "object") {
       const motivo = (resolucao as Record<string, unknown>).motivo;
