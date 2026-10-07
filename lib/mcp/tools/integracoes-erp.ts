@@ -210,7 +210,7 @@ interface BuscaPedidosNoTurno {
   expiraEm: number;
 }
 
-const buscasPedidosPorTurno = new Map<string, BuscaPedidosNoTurno>();
+let buscasPedidosPorTurno = new Map<string, BuscaPedidosNoTurno>();
 
 function chaveNomeClienteTurno(requestId: string, nome: unknown): string | null {
   if (typeof nome !== "string") return null;
@@ -224,9 +224,9 @@ function chaveNomeClienteTurno(requestId: string, nome: unknown): string | null 
 }
 
 function limparBuscasPedidosExpiradas(agora = Date.now()): void {
-  for (const [chave, busca] of buscasPedidosPorTurno) {
-    if (busca.expiraEm <= agora) buscasPedidosPorTurno.delete(chave);
-  }
+  buscasPedidosPorTurno = new Map(
+    [...buscasPedidosPorTurno].filter(([, busca]) => busca.expiraEm > agora),
+  );
 }
 
 function registrarBuscaPedidosNoTurno(
