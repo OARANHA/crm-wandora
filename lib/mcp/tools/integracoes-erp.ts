@@ -323,7 +323,14 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
     }
 
     if (input.nome && !input.cpf_cnpj && !input.email && !input.cliente_contact_id) {
-      const buscaPedidos = buscarPedidosNoMesmoTurno(ctx.requestId, input.nome);
+      let buscaPedidos = buscarPedidosNoMesmoTurno(ctx.requestId, input.nome);
+      if (!buscaPedidos) {
+        // Tool calls do mesmo step podem ser disparadas em paralelo. Cedemos um
+        // tick para a busca de pedidos registrar sua promessa mesmo quando o
+        // scheduler inicia customers alguns milissegundos antes.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        buscaPedidos = buscarPedidosNoMesmoTurno(ctx.requestId, input.nome);
+      }
       if (buscaPedidos && (await buscaPedidos)) {
         return {
           erro: "resolucao_cliente_desnecessaria_apos_pedidos",
@@ -547,11 +554,13 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
         }
 
         return {
+          erro: "identidade_pedido_nao_confirmada",
+          mensagem:
+            "o VendaERP encontrou pedidos para esse nome, mas a identidade do cliente não pôde ser provada com segurança. Resolva o cliente por CPF/CNPJ, e-mail ou crm_erp_search_customers antes de usar esses pedidos.",
           resolucao_cliente: {
             status: "unresolved",
             motivo: resolucao.status === "not_found" ? "nao_encontrado" : resolucao.motivo,
           },
-          pedidos,
         };
       } catch (erro) {
         resolverSequenciamento?.(false);
