@@ -138,6 +138,19 @@ Nome/Razão Social, `crm_erp_search_orders(cliente=...)` é o caminho direto doc
 ele continua preferível por permitir a revalidação forte por `pessoaID`. Para uma NFe específica,
 o número localizado nos pedidos alimenta `crm_erp_get_invoice`.
 
+Quando o administrador pedir **a última nota** ou **as últimas N notas** de um cliente, a
+capability recebe `ultimas_notas=N`, pagina o conjunto de pedidos com NFe antes de ordenar e
+classifica pela data fiscal comprovada. Se `Pedido.dataFaturamento` estiver ausente, o backend
+reaproveita `Fiscal/InformacoesVenda` pelo código da venda para obter `dataEmissao`; se nem essa
+visão fiscal fornecer uma data utilizável, a consulta falha fechado em vez de usar número de NFe,
+código do pedido ou ordem do provider como aproximação temporal.
+
+No WhatsApp administrativo, **última(s) nota(s)** também significa entregar as respectivas
+DANFEs ao administrador na conversa corrente. Para cada NFe selecionada, o agente prepara uma
+DANFE e imediatamente executa o `send_message` que consome aquele documento; só então prepara a
+próxima. Assim cada PDF atravessa o sender canônico, `before_send`, ledger e guardrails existentes,
+sem URL externa nem `storage_path` no contexto do modelo.
+
 A coordenação do mesmo turno é determinística: uma busca de pedidos por Nome/Razão Social registra
 seu resultado pelo `requestId`. Quando todos os pedidos encontrados carregam a mesma `pessoaID`,
 o backend reutiliza a autoridade de identidade da PR #45: procura vínculo ativo por
