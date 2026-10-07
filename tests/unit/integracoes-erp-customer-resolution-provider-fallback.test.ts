@@ -275,6 +275,58 @@ describe("Customer Resolution VendaERP — identidade vinda dos pedidos", () => 
     });
   });
 
+  it("reutiliza contact local compatível por e-mail em vez de criar duplicado", async () => {
+    vi.mocked(localIdentity.localizarContatosCandidatosClienteErp).mockResolvedValue({
+      ok: true,
+      contatos: [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          phone_number: null,
+          email_normalized: "financeiro@eco.test",
+          cpf_hash: null,
+          is_anonymized: false,
+        },
+      ],
+    });
+    vi.mocked(externalIdentity.vincularIdentidadeClienteExterno).mockResolvedValue({
+      ok: true,
+      vinculo: {
+        id: "link-local",
+        organizationId: "org-x",
+        contactId: "33333333-3333-4333-8333-333333333333",
+        provider: "vendaerp",
+        externalId: "erp-eco",
+        externalLabel: "Eco Projetos",
+        externalLabelKey: "eco projetos",
+        providerLookupLabel: "Eco Projetos",
+        resolutionOrigin: "existing_contact",
+      },
+      createdLink: true,
+      createdContact: false,
+    });
+
+    const resultado = await resolverClienteVendaErpPorPedidos(
+      {} as SupabaseClient,
+      "org-x",
+      "Eco Projetos",
+      [pedido("erp-eco")],
+    );
+
+    expect(externalIdentity.vincularIdentidadeClienteExterno).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        contactId: "33333333-3333-4333-8333-333333333333",
+        externalId: "erp-eco",
+        resolutionOrigin: "existing_contact",
+      }),
+    );
+    expect(resultado).toMatchObject({
+      status: "resolved",
+      contactId: "33333333-3333-4333-8333-333333333333",
+      materialized: false,
+    });
+  });
+
   it("reutiliza vínculo existente pela pessoaID e não procura candidato local", async () => {
     vi.mocked(externalIdentity.carregarVinculoClienteExternoPorIdExterno).mockResolvedValue({
       ok: true,
