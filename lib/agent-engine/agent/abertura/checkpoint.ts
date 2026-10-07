@@ -17,10 +17,7 @@
 
 import { z } from "zod";
 
-import {
-  currentExecutionBoundary,
-  guardServiceEffect,
-} from "@/lib/atendimento/fronteira-server";
+import { currentExecutionBoundary, guardServiceEffect } from "@/lib/atendimento/fronteira-server";
 
 import type { Queryable } from "../../queue/queue";
 import {
@@ -34,7 +31,7 @@ export const checkpointContentSchema = z.object({
   commitments: z.array(z.string()).default([]),
   objections: z.array(z.string()).default([]),
   next_action: z.string().nullable().default(null),
-  rolling_summary: z.string().default(''),
+  rolling_summary: z.string().default(""),
   /**
    * A declaração do turno (spec 16 §5) — a fronteira entre FALAR e OPERAR.
    *
@@ -59,7 +56,7 @@ export type CheckpointContent = z.infer<typeof checkpointContentSchema>;
  * prometer `undefined` onde `select *` entrega `null` — e o `=== undefined` de
  * quem lesse a row seria falso justamente no caso que ele quer pegar.
  */
-export interface LeadCheckpointRow extends Omit<CheckpointContent, 'declaracao'> {
+export interface LeadCheckpointRow extends Omit<CheckpointContent, "declaracao"> {
   id: string;
   seq: string;
   organization_id: string;
@@ -79,10 +76,10 @@ export interface LeadCheckpointRow extends Omit<CheckpointContent, 'declaracao'>
  * é a mesma chamada de modelo.
  */
 export const CHECKPOINT_INSTRUCTION =
-  'Feche o turno AGORA. Responda SOMENTE com um JSON válido no formato ' +
+  "Feche o turno AGORA. Responda SOMENTE com um JSON válido no formato " +
   '{"commitments": string[], "objections": string[], "next_action": string|null, "rolling_summary": string} ' +
-  '— compromissos assumidos, objeções do lead, próxima ação e o resumo acumulado ' +
-  'da conversa até aqui (inclua o que o resumo anterior já dizia). ' +
+  "— compromissos assumidos, objeções do lead, próxima ação e o resumo acumulado " +
+  "da conversa até aqui (inclua o que o resumo anterior já dizia). " +
   // ⚠️ O REFERENCIAL DE `next_action`, e ele não é zelo de redação.
   //
   // Este JSON é escrito no FECHO do turno: a pergunta já saiu, a resposta ainda
@@ -96,11 +93,11 @@ export const CHECKPOINT_INSTRUCTION =
   // A negação explícita está aqui porque dizer o que É não basta quando o erro
   // tem um atrator forte: a pergunta recém-feita é o texto mais fresco no
   // contexto do modelo.
-  'Em `next_action`, escreva a ação que vem DEPOIS da resposta que você está ' +
-  'esperando — nunca a pergunta que você acabou de fazer. Se o turno terminou ' +
-  'perguntando, a próxima ação é o que fazer COM a resposta quando ela chegar. ' +
+  "Em `next_action`, escreva a ação que vem DEPOIS da resposta que você está " +
+  "esperando — nunca a pergunta que você acabou de fazer. Se o turno terminou " +
+  "perguntando, a próxima ação é o que fazer COM a resposta quando ela chegar. " +
   DECLARACAO_INSTRUCTION +
-  ' Sem texto fora do JSON.';
+  " Sem texto fora do JSON.";
 
 export async function insertCheckpoint(
   db: Queryable,
@@ -137,25 +134,50 @@ export async function insertCheckpoint(
  * volta (pega do primeiro '{' ao último '}'); inválido → erro SEM o texto do
  * modelo na mensagem (pode carregar PII da conversa) — o job re-tenta.
  */
+/**
+ * Recuperação LOCAL do fechamento: se somente a saída JSON vier malformada,
+ * repetir APENAS a chamada de checkpoint, jamais a execução anterior das tools
+ * nem o sender. Não converte texto inválido em estado inventado.
+ *
+ * Se o modelo/infra falhar durante a chamada (antes do parse), a falha propaga
+ * imediatamente. Após três saídas inválidas, conserva o erro existente:
+ * essa última hipótese precisa de tratamento durável próprio para impedir
+ * replay integral do turno após efeitos; não pode ser mascarada aqui.
+ */
+export async function recuperarCheckpointNoFechamento(
+  gerarTexto: (tentativa: number) => Promise<string>,
+): Promise<CheckpointContent> {
+  for (let tentativa = 1; tentativa <= 3; tentativa += 1) {
+    const texto = await gerarTexto(tentativa);
+    try {
+      return parseCheckpointText(texto);
+    } catch (erro) {
+      if (tentativa === 3) throw erro;
+    }
+  }
+  // O limite acima garante que esta linha seja inalcançável.
+  throw new Error("fechamento de checkpoint sem tentativas");
+}
+
 export function parseCheckpointText(text: string): CheckpointContent {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
   if (start === -1 || end <= start) {
-    throw new Error('fechamento do turno sem JSON de checkpoint — run re-tentado pela fila');
+    throw new Error("fechamento do turno sem JSON de checkpoint — run re-tentado pela fila");
   }
   let raw: unknown;
   try {
     raw = JSON.parse(text.slice(start, end + 1));
   } catch {
     throw new Error(
-      'JSON de checkpoint inválido no fechamento do turno — run re-tentado pela fila',
+      "JSON de checkpoint inválido no fechamento do turno — run re-tentado pela fila",
     );
   }
   const parsed = checkpointContentSchema.safeParse(raw);
   if (!parsed.success) {
     const issues = parsed.error.issues
-      .map((i) => `${i.path.join('.') || '(raiz)'}: ${i.code}`)
-      .join('; ');
+      .map((i) => `${i.path.join(".") || "(raiz)"}: ${i.code}`)
+      .join("; ");
     throw new Error(
       `checkpoint do fechamento com shape inválido (${issues}) — run re-tentado pela fila`,
     );
