@@ -400,7 +400,7 @@ describe("tools ERP READ — comportamento do agente", () => {
   it("últimas notas paginam, enriquecem data fiscal ausente e retornam ranking comprovado", async () => {
     const pedido = (
       codigo: number,
-      numeroNFe: string,
+      numeroNFe: string | null,
       dataFaturamento: string | null,
     ): PedidoErpComIdentidadeInterna => ({
       pedido: {
@@ -415,7 +415,7 @@ describe("tools ERP READ — comportamento do agente", () => {
         numeroNFe,
         dataFaturamento,
         chaveAcessoNFe: null,
-        danfeUrl: "https://erp.example/danfe-" + numeroNFe,
+        danfeUrl: numeroNFe ? "https://erp.example/danfe-" + numeroNFe : null,
         urlSefaz: null,
       },
       identidadeCliente: {
@@ -429,6 +429,7 @@ describe("tools ERP READ — comportamento do agente", () => {
       pedido(1000 + i, String(8000 + i), "2026-10-01T10:00:00Z"),
     );
     primeiraPagina[10] = pedido(1010, "9010", null);
+    primeiraPagina[11] = pedido(1011, null, "2026-10-08T12:00:00Z");
     const segundaPagina = [
       pedido(2001, "9998", "2026-10-06T09:00:00Z"),
       pedido(2002, "9999", "2026-10-07T09:00:00Z"),
@@ -480,7 +481,7 @@ describe("tools ERP READ — comportamento do agente", () => {
 
     expect(resultado.pedidos.map((item) => item.numeroNFe)).toEqual(["9010", "9999"]);
     expect(resultado.resumo).toEqual({
-      quantidadeEncontrada: 102,
+      quantidadeEncontrada: 101,
       quantidadeRetornada: 2,
       resultadoCompleto: true,
     });
@@ -490,7 +491,6 @@ describe("tools ERP READ — comportamento do agente", () => {
       ctx.organizationId,
       expect.objectContaining({
         cliente: "Eco Projetos",
-        possuiNotaFiscal: true,
         pageSize: 100,
         skip: 0,
       }),
@@ -501,6 +501,12 @@ describe("tools ERP READ — comportamento do agente", () => {
       ctx.organizationId,
       expect.objectContaining({ pageSize: 100, skip: 100 }),
     );
+    expect(
+      vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mock.calls[0]?.[2],
+    ).not.toHaveProperty("possuiNotaFiscal");
+    expect(
+      vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mock.calls[1]?.[2],
+    ).not.toHaveProperty("possuiNotaFiscal");
     expect(service.obterInformacaoFiscalDaVendaErp).toHaveBeenCalledWith(
       ctx.supabase,
       ctx.organizationId,

@@ -139,11 +139,15 @@ ele continua preferível por permitir a revalidação forte por `pessoaID`. Para
 o número localizado nos pedidos alimenta `crm_erp_get_invoice`.
 
 Quando o administrador pedir **a última nota** ou **as últimas N notas** de um cliente, a
-capability recebe `ultimas_notas=N`, pagina o conjunto de pedidos com NFe antes de ordenar e
-classifica pela data fiscal comprovada. Se `Pedido.dataFaturamento` estiver ausente, o backend
-reaproveita `Fiscal/InformacoesVenda` pelo código da venda para obter `dataEmissao`; se nem essa
-visão fiscal fornecer uma data utilizável, a consulta falha fechado em vez de usar número de NFe,
-código do pedido ou ordem do provider como aproximação temporal.
+capability recebe `ultimas_notas=N`, pagina os pedidos do cliente e só então seleciona localmente
+os itens cujo retorno realmente contém `numeroNFe`, antes de ordenar pela data fiscal comprovada.
+O parâmetro documentado `possuiNotaFiscal=true` não é usado como autoridade de filtragem: no
+canário real de 2026-10-07 às 17:06 ele devolveu conjunto vazio para a Eco Projetos, embora uma
+consulta do mesmo turno sem esse filtro tenha localizado uma NFe confirmada. Se
+`Pedido.dataFaturamento` estiver ausente, o backend reaproveita `Fiscal/InformacoesVenda` pelo
+código da venda para obter `dataEmissao`; se nem essa visão fiscal fornecer uma data utilizável,
+a consulta falha fechado em vez de usar número de NFe, código do pedido ou ordem do provider
+como aproximação temporal.
 
 No WhatsApp administrativo, **última(s) nota(s)** também significa entregar as respectivas
 DANFEs ao administrador na conversa corrente. Para cada NFe selecionada, o agente prepara uma
@@ -220,7 +224,12 @@ materializado.
 
 A rota nunca aceita uma URL de documento enviada pelo browser e nunca envia credenciais do
 VendaERP para a referência de DANFE. A URL normalizada é buscada com
-`fetchParaDestinoDaOrganizacao()`, que reaplica SSRF/DNS e não segue redirect.
+`fetchParaDestinoDaOrganizacao()`, que reaplica SSRF/DNS e não segue redirect. Quando a referência
+é a SPA pública estritamente allowlisted do VendaERP e precisa de Chromium para virar PDF, a URL
+sensível não entra no argv/process list: o renderer abre um endpoint efêmero somente em
+`127.0.0.1`, protegido por nonce, que responde o redirect HTTP para o destino já autorizado enquanto a renderização estiver ativa.
+Isso substitui o salto anterior por `file://` + JavaScript, que continuou expirando no canário real
+de 2026-10-07 às 17:06 mesmo com timeout de 60 segundos.
 O corpo é limitado a 50 MB e precisa ser reconhecido pela allowlist documental
 já usada pelo upload outbound. Não se presume PDF: `application/octet-stream`
 só vira PDF quando os próprios bytes contêm assinatura `%PDF-`.
