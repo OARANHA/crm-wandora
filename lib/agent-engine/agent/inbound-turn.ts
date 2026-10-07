@@ -4458,6 +4458,9 @@ async function executarTurnoDoAgente(
     // O fechamento ocorre DEPOIS dos efeitos do turno. Uma resposta JSON
     // malformada não pode reiniciar imediatamente tools e envios já executados.
     // Recupere localmente apenas o checkpoint, sem reenviar o turno ao agente.
+    // A autoria da atividade acompanha a chamada que produziu o checkpoint válido.
+    // Preservamos o callId fora do callback sem repetir as ferramentas do turno.
+    const checkpointCall = { id: null as string | null };
     const content = await recuperarCheckpointNoFechamento(async (tentativa) => {
       const closing = await runModelCall(
         pool,
@@ -4493,6 +4496,7 @@ async function executarTurnoDoAgente(
         },
         { registry: deps.registry, log: runLog },
       );
+      checkpointCall.id = closing.callId ?? null;
       return closing.result.text.replace(
         /https:\/\/meet\.google\.com\/[a-zA-Z0-9-]+/g,
         '[link da reunião disponível na Agenda]',
@@ -4617,7 +4621,7 @@ async function executarTurnoDoAgente(
           // O lastro é a chamada de modelo que PRODUZIU este checkpoint
           // (llm_calls.id). Sem ele a linha entraria como 'system' e perderia a
           // autoria justamente no evento mais "de IA" que existe.
-          ...(closing.callId ? { evidence: { llm_call_ids: [closing.callId] } } : {}),
+          ...(checkpointCall.id ? { evidence: { llm_call_ids: [checkpointCall.id] } } : {}),
           ...(agentConfig?.agentId ? { agentId: agentConfig.agentId } : {}),
           reason: mudanca.reason,
           payload: {
