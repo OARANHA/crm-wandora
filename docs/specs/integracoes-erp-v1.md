@@ -98,6 +98,39 @@ Elas usam o mesmo catálogo MCP do restante do produto; não existe uma segunda 
 
 Os filtros de busca são redigidos antes de entrar no log de auditoria. O payload do VendaERP não é entregue cru ao modelo: Produto, Pessoa e Pedido passam por projeções internas do Elus.
 
+## Customer Resolution / ERP Identity Link V1
+
+A busca de cliente deixa de ser apenas uma consulta textual e passa a poder materializar uma
+identidade reutilizável no Elus. O vínculo pertence ao `contact` canônico, nunca ao lead, e
+fica em `erp_customer_identity_links`, tabela opcional do próprio módulo.
+
+O contrato separa duas coisas que não podem ser confundidas:
+
+- `external_id`: identidade estável da Pessoa no provider; no VendaERP é `Pessoa.id`;
+- `provider_lookup_label`: texto aceito pela busca downstream do provider; não é identidade.
+
+A resolução pública distingue `resolved`, `ambiguous`, `not_found` e `unresolved`.
+Erro do provider nunca vira `not_found`, e ambiguidade nunca seleciona o primeiro resultado.
+Uma resolução por nome compara de forma normalizada `nome`, `nomeFantasia` e
+`razaoSocial` retornados pela Pessoa. Quando CPF/CNPJ ou e-mail também são informados, esses
+sinais precisam concordar; um vínculo antigo por rótulo não pode ignorá-los.
+
+O Swagger de `Pessoas/Pesquisar` expõe `nomefantasia`, CPF/CNPJ, e-mail e Identificador
+Único como filtros, mas não documenta um filtro separado `razaoSocial`. Por isso a V1 não
+inventa esse parâmetro: razão social é usada na seleção exata do retorno e como rótulo de
+lookup quando um endpoint downstream documenta Nome/Razão Social.
+
+Para `Pedidos/Pesquisar`, o Swagger documenta o filtro `cliente` como **Nome/Razão Social**
+e o schema do pedido contém `pessoaID`. Não há filtro comprovado por `pessoaID`. Assim,
+`crm_erp_search_orders(cliente_contact_id=...)` usa o rótulo persistido apenas para estreitar
+a chamada e, antes de expor qualquer pedido, filtra novamente o retorno por
+`Pedido.pessoaID === external_id`. Se nada do retorno confirma essa identidade, falha fechado.
+
+Criação mínima de contato + vínculo é transacional e idempotente. Uniques parciais protegem o
+mesmo `external_id` e o mesmo `contact/provider`; advisory locks fecham corrida de retries.
+Correção invalida o vínculo antigo sem apagar o histórico. A tabela é server-only e declara sua
+seção de LGPD pelo mecanismo D8 da ADR-0002.
+
 ### Evidência complementar e lacunas do Swagger
 
 O Swagger recebido não declara schema de resposta para Estoque/BuscarQuantidades nem para Fiscal/ConsultarNFE. A V1 não inventa esses corpos.

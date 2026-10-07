@@ -8,13 +8,20 @@
 import { z } from "zod";
 
 import {
-  buscarClientesErp,
   buscarPedidosErp,
+  buscarPedidosErpComIdentidadeInterna,
   buscarProdutosErp,
   lerEstoqueErp,
   obterNotaErp,
   type ConsultaErpResultado,
 } from "@/lib/integracoes-erp/service";
+import { carregarVinculoClienteExterno } from "@/lib/integracoes-erp/identidade-externa-cliente";
+import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
+import {
+  resolverClienteVendaErp,
+  type CandidatoClienteSeguro,
+} from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
+import type { ClienteErp, PedidoErp } from "@/lib/integracoes-erp/tipos";
 
 import type { McpToolDefinition } from "../types";
 
@@ -45,6 +52,10 @@ function mensagemDeFalha(motivo: string): string {
       return "há mais de um depósito no VendaERP; escolha qual deve ser consultado.";
     case "deposito_sem_nome":
       return "o único depósito retornado pelo VendaERP não tem nome utilizável.";
+    case "cliente_nao_resolvido":
+      return "este cliente ainda não possui uma identidade ERP resolvida para esta empresa.";
+    case "identidade_pedido_nao_confirmada":
+      return "o ERP retornou pedidos, mas nenhum pôde ser provado como pertencente à identidade resolvida.";
     default:
       return "não foi possível consultar o VendaERP agora.";
   }
@@ -87,6 +98,7 @@ const CHAVES_DE_BUSCA = new Set([
   "status",
   "numero_nfe",
   "codigo_nfe",
+  "cliente_contact_id",
 ]);
 
 function redigirBusca(args: Record<string, unknown>): Record<string, unknown> {
@@ -194,36 +206,107 @@ const clientesInputShape = {
   nome: z.string().trim().min(2).max(200).optional(),
   cpf_cnpj: z.string().trim().min(3).max(30).optional(),
   email: z.string().trim().email().max(254).optional(),
+  cliente_contact_id: z.string().uuid().optional(),
   limite: limiteSchema,
   skip: skipSchema,
 };
 
+function clienteSeguroParaTool(
+  cliente: ClienteErp | undefined,
+  fallback: string,
+): CandidatoClienteSeguro {
+  return cliente
+    ? {
+        nome: cliente.nome,
+        nomeFantasia: cliente.nomeFantasia,
+        razaoSocial: cliente.razaoSocial,
+        cidade: cliente.cidade,
+        uf: cliente.uf,
+      }
+    : { nome: fallback, nomeFantasia: null, razaoSocial: null, cidade: null, uf: null };
+}
+
+function motivoResolucaoCliente(resultado: unknown): string | null {
+  if (!resultado || typeof resultado !== "object") return null;
+  const objeto = resultado as {
+    erro?: string;
+    resolucao?: { status?: string; motivo?: string };
+  };
+  if (typeof objeto.erro === "string") return objeto.erro;
+  const r = objeto.resolucao;
+  if (!r?.status || r.status === "resolved") return null;
+  return r.motivo ?? r.status;
+}
+
 export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape> = {
   name: "crm_erp_search_customers",
   description:
-    "Procura clientes no VendaERP por nome, CPF/CNPJ ou e-mail e devolve apenas identificação e contato necessários para conferir cadastro. Nunca recebe senha, salt ou outros campos brutos da pessoa.",
+    "Resolve um cliente no ERP e devolve um contact_id local estável. Reutilize esse contact_id em consultas seguintes; ambiguidade nunca escolhe o primeiro resultado.",
   inputSchema: clientesInputShape,
   category: "read",
   requiresRole: "agent",
   requiresScope: "mcp:read",
   redigirParaAuditoria: redigirBusca,
-  motivoDoVazio: motivoDoVazio("clientes"),
+  motivoDoVazio: motivoResolucaoCliente,
   handler: async (input, ctx) => {
-    if (!input.nome && !input.cpf_cnpj && !input.email) {
+    if (!input.nome && !input.cpf_cnpj && !input.email && !input.cliente_contact_id) {
       return {
         erro: "filtro_obrigatorio",
-        mensagem: "informe nome, CPF/CNPJ ou e-mail para procurar um cliente.",
+        mensagem: "informe nome, CPF/CNPJ, e-mail ou um contact_id já resolvido.",
       };
     }
-    const r = await buscarClientesErp(ctx.supabase, ctx.organizationId, {
-      nomefantasia: input.nome,
-      cpfcnpj: input.cpf_cnpj,
-      email: input.email,
-      pageSize: input.limite,
-      skip: input.skip,
-    });
-    const saida = resposta(r);
-    return saida.erro ? saida : { clientes: saida.dados };
+    if (input.cliente_contact_id && (input.nome || input.cpf_cnpj || input.email)) {
+      return {
+        erro: "sinais_cliente_conflitantes",
+        mensagem:
+          "use o contact_id já resolvido sozinho; se o cliente mudou, faça uma nova resolução por nome, CPF/CNPJ ou e-mail.",
+      };
+    }
+    const resolucao = await resolverClienteVendaErp(
+      ctx.supabase,
+      ctx.organizationId,
+      {
+        nome: input.nome,
+        cpfCnpj: input.cpf_cnpj,
+        email: input.email,
+        contactId: input.cliente_contact_id,
+        limite: input.limite,
+        skip: input.skip,
+      },
+      {
+        actorUserId: ctx.actor.type === "user" ? ctx.actor.id : null,
+        actorApiTokenId: ctx.actor.type === "user" ? null : ctx.apiTokenId,
+        requestId: ctx.requestId,
+      },
+    );
+    if (resolucao.status === "resolved") {
+      return {
+        resolucao: {
+          status: "resolved",
+          contact_id: resolucao.contactId,
+          origem: resolucao.origem,
+          materializado: resolucao.materialized,
+        },
+        clientes: [clienteSeguroParaTool(resolucao.cliente, resolucao.externalLabel)],
+      };
+    }
+    if (resolucao.status === "ambiguous") {
+      return {
+        resolucao: { status: "ambiguous", motivo: resolucao.motivo },
+        candidatos: resolucao.candidatos,
+      };
+    }
+    if (resolucao.status === "not_found")
+      return { resolucao: { status: "not_found" }, clientes: [] };
+    return {
+      erro: resolucao.motivoProvider ?? resolucao.motivo,
+      mensagem:
+        resolucao.motivo === "provider_error" && resolucao.motivoProvider
+          ? mensagemDeFalha(resolucao.motivoProvider)
+          : "não foi possível resolver o cliente de forma determinística.",
+      resolucao: { status: "unresolved", motivo: resolucao.motivo },
+      ...(resolucao.candidatos ? { candidatos: resolucao.candidatos } : {}),
+    };
   },
 };
 
@@ -231,16 +314,34 @@ const pedidosInputShape = {
   codigo: z.number().int().positive().optional(),
   cliente: z.string().trim().min(2).max(200).optional(),
   cpf_cnpj: z.string().trim().min(3).max(30).optional(),
+  cliente_contact_id: z.string().uuid().optional(),
   status: z.string().trim().min(1).max(100).optional(),
   numero_nfe: z.string().trim().min(1).max(60).optional(),
   limite: limiteSchema,
   skip: skipSchema,
 };
 
+function projetarPedidoParaTool(pedido: PedidoErp) {
+  return {
+    id: pedido.id,
+    codigo: pedido.codigo,
+    cliente: pedido.cliente,
+    status: pedido.status,
+    statusSistema: pedido.statusSistema,
+    total: pedido.total,
+    data: pedido.data,
+    finalizado: pedido.finalizado,
+    numeroNFe: pedido.numeroNFe,
+    dataFaturamento: pedido.dataFaturamento,
+    chaveAcessoNFe: pedido.chaveAcessoNFe,
+    danfeDisponivel: Boolean(pedido.danfeUrl),
+  };
+}
+
 export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   name: "crm_erp_search_orders",
   description:
-    "Procura pedidos no VendaERP por número, cliente, CPF/CNPJ, status ou número da nota e devolve situação, total e os dados fiscais documentados no pedido. Use para conferir pedido existente e faturamento.",
+    "Procura pedidos no ERP. Se crm_erp_search_customers já resolveu o cliente, use cliente_contact_id: o backend reutiliza o vínculo e revalida Pedido.pessoaID antes de expor pedidos.",
   inputSchema: pedidosInputShape,
   category: "read",
   requiresRole: "agent",
@@ -248,13 +349,70 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   redigirParaAuditoria: redigirBusca,
   motivoDoVazio: motivoDoVazio("pedidos"),
   handler: async (input, ctx) => {
-    if (!input.codigo && !input.cliente && !input.cpf_cnpj && !input.status && !input.numero_nfe) {
+    if (
+      !input.codigo &&
+      !input.cliente &&
+      !input.cpf_cnpj &&
+      !input.cliente_contact_id &&
+      !input.status &&
+      !input.numero_nfe
+    ) {
       return {
         erro: "filtro_obrigatorio",
         mensagem:
-          "informe ao menos um identificador, cliente, status ou número da nota para procurar pedidos.",
+          "informe ao menos um identificador, cliente resolvido, status ou número da nota para procurar pedidos.",
       };
     }
+
+    if (input.cliente_contact_id) {
+      if (input.cliente || input.cpf_cnpj) {
+        return {
+          erro: "filtros_cliente_conflitantes",
+          mensagem:
+            "use o cliente já resolvido sem misturar nome/CPF; resolva outra entidade explicitamente se o alvo mudou.",
+        };
+      }
+      const leitura = await carregarVinculoClienteExterno(ctx.supabase, {
+        organizationId: ctx.organizationId,
+        contactId: input.cliente_contact_id,
+        provider: PROVEDOR_VENDAERP.id,
+      });
+      if (!leitura.ok) return resposta({ ok: false, motivo: "banco" });
+      if (!leitura.vinculo)
+        return {
+          erro: "cliente_nao_resolvido",
+          mensagem: mensagemDeFalha("cliente_nao_resolvido"),
+        };
+
+      const r = await buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
+        codigo: input.codigo,
+        cliente: leitura.vinculo.providerLookupLabel,
+        status: input.status,
+        numeroNFe: input.numero_nfe,
+        pageSize: input.limite,
+        skip: input.skip,
+      });
+      if (!r.ok) return resposta(r);
+      const comprovados = r.dados.filter(
+        (p) => p.identidadeCliente.pessoaId === leitura.vinculo!.externalId,
+      );
+      if (r.dados.length > 0 && comprovados.length === 0) {
+        return {
+          erro: "identidade_pedido_nao_confirmada",
+          mensagem: mensagemDeFalha("identidade_pedido_nao_confirmada"),
+          resolucao_cliente: { status: "unresolved", contact_id: input.cliente_contact_id },
+        };
+      }
+      return {
+        resolucao_cliente: {
+          status: "resolved",
+          contact_id: input.cliente_contact_id,
+          origem: "external_identity_link",
+        },
+        pedidos: comprovados.map((item) => projetarPedidoParaTool(item.pedido)),
+      };
+    }
+
     const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
       codigo: input.codigo,
       cliente: input.cliente,
@@ -266,22 +424,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
     });
     const saida = resposta(r);
     if (saida.erro) return saida;
-    return {
-      pedidos: saida.dados?.map((pedido) => ({
-        id: pedido.id,
-        codigo: pedido.codigo,
-        cliente: pedido.cliente,
-        status: pedido.status,
-        statusSistema: pedido.statusSistema,
-        total: pedido.total,
-        data: pedido.data,
-        finalizado: pedido.finalizado,
-        numeroNFe: pedido.numeroNFe,
-        dataFaturamento: pedido.dataFaturamento,
-        chaveAcessoNFe: pedido.chaveAcessoNFe,
-        danfeDisponivel: Boolean(pedido.danfeUrl),
-      })),
-    };
+    return { pedidos: saida.dados?.map((pedido) => projetarPedidoParaTool(pedido)) };
   },
 };
 

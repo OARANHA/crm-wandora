@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type * as ErpService from "@/lib/integracoes-erp/service";
+import type { PedidoErpComIdentidadeInterna } from "@/lib/integracoes-erp/service";
 import type { McpContext } from "@/lib/mcp/types";
 
 vi.mock("@/lib/integracoes-erp/service", async (original) => {
@@ -12,12 +13,22 @@ vi.mock("@/lib/integracoes-erp/service", async (original) => {
     buscarProdutosErp: vi.fn(),
     buscarClientesErp: vi.fn(),
     buscarPedidosErp: vi.fn(),
+    buscarPedidosErpComIdentidadeInterna: vi.fn(),
     lerEstoqueErp: vi.fn(),
     obterNotaErp: vi.fn(),
   };
 });
 
+vi.mock("@/lib/integracoes-erp/resolucao-cliente-vendaerp", () => ({
+  resolverClienteVendaErp: vi.fn(),
+}));
+vi.mock("@/lib/integracoes-erp/identidade-externa-cliente", () => ({
+  carregarVinculoClienteExterno: vi.fn(),
+}));
+
 const service = await import("@/lib/integracoes-erp/service");
+const customerResolution = await import("@/lib/integracoes-erp/resolucao-cliente-vendaerp");
+const identityLinks = await import("@/lib/integracoes-erp/identidade-externa-cliente");
 const {
   crmErpGetInvoice,
   crmErpReadStock,
@@ -186,7 +197,7 @@ describe("tools ERP READ — comportamento do agente", () => {
       ctx,
     )) as { erro: string };
     expect(cliente.erro).toBe("filtro_obrigatorio");
-    expect(service.buscarClientesErp).not.toHaveBeenCalled();
+    expect(customerResolution.resolverClienteVendaErp).not.toHaveBeenCalled();
 
     const pedido = (await crmErpSearchOrders.handler(
       {
@@ -218,5 +229,274 @@ describe("tools ERP READ — comportamento do agente", () => {
 
     expect(resultado.erro).toBe("rate_limited");
     expect(resultado.mensagem).toMatch(/limite de consultas/i);
+  });
+  it("cliente resolvido devolve contact_id estável sem expor identificadores do provider", async () => {
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValue({
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      origem: "provider",
+      materialized: true,
+      externalLabel: "Eco Projetos",
+      cliente: {
+        id: "erp-42",
+        nome: "Eco Projetos",
+        nomeFantasia: "Eco Projetos",
+        razaoSocial: "ECO PROJETOS LTDA",
+        cpfCnpj: "12345678000190",
+        email: "financeiro@eco.test",
+        telefone: "51999999999",
+        celular: null,
+        cidade: "Porto Alegre",
+        uf: "RS",
+      },
+    });
+
+    const resultado = (await crmErpSearchCustomers.handler(
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as {
+      resolucao: { status: string; contact_id: string };
+      clientes: Array<Record<string, unknown>>;
+    };
+
+    expect(resultado.resolucao).toMatchObject({
+      status: "resolved",
+      contact_id: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(resultado.clientes[0]).not.toHaveProperty("id");
+    expect(resultado.clientes[0]).not.toHaveProperty("cpfCnpj");
+    expect(resultado.clientes[0]).not.toHaveProperty("email");
+    expect(resultado.clientes[0]).not.toHaveProperty("telefone");
+  });
+
+  it("pedido por contact_id usa rótulo só para transporte e pessoaID como autoridade", async () => {
+    vi.mocked(identityLinks.carregarVinculoClienteExterno).mockResolvedValue({
+      ok: true,
+      vinculo: {
+        id: "link-1",
+        organizationId: ctx.organizationId,
+        contactId: "11111111-1111-4111-8111-111111111111",
+        provider: "vendaerp",
+        externalId: "erp-42",
+        externalLabel: "Eco Projetos",
+        externalLabelKey: "eco projetos",
+        providerLookupLabel: "ECO PROJETOS LTDA",
+        resolutionOrigin: "exact_name",
+      },
+    });
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+      ok: true,
+      dados: [
+        {
+          pedido: {
+            id: "pedido-certo",
+            codigo: 10,
+            cliente: "Eco Projetos",
+            status: "Faturado",
+            statusSistema: null,
+            total: 100,
+            data: null,
+            finalizado: true,
+            numeroNFe: "55",
+            dataFaturamento: null,
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
+          },
+          identidadeCliente: { pessoaId: "erp-42", cpfCnpj: null, email: null },
+        } as PedidoErpComIdentidadeInterna,
+        {
+          pedido: {
+            id: "pedido-outro",
+            codigo: 11,
+            cliente: "Homônimo",
+            status: "Faturado",
+            statusSistema: null,
+            total: 200,
+            data: null,
+            finalizado: true,
+            numeroNFe: "56",
+            dataFaturamento: null,
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
+          },
+          identidadeCliente: { pessoaId: "erp-outro", cpfCnpj: null, email: null },
+        } as PedidoErpComIdentidadeInterna,
+      ],
+    });
+
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: undefined,
+        cpf_cnpj: undefined,
+        cliente_contact_id: "11111111-1111-4111-8111-111111111111",
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { pedidos: Array<{ id: string }>; resolucao_cliente: { status: string } };
+
+    expect(service.buscarPedidosErpComIdentidadeInterna).toHaveBeenCalledWith(
+      ctx.supabase,
+      ctx.organizationId,
+      expect.objectContaining({ cliente: "ECO PROJETOS LTDA" }),
+    );
+    expect(resultado.resolucao_cliente.status).toBe("resolved");
+    expect(resultado.pedidos.map((p) => p.id)).toEqual(["pedido-certo"]);
+  });
+
+  it("pedido com retorno sem pessoaID correspondente falha fechado", async () => {
+    vi.mocked(identityLinks.carregarVinculoClienteExterno).mockResolvedValue({
+      ok: true,
+      vinculo: {
+        id: "link-1",
+        organizationId: ctx.organizationId,
+        contactId: "11111111-1111-4111-8111-111111111111",
+        provider: "vendaerp",
+        externalId: "erp-42",
+        externalLabel: "Eco Projetos",
+        externalLabelKey: "eco projetos",
+        providerLookupLabel: "ECO PROJETOS LTDA",
+        resolutionOrigin: "exact_name",
+      },
+    });
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+      ok: true,
+      dados: [
+        {
+          pedido: {
+            id: "pedido-outro",
+            codigo: 11,
+            cliente: "Eco Projetos",
+            status: "Faturado",
+            statusSistema: null,
+            total: 200,
+            data: null,
+            finalizado: true,
+            numeroNFe: null,
+            dataFaturamento: null,
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
+          },
+          identidadeCliente: { pessoaId: "erp-outro", cpfCnpj: null, email: null },
+        } as PedidoErpComIdentidadeInterna,
+      ],
+    });
+
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: undefined,
+        cpf_cnpj: undefined,
+        cliente_contact_id: "11111111-1111-4111-8111-111111111111",
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { erro: string };
+    expect(resultado.erro).toBe("identidade_pedido_nao_confirmada");
+  });
+
+  it("cliente_contact_id não pode ser misturado com novos sinais de identidade", async () => {
+    const resultado = (await crmErpSearchCustomers.handler(
+      {
+        nome: "Outro cliente",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: "11111111-1111-4111-8111-111111111111",
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { erro: string };
+
+    expect(resultado.erro).toBe("sinais_cliente_conflitantes");
+    expect(customerResolution.resolverClienteVendaErp).not.toHaveBeenCalled();
+  });
+
+  it("ambiguidade, ausência e erro de provider permanecem estados diferentes", async () => {
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValueOnce({
+      status: "ambiguous",
+      motivo: "mais_de_um_cliente_exato",
+      candidatos: [
+        {
+          nome: "Eco Projetos",
+          nomeFantasia: "Eco Projetos",
+          razaoSocial: "ECO A LTDA",
+          cidade: "POA",
+          uf: "RS",
+        },
+        {
+          nome: "Eco Projetos",
+          nomeFantasia: "Eco Projetos",
+          razaoSocial: "ECO B LTDA",
+          cidade: "POA",
+          uf: "RS",
+        },
+      ],
+    });
+    const ambiguo = (await crmErpSearchCustomers.handler(
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { resolucao: { status: string }; candidatos: unknown[] };
+    expect(ambiguo.resolucao.status).toBe("ambiguous");
+    expect(ambiguo.candidatos).toHaveLength(2);
+
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValueOnce({
+      status: "not_found",
+    });
+    const ausente = (await crmErpSearchCustomers.handler(
+      {
+        nome: "Inexistente",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { resolucao: { status: string }; clientes: unknown[] };
+    expect(ausente.resolucao.status).toBe("not_found");
+    expect(ausente.clientes).toEqual([]);
+
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValueOnce({
+      status: "unresolved",
+      motivo: "provider_error",
+      motivoProvider: "timeout",
+    });
+    const falhou = (await crmErpSearchCustomers.handler(
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      ctx,
+    )) as { erro: string; resolucao: { status: string; motivo: string } };
+    expect(falhou.erro).toBe("timeout");
+    expect(falhou.resolucao).toEqual({ status: "unresolved", motivo: "provider_error" });
   });
 });
