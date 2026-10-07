@@ -71,6 +71,7 @@ describe("tools ERP READ — comportamento do agente", () => {
     expect(blocosErpResidentes(["crm_erp_search_customers", "crm_erp_get_invoice"])).toEqual([]);
 
     const [bloco] = blocosErpResidentes(["crm_erp_search_orders"]);
+    if (bloco === undefined) throw new Error("bloco ERP ausente");
     const nomeadas = [...bloco.matchAll(/crm_erp_[a-z_]+/g)].map((m) => m[0]);
     expect(new Set(nomeadas)).toEqual(new Set(["crm_erp_search_orders"]));
   });
