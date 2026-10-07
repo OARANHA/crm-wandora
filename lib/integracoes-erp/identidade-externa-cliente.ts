@@ -90,6 +90,34 @@ export async function carregarVinculoClienteExterno(
   return { ok: true, vinculo: data?.[0] ? mapear(data[0] as VinculoRow) : null };
 }
 
+export async function carregarVinculoClienteExternoPorIdExterno(
+  db: SupabaseClient,
+  input: { organizationId: string; provider: string; externalId: string },
+): Promise<
+  { ok: true; vinculo: VinculoIdentidadeClienteExterno | null } | { ok: false; motivo: "banco" }
+> {
+  const externalId = input.externalId.trim();
+  if (!externalId) return { ok: true, vinculo: null };
+
+  const { data, error } = await db
+    .from("erp_customer_identity_links")
+    .select(
+      "id, organization_id, contact_id, provider, external_id, external_label, external_label_key, provider_lookup_label, resolution_origin",
+    )
+    .eq("organization_id", input.organizationId)
+    .eq("provider", input.provider)
+    .eq("external_entity_type", "customer")
+    .eq("external_id", externalId)
+    .eq("status", "active")
+    .limit(2);
+  if (error || (data ?? []).length > 1) return { ok: false, motivo: "banco" };
+  if (!data?.[0]) return { ok: true, vinculo: null };
+
+  const contato = await contatoElegivel(db, input.organizationId, data[0].contact_id);
+  if (!contato.ok || !contato.elegivel) return { ok: false, motivo: "banco" };
+  return { ok: true, vinculo: mapear(data[0] as VinculoRow) };
+}
+
 export async function buscarVinculosClientePorRotulo(
   db: SupabaseClient,
   input: { organizationId: string; provider: string; rotulo: string },
