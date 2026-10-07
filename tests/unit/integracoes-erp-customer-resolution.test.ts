@@ -7,6 +7,7 @@ import {
   selecionarClientesVendaErpCompativeisPorNome,
   selecionarClientesVendaErpExatos,
 } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
+import { normalizarClientesVendaErp } from "@/lib/integracoes-erp/service";
 import type { ClienteErp } from "@/lib/integracoes-erp/tipos";
 
 function cliente(overrides: Partial<ClienteErp> = {}): ClienteErp {
@@ -26,6 +27,37 @@ function cliente(overrides: Partial<ClienteErp> = {}): ClienteErp {
 }
 
 describe("Customer Resolution VendaERP — seleção fail-closed", () => {
+  it("preserva identidade quando Pessoas/Pesquisar responde em PascalCase", () => {
+    expect(
+      normalizarClientesVendaErp([
+        {
+          ID: "erp-pascal",
+          NomeFantasia: "Eco Projetos Engenharia",
+          RazaoSocial: "ECO PROJETOS ENGENHARIA LTDA",
+          CNPJ_CPF: "12.345.678/0001-90",
+          Email: "financeiro@eco.test",
+          Telefone: "5130000000",
+          Celular: "51999999999",
+          Cidade: "Porto Alegre",
+          UF: "RS",
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "erp-pascal",
+        nome: "Eco Projetos Engenharia",
+        nomeFantasia: "Eco Projetos Engenharia",
+        razaoSocial: "ECO PROJETOS ENGENHARIA LTDA",
+        cpfCnpj: "12.345.678/0001-90",
+        email: "financeiro@eco.test",
+        telefone: "5130000000",
+        celular: "51999999999",
+        cidade: "Porto Alegre",
+        uf: "RS",
+      },
+    ]);
+  });
+
   it("aceita nome fantasia ou razão social somente quando o match normalizado é exato", () => {
     const c = cliente();
     expect(selecionarClientesVendaErpExatos({ nome: "ÉCO PROJETOS" }, [c])).toEqual([c]);

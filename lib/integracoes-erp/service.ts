@@ -263,19 +263,22 @@ export function normalizarProdutosVendaErp(valor: unknown): ProdutoErp[] {
 
 export function normalizarClientesVendaErp(valor: unknown): ClienteErp[] {
   return listaDeObjetos(valor).map((p) => {
-    const nomeFantasia = texto(p.nomeFantasia);
-    const razaoSocial = texto(p.razaoSocial);
+    // O VendaERP já foi observado alternando camelCase/PascalCase em outros
+    // endpoints. Pessoa aceita os dois formatos para a identidade não sumir
+    // só por diferença de casing no JSON do provider.
+    const nomeFantasia = texto(p.nomeFantasia ?? p.NomeFantasia);
+    const razaoSocial = texto(p.razaoSocial ?? p.RazaoSocial);
     return {
-      id: texto(p.id),
+      id: texto(p.id ?? p.ID),
       nome: nomeFantasia ?? razaoSocial,
       nomeFantasia,
       razaoSocial,
-      cpfCnpj: texto(p.cnpJ_CPF),
-      email: texto(p.email),
-      telefone: texto(p.telefone),
-      celular: texto(p.celular),
-      cidade: texto(p.cidade),
-      uf: texto(p.uf),
+      cpfCnpj: texto(p.cnpJ_CPF ?? p.CnpJ_CPF ?? p.CNPJ_CPF),
+      email: texto(p.email ?? p.Email),
+      telefone: texto(p.telefone ?? p.Telefone),
+      celular: texto(p.celular ?? p.Celular),
+      cidade: texto(p.cidade ?? p.Cidade),
+      uf: texto(p.uf ?? p.UF),
     };
   });
 }
