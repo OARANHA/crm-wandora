@@ -117,8 +117,12 @@ sinais precisam concordar; um vínculo antigo por rótulo não pode ignorá-los.
 
 O Swagger de `Pessoas/Pesquisar` expõe `nomefantasia`, CPF/CNPJ, e-mail e Identificador
 Único como filtros, mas não documenta um filtro separado `razaoSocial`. Por isso a V1 não
-inventa esse parâmetro: razão social é usada na seleção exata do retorno e como rótulo de
-lookup quando um endpoint downstream documenta Nome/Razão Social.
+inventa esse parâmetro. A resolução por nome tenta primeiro `nomefantasia`; se essa chamada não
+trouxer correspondência exata, faz uma varredura paginada e limitada somente de clientes,
+comparando `nomeFantasia` e `razaoSocial` no backend. Se o limite for atingido sem provar
+unicidade, o estado permanece `unresolved` e pede um identificador mais forte, em vez de
+declarar `not_found`. Razão social também é preservada como rótulo de lookup quando um endpoint
+downstream documenta Nome/Razão Social.
 
 Para `Pedidos/Pesquisar`, o Swagger documenta o filtro `cliente` como **Nome/Razão Social**
 e o schema do pedido contém `pessoaID`. Não há filtro comprovado por `pessoaID`. Assim,

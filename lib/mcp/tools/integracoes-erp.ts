@@ -303,7 +303,9 @@ export const crmErpSearchCustomers: McpToolDefinition<typeof clientesInputShape>
       mensagem:
         resolucao.motivo === "provider_error" && resolucao.motivoProvider
           ? mensagemDeFalha(resolucao.motivoProvider)
-          : "não foi possível resolver o cliente de forma determinística.",
+          : resolucao.motivo === "busca_nome_incompleta"
+            ? "a busca por nome não conseguiu provar uma identidade única; informe CPF/CNPJ ou e-mail para confirmar o cliente."
+            : "não foi possível resolver o cliente de forma determinística.",
       resolucao: { status: "unresolved", motivo: resolucao.motivo },
       ...(resolucao.candidatos ? { candidatos: resolucao.candidatos } : {}),
     };
