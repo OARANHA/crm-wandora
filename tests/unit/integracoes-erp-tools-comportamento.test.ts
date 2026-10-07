@@ -15,6 +15,7 @@ vi.mock("@/lib/integracoes-erp/service", async (original) => {
     buscarPedidosErp: vi.fn(),
     buscarPedidosErpComIdentidadeInterna: vi.fn(),
     lerEstoqueErp: vi.fn(),
+    obterInformacaoFiscalDaVendaErp: vi.fn(),
     obterNotaErp: vi.fn(),
   };
 });
@@ -394,6 +395,201 @@ describe("tools ERP READ — comportamento do agente", () => {
     );
 
     expect(customerResolution.resolverClienteVendaErp).toHaveBeenCalledTimes(1);
+  });
+
+  it("últimas notas paginam, enriquecem data fiscal ausente e retornam ranking comprovado", async () => {
+    const pedido = (
+      codigo: number,
+      numeroNFe: string,
+      dataFaturamento: string | null,
+    ): PedidoErpComIdentidadeInterna => ({
+      pedido: {
+        id: "pedido-" + codigo,
+        codigo,
+        cliente: "Eco Projetos",
+        status: "Faturado",
+        statusSistema: "faturado",
+        total: codigo,
+        data: "2026-09-01T10:00:00Z",
+        finalizado: true,
+        numeroNFe,
+        dataFaturamento,
+        chaveAcessoNFe: null,
+        danfeUrl: "https://erp.example/danfe-" + numeroNFe,
+        urlSefaz: null,
+      },
+      identidadeCliente: {
+        pessoaId: "erp-eco",
+        cpfCnpj: "12345678000190",
+        email: "financeiro@eco.test",
+      },
+    });
+
+    const primeiraPagina = Array.from({ length: 100 }, (_, i) =>
+      pedido(1000 + i, String(8000 + i), "2026-10-01T10:00:00Z"),
+    );
+    primeiraPagina[10] = pedido(1010, "9010", null);
+    const segundaPagina = [
+      pedido(2001, "9998", "2026-10-06T09:00:00Z"),
+      pedido(2002, "9999", "2026-10-07T09:00:00Z"),
+    ];
+
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna)
+      .mockResolvedValueOnce({ ok: true, dados: primeiraPagina })
+      .mockResolvedValueOnce({ ok: true, dados: segundaPagina });
+    vi.mocked(service.obterInformacaoFiscalDaVendaErp).mockResolvedValue({
+      ok: true,
+      dados: {
+        tipo: "NFe",
+        numero: 9010,
+        serie: "1",
+        chave: null,
+        dataEmissao: "07/10/2026 - 14:30",
+        danfeUrl: "https://erp.example/danfe-9010",
+      },
+    });
+    vi.mocked(customerResolution.resolverClienteVendaErpPorPedidos).mockResolvedValue({
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      origem: "provider",
+      materialized: false,
+      externalLabel: "Eco Projetos",
+    });
+
+    const resultado = (await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
+        limite: 10,
+        skip: 0,
+      },
+      { ...ctx, requestId: "req-ultimas-notas" },
+    )) as {
+      pedidos: Array<{ numeroNFe: string | null }>;
+      resumo: {
+        quantidadeEncontrada: number;
+        quantidadeRetornada: number;
+        resultadoCompleto: boolean;
+      };
+    };
+
+    expect(resultado.pedidos.map((item) => item.numeroNFe)).toEqual(["9010", "9999"]);
+    expect(resultado.resumo).toEqual({
+      quantidadeEncontrada: 102,
+      quantidadeRetornada: 2,
+      resultadoCompleto: true,
+    });
+    expect(service.buscarPedidosErpComIdentidadeInterna).toHaveBeenNthCalledWith(
+      1,
+      ctx.supabase,
+      ctx.organizationId,
+      expect.objectContaining({
+        cliente: "Eco Projetos",
+        possuiNotaFiscal: true,
+        pageSize: 100,
+        skip: 0,
+      }),
+    );
+    expect(service.buscarPedidosErpComIdentidadeInterna).toHaveBeenNthCalledWith(
+      2,
+      ctx.supabase,
+      ctx.organizationId,
+      expect.objectContaining({ pageSize: 100, skip: 100 }),
+    );
+    expect(service.obterInformacaoFiscalDaVendaErp).toHaveBeenCalledWith(
+      ctx.supabase,
+      ctx.organizationId,
+      1010,
+    );
+    expect(customerResolution.resolverClienteVendaErpPorPedidos).toHaveBeenCalledTimes(1);
+  });
+
+  it("últimas notas falham fechado se nem a visão fiscal provar a data ausente", async () => {
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+      ok: true,
+      dados: [
+        {
+          pedido: {
+            id: "pedido-sem-data",
+            codigo: 500,
+            cliente: "Eco Projetos",
+            status: "Faturado",
+            statusSistema: "faturado",
+            total: 500,
+            data: "2026-10-01T10:00:00Z",
+            finalizado: true,
+            numeroNFe: "9500",
+            dataFaturamento: null,
+            chaveAcessoNFe: null,
+            danfeUrl: "https://erp.example/danfe-9500",
+            urlSefaz: null,
+          },
+          identidadeCliente: {
+            pessoaId: "erp-eco",
+            cpfCnpj: "12345678000190",
+            email: "financeiro@eco.test",
+          },
+        },
+      ],
+    });
+    vi.mocked(customerResolution.resolverClienteVendaErpPorPedidos).mockResolvedValue({
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      origem: "provider",
+      materialized: false,
+      externalLabel: "Eco Projetos",
+    });
+    vi.mocked(service.obterInformacaoFiscalDaVendaErp).mockResolvedValue({
+      ok: true,
+      dados: {
+        tipo: "NFe",
+        numero: 9500,
+        serie: "1",
+        chave: null,
+        dataEmissao: null,
+        danfeUrl: null,
+      },
+    });
+
+    const resultado = await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
+        limite: 10,
+        skip: 0,
+      },
+      { ...ctx, requestId: "req-ultimas-sem-data" },
+    );
+
+    expect(resultado).toMatchObject({
+      erro: "data_faturamento_indisponivel",
+    });
+    expect(resultado).not.toHaveProperty("pedidos");
+  });
+
+  it("últimas notas com DANFE ensinam prepare e send sequenciais no próprio turno", () => {
+    const [bloco] = blocosErpResidentes([
+      "crm_erp_search_orders",
+      "crm_erp_get_invoice",
+      "crm_erp_prepare_admin_danfe",
+    ]);
+    if (bloco === undefined) throw new Error("bloco ERP ausente");
+
+    expect(bloco).toContain("ultimas_notas=N");
+    expect(bloco).toMatch(/última nota|últimas N notas/);
+    expect(bloco).toContain("crm_erp_prepare_admin_danfe");
+    expect(bloco).toContain("IMEDIATAMENTE depois send_message");
+    expect(bloco).toMatch(/Não prepare duas DANFEs seguidas/i);
   });
 
   it("pedido ou nota por nome usa pedidos diretamente sem exigir resolução prévia do cliente", () => {
