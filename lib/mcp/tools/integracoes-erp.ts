@@ -12,8 +12,10 @@ import {
   buscarPedidosErpComIdentidadeInterna,
   buscarProdutosErp,
   lerEstoqueErp,
+  obterInformacaoFiscalDaVendaErp,
   obterNotaErp,
   type ConsultaErpResultado,
+  type PedidoErpComIdentidadeInterna,
 } from "@/lib/integracoes-erp/service";
 import { carregarVinculoClienteExterno } from "@/lib/integracoes-erp/identidade-externa-cliente";
 import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
@@ -414,6 +416,15 @@ const pedidosInputShape = {
   cliente_contact_id: z.string().uuid().optional(),
   status: z.string().trim().min(1).max(100).optional(),
   numero_nfe: z.string().trim().min(1).max(60).optional(),
+  ultimas_notas: z
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .optional()
+    .describe(
+      "Retorna as N NFes mais recentes do cliente por data fiscal comprovada. Pagina o conjunto antes de ordenar e falha fechado se não conseguir provar a recência.",
+    ),
   limite: limiteSchema,
   skip: skipSchema,
 };
@@ -435,10 +446,141 @@ function projetarPedidoParaTool(pedido: PedidoErp) {
   };
 }
 
+const TAMANHO_PAGINA_NOTAS_RECENTES = 100;
+const MAX_PAGINAS_NOTAS_RECENTES = 5;
+const MAX_ENRIQUECIMENTOS_FISCAIS = 20;
+
+async function buscarConjuntoCompleto<T>(
+  buscar: (pageSize: number, skip: number) => Promise<ConsultaErpResultado<T[]>>,
+): Promise<ConsultaErpResultado<T[]>> {
+  const acumulados: T[] = [];
+
+  for (let pagina = 0; pagina < MAX_PAGINAS_NOTAS_RECENTES; pagina += 1) {
+    const lote = await buscar(
+      TAMANHO_PAGINA_NOTAS_RECENTES,
+      pagina * TAMANHO_PAGINA_NOTAS_RECENTES,
+    );
+    if (!lote.ok) return lote;
+    acumulados.push(...lote.dados);
+    if (lote.dados.length < TAMANHO_PAGINA_NOTAS_RECENTES) {
+      return { ok: true, dados: acumulados };
+    }
+  }
+
+  const limiteAnalisado = TAMANHO_PAGINA_NOTAS_RECENTES * MAX_PAGINAS_NOTAS_RECENTES;
+  const provaDeFim = await buscar(1, limiteAnalisado);
+  if (!provaDeFim.ok) return provaDeFim;
+  if (provaDeFim.dados.length > 0) {
+    return {
+      ok: false,
+      motivo: "consulta_parcial",
+      detalhes: { limiteAnalisado },
+    };
+  }
+  return { ok: true, dados: acumulados };
+}
+
+function instanteFiscalLocal(valor: string | null): number | null {
+  if (!valor) return null;
+  const iso = Date.parse(valor);
+  if (Number.isFinite(iso)) return iso;
+
+  const local = valor
+    .trim()
+    .match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s*-\s*|\s+)(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!local) return null;
+  const [, dia, mes, ano, hora, minuto, segundo] = local;
+  return Date.UTC(
+    Number(ano),
+    Number(mes) - 1,
+    Number(dia),
+    Number(hora),
+    Number(minuto),
+    Number(segundo ?? "0"),
+  );
+}
+
+async function ordenarUltimasNotas(
+  ctx: McpContext,
+  pedidosBrutos: readonly PedidoErp[],
+  quantidade: number,
+): Promise<
+  | { ok: true; pedidos: PedidoErp[]; quantidadeEncontrada: number }
+  | { ok: false; erro: string; mensagem: string }
+> {
+  const comNfe = pedidosBrutos.filter((pedido) => Boolean(pedido.numeroNFe?.trim()));
+  if (comNfe.length === 0) return { ok: true, pedidos: [], quantidadeEncontrada: 0 };
+
+  const semData = comNfe.filter((pedido) => instanteFiscalLocal(pedido.dataFaturamento) === null);
+  if (semData.length > MAX_ENRIQUECIMENTOS_FISCAIS) {
+    return {
+      ok: false,
+      erro: "data_faturamento_indisponivel",
+      mensagem:
+        "há muitas notas sem data fiscal utilizável para provar quais são as mais recentes com segurança.",
+    };
+  }
+
+  const datasPorPedido = new Map<PedidoErp, number>();
+  for (const pedido of comNfe) {
+    const direta = instanteFiscalLocal(pedido.dataFaturamento);
+    if (direta !== null) {
+      datasPorPedido.set(pedido, direta);
+      continue;
+    }
+
+    if (typeof pedido.codigo !== "number") {
+      return {
+        ok: false,
+        erro: "data_faturamento_indisponivel",
+        mensagem:
+          "há nota sem data de faturamento e sem código de venda utilizável para confirmar a data fiscal.",
+      };
+    }
+
+    const fiscal = await obterInformacaoFiscalDaVendaErp(
+      ctx.supabase,
+      ctx.organizationId,
+      pedido.codigo,
+    );
+    if (!fiscal.ok) {
+      return {
+        ok: false,
+        erro: fiscal.motivo,
+        mensagem: mensagemDeFalha(fiscal.motivo),
+      };
+    }
+
+    const enriquecida = instanteFiscalLocal(fiscal.dados.dataEmissao);
+    if (enriquecida === null) {
+      return {
+        ok: false,
+        erro: "data_faturamento_indisponivel",
+        mensagem:
+          "há nota cuja data fiscal não pôde ser confirmada; não dá para afirmar quais são as últimas sem adivinhar.",
+      };
+    }
+    datasPorPedido.set(pedido, enriquecida);
+  }
+
+  const ordenados = [...comNfe].sort((a, b) => {
+    const dataA = datasPorPedido.get(a) ?? Number.NEGATIVE_INFINITY;
+    const dataB = datasPorPedido.get(b) ?? Number.NEGATIVE_INFINITY;
+    if (dataA !== dataB) return dataB - dataA;
+    return (b.codigo ?? Number.NEGATIVE_INFINITY) - (a.codigo ?? Number.NEGATIVE_INFINITY);
+  });
+
+  return {
+    ok: true,
+    pedidos: ordenados.slice(0, quantidade),
+    quantidadeEncontrada: ordenados.length,
+  };
+}
+
 export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   name: "crm_erp_search_orders",
   description:
-    "Procura pedidos e localiza NFe/NFCe relacionadas no ERP. Quando a solicitação JÁ é sobre pedidos, compras, notas ou NFes de um cliente e você só tem o nome/razão social, use esta ferramenta DIRETAMENTE com cliente; crm_erp_search_customers NÃO é pré-requisito. Se o cliente já foi resolvido e existe cliente_contact_id, prefira esse id: o backend reutiliza o vínculo e revalida Pedido.pessoaID antes de expor pedidos.",
+    "Procura pedidos e localiza NFe/NFCe relacionadas no ERP. Quando a solicitação JÁ é sobre pedidos, compras, notas ou NFes de um cliente e você só tem o nome/razão social, use esta ferramenta DIRETAMENTE com cliente; crm_erp_search_customers NÃO é pré-requisito. Para 'última nota' ou 'últimas N notas', informe ultimas_notas=N: a capability pagina o conjunto, considera somente pedidos com NFe, comprova a data fiscal e devolve as NFes mais recentes em ordem decrescente. Se o cliente já foi resolvido e existe cliente_contact_id, prefira esse id.",
   inputSchema: pedidosInputShape,
   category: "read",
   requiresRole: "agent",
@@ -452,12 +594,13 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       !input.cpf_cnpj &&
       !input.cliente_contact_id &&
       !input.status &&
-      !input.numero_nfe
+      !input.numero_nfe &&
+      !input.ultimas_notas
     ) {
       return {
         erro: "filtro_obrigatorio",
         mensagem:
-          "informe ao menos um identificador, cliente resolvido, status ou número da nota para procurar pedidos.",
+          "informe ao menos um identificador, cliente resolvido, status, número da nota ou quantidade de últimas notas.",
       };
     }
 
@@ -481,15 +624,28 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
           mensagem: mensagemDeFalha("cliente_nao_resolvido"),
         };
 
-      const r = await buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
-        codigo: input.codigo,
-        cliente: leitura.vinculo.providerLookupLabel,
-        status: input.status,
-        numeroNFe: input.numero_nfe,
-        pageSize: input.limite,
-        skip: input.skip,
-      });
+      const r = input.ultimas_notas
+        ? await buscarConjuntoCompleto<PedidoErpComIdentidadeInterna>((pageSize, skip) =>
+            buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
+              codigo: input.codigo,
+              cliente: leitura.vinculo!.providerLookupLabel,
+              status: input.status,
+              numeroNFe: input.numero_nfe,
+              possuiNotaFiscal: true,
+              pageSize,
+              skip,
+            }),
+          )
+        : await buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
+            codigo: input.codigo,
+            cliente: leitura.vinculo.providerLookupLabel,
+            status: input.status,
+            numeroNFe: input.numero_nfe,
+            pageSize: input.limite,
+            skip: input.skip,
+          });
       if (!r.ok) return resposta(r);
+
       const comprovados = r.dados.filter(
         (p) => p.identidadeCliente.pessoaId === leitura.vinculo!.externalId,
       );
@@ -500,6 +656,29 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
           resolucao_cliente: { status: "unresolved", contact_id: input.cliente_contact_id },
         };
       }
+
+      if (input.ultimas_notas) {
+        const ranking = await ordenarUltimasNotas(
+          ctx,
+          comprovados.map((item) => item.pedido),
+          input.ultimas_notas,
+        );
+        if (!ranking.ok) return ranking;
+        return {
+          resolucao_cliente: {
+            status: "resolved",
+            contact_id: input.cliente_contact_id,
+            origem: "external_identity_link",
+          },
+          pedidos: ranking.pedidos.map(projetarPedidoParaTool),
+          resumo: {
+            quantidadeEncontrada: ranking.quantidadeEncontrada,
+            quantidadeRetornada: ranking.pedidos.length,
+            resultadoCompleto: true,
+          },
+        };
+      }
+
       return {
         resolucao_cliente: {
           status: "resolved",
@@ -513,20 +692,32 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
     if (input.cliente && !input.cpf_cnpj) {
       const resolverSequenciamento = registrarBuscaPedidosNoTurno(ctx.requestId, input.cliente);
       try {
-        const r = await buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
-          codigo: input.codigo,
-          cliente: input.cliente,
-          status: input.status,
-          numeroNFe: input.numero_nfe,
-          pageSize: input.limite,
-          skip: input.skip,
-        });
+        const r = input.ultimas_notas
+          ? await buscarConjuntoCompleto<PedidoErpComIdentidadeInterna>((pageSize, skip) =>
+              buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
+                codigo: input.codigo,
+                cliente: input.cliente,
+                status: input.status,
+                numeroNFe: input.numero_nfe,
+                possuiNotaFiscal: true,
+                pageSize,
+                skip,
+              }),
+            )
+          : await buscarPedidosErpComIdentidadeInterna(ctx.supabase, ctx.organizationId, {
+              codigo: input.codigo,
+              cliente: input.cliente,
+              status: input.status,
+              numeroNFe: input.numero_nfe,
+              pageSize: input.limite,
+              skip: input.skip,
+            });
         if (!r.ok) {
           resolverSequenciamento?.(false);
           return resposta(r);
         }
 
-        const pedidos = r.dados.map((item) => projetarPedidoParaTool(item.pedido));
+        const pedidos = r.dados.map((item) => item.pedido);
         if (pedidos.length === 0) {
           resolverSequenciamento?.(false);
           return { pedidos: [] };
@@ -546,6 +737,24 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
 
         if (resolucao.status === "resolved") {
           resolverSequenciamento?.(true);
+          if (input.ultimas_notas) {
+            const ranking = await ordenarUltimasNotas(ctx, pedidos, input.ultimas_notas);
+            if (!ranking.ok) return ranking;
+            return {
+              resolucao_cliente: {
+                status: "resolved",
+                contact_id: resolucao.contactId,
+                origem: resolucao.origem,
+                materializado: resolucao.materialized,
+              },
+              pedidos: ranking.pedidos.map(projetarPedidoParaTool),
+              resumo: {
+                quantidadeEncontrada: ranking.quantidadeEncontrada,
+                quantidadeRetornada: ranking.pedidos.length,
+                resultadoCompleto: true,
+              },
+            };
+          }
           return {
             resolucao_cliente: {
               status: "resolved",
@@ -553,7 +762,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
               origem: resolucao.origem,
               materializado: resolucao.materialized,
             },
-            pedidos,
+            pedidos: pedidos.map(projetarPedidoParaTool),
           };
         }
 
@@ -583,17 +792,44 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       }
     }
 
-    const r = await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
-      codigo: input.codigo,
-      cliente: input.cliente,
-      cpf_cnpj: input.cpf_cnpj,
-      status: input.status,
-      numeroNFe: input.numero_nfe,
-      pageSize: input.limite,
-      skip: input.skip,
-    });
+    const r = input.ultimas_notas
+      ? await buscarConjuntoCompleto<PedidoErp>((pageSize, skip) =>
+          buscarPedidosErp(ctx.supabase, ctx.organizationId, {
+            codigo: input.codigo,
+            cliente: input.cliente,
+            cpf_cnpj: input.cpf_cnpj,
+            status: input.status,
+            numeroNFe: input.numero_nfe,
+            possuiNotaFiscal: true,
+            pageSize,
+            skip,
+          }),
+        )
+      : await buscarPedidosErp(ctx.supabase, ctx.organizationId, {
+          codigo: input.codigo,
+          cliente: input.cliente,
+          cpf_cnpj: input.cpf_cnpj,
+          status: input.status,
+          numeroNFe: input.numero_nfe,
+          pageSize: input.limite,
+          skip: input.skip,
+        });
     const saida = resposta(r);
     if (saida.erro) return saida;
+
+    if (input.ultimas_notas) {
+      const ranking = await ordenarUltimasNotas(ctx, saida.dados ?? [], input.ultimas_notas);
+      if (!ranking.ok) return ranking;
+      return {
+        pedidos: ranking.pedidos.map(projetarPedidoParaTool),
+        resumo: {
+          quantidadeEncontrada: ranking.quantidadeEncontrada,
+          quantidadeRetornada: ranking.pedidos.length,
+          resultadoCompleto: true,
+        },
+      };
+    }
+
     return { pedidos: saida.dados?.map((pedido) => projetarPedidoParaTool(pedido)) };
   },
 };
