@@ -138,6 +138,12 @@ Nome/Razão Social, `crm_erp_search_orders(cliente=...)` é o caminho direto doc
 ele continua preferível por permitir a revalidação forte por `pessoaID`. Para uma NFe específica,
 o número localizado nos pedidos alimenta `crm_erp_get_invoice`.
 
+A coordenação do mesmo turno é determinística: uma busca de pedidos por Nome/Razão Social registra
+seu resultado pelo `requestId`. Uma resolução apenas por esse mesmo nome aguarda a busca se ela
+estiver em andamento. Se houver pedidos, a resolução redundante é recusada e o agente deve usar os
+pedidos já retornados; se vier vazio ou falha, a resolução de cliente continua disponível. Outro
+cliente, CPF/CNPJ, e-mail e outro turno não são bloqueados.
+
 Criação mínima de contato + vínculo é transacional e idempotente. Uniques parciais protegem o
 mesmo `external_id` e o mesmo `contact/provider`; advisory locks fecham corrida de retries.
 Correção invalida o vínculo antigo sem apagar o histórico. A tabela é server-only e declara sua
