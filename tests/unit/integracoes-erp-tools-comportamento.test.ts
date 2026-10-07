@@ -21,6 +21,7 @@ vi.mock("@/lib/integracoes-erp/service", async (original) => {
 
 vi.mock("@/lib/integracoes-erp/resolucao-cliente-vendaerp", () => ({
   resolverClienteVendaErp: vi.fn(),
+  resolverClienteVendaErpPorPedidos: vi.fn(),
 }));
 vi.mock("@/lib/integracoes-erp/identidade-externa-cliente", () => ({
   carregarVinculoClienteExterno: vi.fn(),
@@ -50,14 +51,21 @@ const ctx: McpContext = {
 describe("tools ERP READ — comportamento do agente", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("espera pedidos em voo e bloqueia resolução redundante do mesmo cliente quando há resultado", async () => {
+  it("espera pedidos em voo, materializa o cliente e bloqueia resolução redundante no mesmo turno", async () => {
     let liberar!: (valor: unknown) => void;
-    vi.mocked(service.buscarPedidosErp).mockImplementation(
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockImplementation(
       () =>
         new Promise((resolve) => {
           liberar = resolve;
         }) as never,
     );
+    vi.mocked(customerResolution.resolverClienteVendaErpPorPedidos).mockResolvedValue({
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      origem: "provider",
+      materialized: true,
+      externalLabel: "Eco Projetos",
+    });
     vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValue({
       status: "not_found",
     });
@@ -77,7 +85,9 @@ describe("tools ERP READ — comportamento do agente", () => {
       turno,
     );
 
-    await vi.waitFor(() => expect(service.buscarPedidosErp).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() =>
+      expect(service.buscarPedidosErpComIdentidadeInterna).toHaveBeenCalledTimes(1),
+    );
 
     const clientePromise = crmErpSearchCustomers.handler(
       {
@@ -97,25 +107,38 @@ describe("tools ERP READ — comportamento do agente", () => {
       ok: true,
       dados: [
         {
-          id: "pedido-eco-1",
-          codigo: 101,
-          cliente: "Eco Projetos",
-          status: "Faturado",
-          statusSistema: "faturado",
-          total: 1234.56,
-          data: "2026-10-01T12:00:00Z",
-          finalizado: true,
-          numeroNFe: "9001",
-          dataFaturamento: "2026-10-01T13:00:00Z",
-          chaveAcessoNFe: null,
-          danfeUrl: null,
-        },
+          pedido: {
+            id: "pedido-eco-1",
+            codigo: 101,
+            cliente: "Eco Projetos",
+            status: "Faturado",
+            statusSistema: "faturado",
+            total: 1234.56,
+            data: "2026-10-01T12:00:00Z",
+            finalizado: true,
+            numeroNFe: "9001",
+            dataFaturamento: "2026-10-01T13:00:00Z",
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
+          },
+          identidadeCliente: {
+            pessoaId: "erp-eco",
+            cpfCnpj: "12345678000190",
+            email: "financeiro@eco.test",
+          },
+        } as PedidoErpComIdentidadeInterna,
       ],
     });
 
     const [pedidos, cliente] = await Promise.all([pedidosPromise, clientePromise]);
 
     expect(pedidos).toMatchObject({
+      resolucao_cliente: {
+        status: "resolved",
+        contact_id: "11111111-1111-4111-8111-111111111111",
+        materializado: true,
+      },
       pedidos: [expect.objectContaining({ numeroNFe: "9001" })],
     });
     expect(cliente).toMatchObject({
@@ -126,7 +149,10 @@ describe("tools ERP READ — comportamento do agente", () => {
   });
 
   it("busca de pedidos vazia libera resolução do mesmo cliente", async () => {
-    vi.mocked(service.buscarPedidosErp).mockResolvedValue({ ok: true, dados: [] });
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+      ok: true,
+      dados: [],
+    });
     vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValue({
       status: "not_found",
     });
@@ -162,25 +188,40 @@ describe("tools ERP READ — comportamento do agente", () => {
     expect(cliente).toEqual({ resolucao: { status: "not_found" }, clientes: [] });
   });
 
-  it("pedidos de um nome não bloqueiam resolução de outro cliente", async () => {
-    vi.mocked(service.buscarPedidosErp).mockResolvedValue({
+  it("pedidos materializados de um nome não bloqueiam resolução de outro cliente", async () => {
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
       ok: true,
       dados: [
         {
-          id: "pedido-eco-2",
-          codigo: 102,
-          cliente: "Eco Projetos",
-          status: "Faturado",
-          statusSistema: "faturado",
-          total: 99,
-          data: "2026-10-02T12:00:00Z",
-          finalizado: true,
-          numeroNFe: "9002",
-          dataFaturamento: "2026-10-02T13:00:00Z",
-          chaveAcessoNFe: null,
-          danfeUrl: null,
-        },
+          pedido: {
+            id: "pedido-eco-2",
+            codigo: 102,
+            cliente: "Eco Projetos",
+            status: "Faturado",
+            statusSistema: "faturado",
+            total: 99,
+            data: "2026-10-02T12:00:00Z",
+            finalizado: true,
+            numeroNFe: "9002",
+            dataFaturamento: "2026-10-02T13:00:00Z",
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
+          },
+          identidadeCliente: {
+            pessoaId: "erp-eco",
+            cpfCnpj: null,
+            email: "financeiro@eco.test",
+          },
+        } as PedidoErpComIdentidadeInterna,
       ],
+    });
+    vi.mocked(customerResolution.resolverClienteVendaErpPorPedidos).mockResolvedValue({
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      origem: "provider",
+      materialized: false,
+      externalLabel: "Eco Projetos",
     });
     vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValue({
       status: "not_found",
