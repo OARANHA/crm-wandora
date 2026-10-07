@@ -50,6 +50,171 @@ const ctx: McpContext = {
 describe("tools ERP READ — comportamento do agente", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("espera pedidos em voo e bloqueia resolução redundante do mesmo cliente quando há resultado", async () => {
+    let liberar!: (valor: unknown) => void;
+    vi.mocked(service.buscarPedidosErp).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          liberar = resolve;
+        }) as never,
+    );
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValue({
+      status: "not_found",
+    });
+
+    const turno = { ...ctx, requestId: "req-erp-paralelo" };
+    const pedidosPromise = crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      turno,
+    );
+
+    await vi.waitFor(() => expect(service.buscarPedidosErp).toHaveBeenCalledTimes(1));
+
+    const clientePromise = crmErpSearchCustomers.handler(
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      turno,
+    );
+
+    expect(customerResolution.resolverClienteVendaErp).not.toHaveBeenCalled();
+
+    liberar({
+      ok: true,
+      dados: [
+        {
+          id: "pedido-eco-1",
+          codigo: 101,
+          cliente: "Eco Projetos",
+          status: "Faturado",
+          statusSistema: "faturado",
+          total: 1234.56,
+          data: "2026-10-01T12:00:00Z",
+          finalizado: true,
+          numeroNFe: "9001",
+          dataFaturamento: "2026-10-01T13:00:00Z",
+          chaveAcessoNFe: null,
+          danfeUrl: null,
+        },
+      ],
+    });
+
+    const [pedidos, cliente] = await Promise.all([pedidosPromise, clientePromise]);
+
+    expect(pedidos).toMatchObject({
+      pedidos: [expect.objectContaining({ numeroNFe: "9001" })],
+    });
+    expect(cliente).toMatchObject({
+      erro: "resolucao_cliente_desnecessaria_apos_pedidos",
+    });
+    expect((cliente as { mensagem: string }).mensagem).toMatch(/use os pedidos já retornados/i);
+    expect(customerResolution.resolverClienteVendaErp).not.toHaveBeenCalled();
+  });
+
+  it("busca de pedidos vazia libera resolução do mesmo cliente", async () => {
+    vi.mocked(service.buscarPedidosErp).mockResolvedValue({ ok: true, dados: [] });
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValue({
+      status: "not_found",
+    });
+
+    const turno = { ...ctx, requestId: "req-erp-vazio" };
+    const pedidos = await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      turno,
+    );
+    const cliente = await crmErpSearchCustomers.handler(
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      turno,
+    );
+
+    expect(pedidos).toEqual({ pedidos: [] });
+    expect(customerResolution.resolverClienteVendaErp).toHaveBeenCalledTimes(1);
+    expect(cliente).toEqual({ resolucao: { status: "not_found" }, clientes: [] });
+  });
+
+  it("pedidos de um nome não bloqueiam resolução de outro cliente", async () => {
+    vi.mocked(service.buscarPedidosErp).mockResolvedValue({
+      ok: true,
+      dados: [
+        {
+          id: "pedido-eco-2",
+          codigo: 102,
+          cliente: "Eco Projetos",
+          status: "Faturado",
+          statusSistema: "faturado",
+          total: 99,
+          data: "2026-10-02T12:00:00Z",
+          finalizado: true,
+          numeroNFe: "9002",
+          dataFaturamento: "2026-10-02T13:00:00Z",
+          chaveAcessoNFe: null,
+          danfeUrl: null,
+        },
+      ],
+    });
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValue({
+      status: "not_found",
+    });
+
+    const turno = { ...ctx, requestId: "req-erp-outro-cliente" };
+    await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      turno,
+    );
+    await crmErpSearchCustomers.handler(
+      {
+        nome: "Outra Empresa",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      turno,
+    );
+
+    expect(customerResolution.resolverClienteVendaErp).toHaveBeenCalledTimes(1);
+  });
+
   it("pedido ou nota por nome usa pedidos diretamente sem exigir resolução prévia do cliente", () => {
     const [bloco] = blocosErpResidentes([
       "crm_erp_search_customers",
