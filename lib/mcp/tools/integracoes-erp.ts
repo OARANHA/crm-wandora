@@ -345,7 +345,7 @@ function projetarPedidoParaTool(pedido: PedidoErp) {
 export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   name: "crm_erp_search_orders",
   description:
-    "Procura pedidos no ERP. Se crm_erp_search_customers já resolveu o cliente, use cliente_contact_id: o backend reutiliza o vínculo e revalida Pedido.pessoaID antes de expor pedidos.",
+    "Procura pedidos e localiza NFe/NFCe relacionadas no ERP. Quando a solicitação JÁ é sobre pedidos, compras, notas ou NFes de um cliente e você só tem o nome/razão social, use esta ferramenta DIRETAMENTE com cliente; crm_erp_search_customers NÃO é pré-requisito. Se o cliente já foi resolvido e existe cliente_contact_id, prefira esse id: o backend reutiliza o vínculo e revalida Pedido.pessoaID antes de expor pedidos.",
   inputSchema: pedidosInputShape,
   category: "read",
   requiresRole: "agent",

@@ -1014,6 +1014,39 @@ export function blocosDeAgendaResidentes(toolIds: readonly string[]): string[] {
 }
 
 /**
+ * Ensino residente do caminho de leitura ERP para perguntas que já são sobre
+ * pedidos ou notas. A lista recebida precisa ser a lista REAL do turno: tools
+ * ERP administrativas podem estar ligadas na versão do agente e ainda assim
+ * sair pelo gate de autoridade do WhatsApp.
+ */
+export function blocosErpResidentes(toolIds: readonly string[]): string[] {
+  const orders = "crm_erp_search_orders";
+  const customers = "crm_erp_search_customers";
+  const invoice = "crm_erp_get_invoice";
+
+  if (!toolIds.includes(orders)) return [];
+
+  let bloco =
+    "## ERP — pedidos e notas por cliente\n" +
+    "Se o administrador pedir pedidos, compras, notas ou NFes de um cliente e informar apenas o " +
+    "nome ou a razão social, chame crm_erp_search_orders DIRETAMENTE com cliente antes de responder. " +
+    "Se já houver um cliente_contact_id resolvido nesta conversa, prefira esse id. ";
+
+  if (toolIds.includes(customers)) {
+    bloco +=
+      "crm_erp_search_customers não é pré-requisito para uma pergunta que já é sobre pedidos/notas; " +
+      "use a resolução de cliente quando a identidade em si precisar ser confirmada ou quando a busca de pedidos não for suficiente. ";
+  }
+
+  if (toolIds.includes(invoice)) {
+    bloco +=
+      "Para consultar os dados fiscais de uma NFe específica, primeiro localize o número da nota nos pedidos e então use crm_erp_get_invoice com esse número.";
+  }
+
+  return [bloco.trim()];
+}
+
+/**
  * Tools de agenda cuja EXECUÇÃO neste turno arma o `agendaStallGate` (before-send.ts) —
  * ver o wrap no loop de montagem das tools MCP, mais abaixo.
  */
@@ -2235,7 +2268,7 @@ async function executarTurnoDoAgente(
     blocosResidentes.push(
       'MODO PRÉVIA: proponha a resposta com send_message. Operações são propostas separadas; nunca diga que executou uma proposta. Nenhum envio real acontece.',
     );
-  const system = blocosResidentes.join('\n\n');
+  let system = blocosResidentes.join('\n\n');
   const previous = preview
     ? (preview.previous ?? null)
     : await latestCheckpoint(pool, tenantId, leadId);
@@ -3967,6 +4000,15 @@ async function executarTurnoDoAgente(
       runLog.info('capacidades entregues ao operador — fora do turno do conversador', {
         entregues,
       });
+    }
+
+    // ERP administrativo só recebe ensino residente quando as ferramentas
+    // realmente sobreviveram a TODOS os gates deste turno (autoridade, módulo,
+    // capacidade e entrega ao Operador). Assim o prompt nunca ensina uma tool
+    // que o modelo não recebeu.
+    const blocosErpDoTurno = blocosErpResidentes(Object.keys(rawTools));
+    if (blocosErpDoTurno.length > 0) {
+      system = [system, ...blocosErpDoTurno].join('\n\n');
     }
 
     // Circuit breaker de tools (F2-15): estado no closure DESTA invocação — zera
