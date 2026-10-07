@@ -95,6 +95,7 @@ import {
   checkpointContentSchema,
   insertCheckpoint,
   parseCheckpointText,
+  recuperarCheckpointNoFechamento,
   type CheckpointContent,
   type LeadCheckpointRow,
 } from "./abertura/checkpoint";
@@ -4454,40 +4455,53 @@ async function executarTurnoDoAgente(
       avisarSemCandidato(preview);
       return;
     }
-    const closing = await runModelCall(
-      pool,
-      deps.llmCfg,
-      {
-        tenantId,
-        leadId: leadId || null,
-        jobId: job?.id,
-        purpose: 'checkpoint',
-        ...(agentConfig !== null
-          ? {
-              model: agentConfig.model,
-              llmOverride: {
-                provider: agentConfig.provider,
-                credentialId: agentConfig.credentialId,
-              },
-            }
-          : {}),
-        system,
-        messages: [
-          // prune: o checkpoint reusa a abertura só como texto — a mídia nativa (cara) já
-          // fez seu trabalho na 1ª chamada e não precisa ir de novo.
-          ...openingTextOnly,
-          ...responseMessages,
-          { role: 'user', content: CHECKPOINT_INSTRUCTION },
-        ],
-      },
-      { registry: deps.registry, log: runLog },
-    );
-    const content = parseCheckpointText(
-      closing.result.text.replace(
+    // O fechamento ocorre DEPOIS dos efeitos do turno. Uma resposta JSON
+    // malformada não pode reiniciar imediatamente tools e envios já executados.
+    // Recupere localmente apenas o checkpoint, sem reenviar o turno ao agente.
+    // A autoria da atividade acompanha a chamada que produziu o checkpoint válido.
+    // Preservamos o callId fora do callback sem repetir as ferramentas do turno.
+    const checkpointCall = { id: null as string | null };
+    const content = await recuperarCheckpointNoFechamento(async (tentativa) => {
+      const closing = await runModelCall(
+        pool,
+        deps.llmCfg,
+        {
+          tenantId,
+          leadId: leadId || null,
+          jobId: job?.id,
+          purpose: 'checkpoint',
+          ...(agentConfig !== null
+            ? {
+                model: agentConfig.model,
+                llmOverride: {
+                  provider: agentConfig.provider,
+                  credentialId: agentConfig.credentialId,
+                },
+              }
+            : {}),
+          system,
+          messages: [
+            // prune: reusa apenas o texto, sem enviar mídia nativa novamente.
+            ...openingTextOnly,
+            ...responseMessages,
+            {
+              role: 'user',
+              content:
+                CHECKPOINT_INSTRUCTION +
+                (tentativa > 1
+                  ? ' A resposta anterior não era um JSON válido. Corrija somente o formato: devolva um ÚNICO objeto JSON, sem markdown nem explicações. Preserve a declaração de intenções e promessas sem inventar dados.'
+                  : ''),
+            },
+          ],
+        },
+        { registry: deps.registry, log: runLog },
+      );
+      checkpointCall.id = closing.callId ?? null;
+      return closing.result.text.replace(
         /https:\/\/meet\.google\.com\/[a-zA-Z0-9-]+/g,
         '[link da reunião disponível na Agenda]',
-      ),
-    );
+      );
+    });
 
     if (preview) {
       preview.result.checkpoint = content;
@@ -4607,7 +4621,7 @@ async function executarTurnoDoAgente(
           // O lastro é a chamada de modelo que PRODUZIU este checkpoint
           // (llm_calls.id). Sem ele a linha entraria como 'system' e perderia a
           // autoria justamente no evento mais "de IA" que existe.
-          ...(closing.callId ? { evidence: { llm_call_ids: [closing.callId] } } : {}),
+          ...(checkpointCall.id ? { evidence: { llm_call_ids: [checkpointCall.id] } } : {}),
           ...(agentConfig?.agentId ? { agentId: agentConfig.agentId } : {}),
           reason: mudanca.reason,
           payload: {
