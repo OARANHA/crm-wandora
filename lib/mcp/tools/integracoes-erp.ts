@@ -86,6 +86,24 @@ function motivoDoVazio(chave: string) {
   };
 }
 
+function motivoBuscaPedidos(resultado: unknown): string | null {
+  if (resultado === null || typeof resultado !== "object") return null;
+  const r = resultado as Record<string, unknown>;
+  if (
+    r.erro === "identidade_pedido_nao_confirmada" ||
+    r.erro === "identidade_pedido_ambigua"
+  ) {
+    const resolucao = r.resolucao_cliente;
+    if (resolucao && typeof resolucao === "object") {
+      const motivo = (resolucao as Record<string, unknown>).motivo;
+      if (typeof motivo === "string" && motivo.trim()) {
+        return `${String(r.erro)}:${motivo}`;
+      }
+    }
+  }
+  return motivoDoVazio("pedidos")(resultado);
+}
+
 const CHAVES_DE_BUSCA = new Set([
   "codigo",
   "nome",
@@ -429,7 +447,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   requiresRole: "agent",
   requiresScope: "mcp:read",
   redigirParaAuditoria: redigirBusca,
-  motivoDoVazio: motivoDoVazio("pedidos"),
+  motivoDoVazio: motivoBuscaPedidos,
   handler: async (input, ctx) => {
     if (
       !input.codigo &&
