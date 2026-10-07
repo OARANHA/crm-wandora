@@ -399,7 +399,51 @@ describe("Customer Resolution VendaERP — identidade vinda dos pedidos", () => 
     expect(service.buscarClientesErp).not.toHaveBeenCalled();
   });
 
-  it("pessoaID ausente em qualquer pedido impede materialização e falha fechado", async () => {
+  it("pessoaID ausente usa CNPJ do próprio pedido em uma consulta direta e materializa", async () => {
+    vi.mocked(service.buscarClientesErp).mockResolvedValue({
+      ok: true,
+      dados: [cliente()],
+    });
+
+    const resultado = await resolverClienteVendaErpPorPedidos(
+      {} as SupabaseClient,
+      "org-x",
+      "Eco Projetos",
+      [pedido(null), pedido(null)],
+      { actorApiTokenId: "tok-1", requestId: "req-fallback-cnpj" },
+    );
+
+    expect(service.buscarClientesErp).toHaveBeenCalledTimes(1);
+    expect(service.buscarClientesErp).toHaveBeenCalledWith(expect.anything(), "org-x", {
+      cpfcnpj: "12345678000190",
+      pageSize: 20,
+      skip: 0,
+    });
+    expect(externalIdentity.vincularIdentidadeClienteExterno).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        externalId: "erp-eco",
+        resolutionOrigin: "exact_document",
+        evidence: expect.objectContaining({
+          source: "orders_search",
+          identity_field: "clienteCNPJ",
+          pessoa_id_present_count: 0,
+        }),
+      }),
+    );
+    expect(resultado).toMatchObject({
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      materialized: true,
+    });
+  });
+
+  it("pessoaID parcial só aceita o cliente encontrado por CNPJ quando os ids concordam", async () => {
+    vi.mocked(service.buscarClientesErp).mockResolvedValue({
+      ok: true,
+      dados: [cliente({ id: "erp-outro" })],
+    });
+
     const resultado = await resolverClienteVendaErpPorPedidos(
       {} as SupabaseClient,
       "org-x",
@@ -409,9 +453,49 @@ describe("Customer Resolution VendaERP — identidade vinda dos pedidos", () => 
 
     expect(resultado).toEqual({
       status: "unresolved",
-      motivo: "identidade_pedido_incompleta",
+      motivo: "identidade_pedido_inconsistente",
     });
     expect(externalIdentity.vincularIdentidadeClienteExterno).not.toHaveBeenCalled();
+  });
+
+  it("sem pessoaID e sem CNPJ/e-mail continua fail-closed sem consultar Pessoas", async () => {
+    const resultado = await resolverClienteVendaErpPorPedidos(
+      {} as SupabaseClient,
+      "org-x",
+      "Eco Projetos",
+      [pedido(null, { cpfCnpj: null, email: null })],
+    );
+
+    expect(resultado).toEqual({
+      status: "unresolved",
+      motivo: "identidade_pedido_incompleta",
+    });
     expect(service.buscarClientesErp).not.toHaveBeenCalled();
+    expect(externalIdentity.vincularIdentidadeClienteExterno).not.toHaveBeenCalled();
+  });
+
+  it("pessoaID completa e única continua autoridade mesmo se e-mail histórico variar", async () => {
+    const resultado = await resolverClienteVendaErpPorPedidos(
+      {} as SupabaseClient,
+      "org-x",
+      "Eco Projetos",
+      [
+        pedido("erp-eco", { email: "antigo@eco.test" }),
+        pedido("erp-eco", { email: "financeiro@eco.test" }),
+      ],
+    );
+
+    expect(service.buscarClientesErp).not.toHaveBeenCalled();
+    expect(externalIdentity.vincularIdentidadeClienteExterno).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        externalId: "erp-eco",
+        evidence: expect.objectContaining({
+          identity_field: "pessoaID",
+          has_email: false,
+        }),
+      }),
+    );
+    expect(resultado.status).toBe("resolved");
   });
 });
