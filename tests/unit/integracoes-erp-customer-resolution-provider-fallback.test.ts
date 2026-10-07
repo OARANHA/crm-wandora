@@ -31,7 +31,7 @@ const service = await import("@/lib/integracoes-erp/service");
 const externalIdentity = await import("@/lib/integracoes-erp/identidade-externa-cliente");
 const localIdentity = await import("@/lib/integracoes-erp/identidade-cliente");
 const { resolverClienteVendaErp } = await import(
-  "@/lib/integracoes-erp/resolucao-cliente-vendaerp"
+  "@/lib/integracoes-erp/resolucao-cliente-vendaerp",
 );
 
 function cliente(overrides: Partial<ClienteErp> = {}): ClienteErp {
