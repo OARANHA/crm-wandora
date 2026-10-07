@@ -26,7 +26,7 @@ import {
 } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
 import type { ClienteErp, PedidoErp } from "@/lib/integracoes-erp/tipos";
 
-import type { McpToolDefinition } from "../types";
+import type { McpContext, McpToolDefinition } from "../types";
 
 const limiteSchema = z.number().int().min(1).max(20).optional().default(10);
 const skipSchema = z.number().int().min(0).max(10_000).optional().default(0);
