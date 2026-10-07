@@ -4,6 +4,7 @@ import { conferirContatoComClienteErp } from "./autoridade-documento";
 import {
   buscarVinculosClientePorRotulo,
   carregarVinculoClienteExterno,
+  carregarVinculoClienteExternoPorIdExterno,
   normalizarChaveRotuloCliente,
   vincularIdentidadeClienteExterno,
   type AuditoriaVinculoCliente,
@@ -11,7 +12,7 @@ import {
 } from "./identidade-externa-cliente";
 import { localizarContatosCandidatosClienteErp } from "./identidade-cliente";
 import { PROVEDOR_VENDAERP } from "./provedores";
-import { buscarClientesErp } from "./service";
+import { buscarClientesErp, type PedidoErpComIdentidadeInterna } from "./service";
 import type { ClienteErp } from "./tipos";
 
 export interface SinaisResolucaoClienteVendaErp {
@@ -91,6 +92,143 @@ function rotuloExterno(s: SinaisResolucaoClienteVendaErp, c: ClienteErp) {
 function rotuloLookupProvider(c: ClienteErp) {
   // Pedidos/Pesquisar aceita Nome/Razão Social; pessoaID ainda revalida o retorno.
   return c.razaoSocial?.trim() || c.nome?.trim() || c.nomeFantasia?.trim() || null;
+}
+
+export async function resolverClienteVendaErpPorPedidos(
+  db: SupabaseClient,
+  organizationId: string,
+  nomeConsultado: string,
+  pedidos: readonly PedidoErpComIdentidadeInterna[],
+  auditoria?: AuditoriaVinculoCliente,
+): Promise<ResolucaoClienteVendaErp> {
+  const nome = nomeConsultado.trim();
+  if (!nome) return { status: "unresolved", motivo: "sinais_insuficientes" };
+  if (pedidos.length === 0) return { status: "unresolved", motivo: "pedidos_nao_encontrados" };
+
+  const pessoaIds = pedidos.map((item) => item.identidadeCliente.pessoaId?.trim() ?? "");
+  if (pessoaIds.some((id) => !id)) {
+    return { status: "unresolved", motivo: "identidade_pedido_incompleta" };
+  }
+
+  const idsUnicos = [...new Set(pessoaIds)];
+  if (idsUnicos.length > 1) {
+    const candidatos = idsUnicos.slice(0, 5).map((id) => {
+      const pedido = pedidos.find((item) => item.identidadeCliente.pessoaId?.trim() === id);
+      return {
+        nome: pedido?.pedido.cliente ?? nome,
+        nomeFantasia: null,
+        razaoSocial: null,
+        cidade: null,
+        uf: null,
+      };
+    });
+    return {
+      status: "ambiguous",
+      motivo: "mais_de_um_cliente_nos_pedidos",
+      candidatos,
+    };
+  }
+
+  const externalId = idsUnicos[0]!;
+  const documentos = new Map<string, string>();
+  const emails = new Map<string, string>();
+  for (const item of pedidos) {
+    const documentoOriginal = item.identidadeCliente.cpfCnpj?.trim();
+    const documento = documentoKey(documentoOriginal);
+    if (documento && documentoOriginal) documentos.set(documento, documentoOriginal);
+
+    const emailOriginal = item.identidadeCliente.email?.trim();
+    const email = emailKey(emailOriginal);
+    if (email && emailOriginal) emails.set(email, emailOriginal);
+  }
+
+  if (documentos.size > 1 || emails.size > 1) {
+    return { status: "unresolved", motivo: "identidade_pedido_inconsistente" };
+  }
+
+  const clienteDoPedido: ClienteErp = {
+    id: externalId,
+    nome,
+    nomeFantasia: nome,
+    razaoSocial: null,
+    cpfCnpj: [...documentos.values()][0] ?? null,
+    email: [...emails.values()][0] ?? null,
+    telefone: null,
+    celular: null,
+    cidade: null,
+    uf: null,
+  };
+
+  const existente = await carregarVinculoClienteExternoPorIdExterno(db, {
+    organizationId,
+    provider: PROVEDOR_VENDAERP.id,
+    externalId,
+  });
+  if (!existente.ok) return { status: "unresolved", motivo: "banco" };
+
+  let contactId = existente.vinculo?.contactId ?? null;
+  if (!contactId) {
+    const locais = await localizarContatosCandidatosClienteErp(db, organizationId, clienteDoPedido);
+    if (!locais.ok) return { status: "unresolved", motivo: "banco" };
+
+    const confirmados = locais.contatos.filter(
+      (contato) => conferirContatoComClienteErp(contato, clienteDoPedido).ok,
+    );
+    if (confirmados.length > 1) {
+      return {
+        status: "ambiguous",
+        motivo: "mais_de_um_contato_local",
+        candidatos: [candidatoSeguro(clienteDoPedido)],
+      };
+    }
+    if (confirmados.length === 0 && locais.contatos.length > 0) {
+      return {
+        status: "unresolved",
+        motivo: "identidade_local_inconsistente",
+        candidatos: [candidatoSeguro(clienteDoPedido)],
+      };
+    }
+    contactId = confirmados[0]?.id ?? null;
+  }
+
+  const vinculo = await vincularIdentidadeClienteExterno(db, {
+    organizationId,
+    contactId,
+    provider: PROVEDOR_VENDAERP.id,
+    externalId,
+    externalLabel: nome,
+    providerLookupLabel: nome,
+    resolutionOrigin: contactId ? "existing_contact" : "exact_name",
+    evidence: {
+      source: "orders_search",
+      identity_field: "pessoaID",
+      matched_orders: pedidos.length,
+      has_document: documentos.size === 1,
+      has_email: emails.size === 1,
+    },
+    auditoria,
+  });
+
+  if (!vinculo.ok) {
+    return {
+      status: "unresolved",
+      motivo:
+        vinculo.motivo === "conflito"
+          ? "conflito_de_vinculo"
+          : vinculo.motivo === "contato_invalido"
+            ? "contato_local_invalido"
+            : "banco",
+    };
+  }
+
+  return {
+    status: "resolved",
+    contactId: vinculo.vinculo.contactId,
+    origem: existente.vinculo ? "existing_link" : "provider",
+    materialized: vinculo.createdContact,
+    externalLabel: vinculo.vinculo.externalLabel,
+    cliente: clienteDoPedido,
+  };
 }
 
 export async function resolverClienteVendaErp(
