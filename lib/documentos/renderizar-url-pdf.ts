@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -29,11 +31,16 @@ export type RenderizadorUrlPdf = (
   politica: PoliticaRenderizacaoUrlPdf,
 ) => Promise<Buffer>;
 
+export interface RedirectLocalDocumento {
+  url: string;
+  fechar: () => Promise<void>;
+}
+
 function parecePdf(buffer: Buffer): boolean {
   return buffer.subarray(0, Math.min(buffer.length, 1024)).includes(Buffer.from("%PDF-"));
 }
 
-export function argumentosChromiumParaPdf(entrada: string, saida: string): string[] {
+export function argumentosChromiumParaPdfDestino(destino: string, saida: string): string[] {
   return [
     "--headless=new",
     // O runner do Elus já está isolado pelo container e não concede os
@@ -46,8 +53,81 @@ export function argumentosChromiumParaPdf(entrada: string, saida: string): strin
     "--virtual-time-budget=12000",
     "--no-pdf-header-footer",
     "--print-to-pdf=" + saida,
-    "file://" + entrada,
+    destino,
   ];
+}
+
+/**
+ * Compatibilidade para callers/testes antigos que montavam um file:// local.
+ * O renderer real não usa mais este salto por JavaScript.
+ */
+export function argumentosChromiumParaPdf(entrada: string, saida: string): string[] {
+  return argumentosChromiumParaPdfDestino("file://" + entrada, saida);
+}
+
+/**
+ * A URL autorizada pode carregar token provider-specific e não deve aparecer
+ * em argv/process list. O Chromium recebe apenas um endpoint loopback com nonce
+ * imprevisível; esse endpoint responde 302 para a URL autorizada em memória.
+ *
+ * O servidor escuta somente 127.0.0.1, não é exposto pela rede do container e
+ * permanece aberto apenas durante a renderização.
+ */
+export async function abrirRedirectLocalParaDocumento(
+  destino: string,
+): Promise<RedirectLocalDocumento> {
+  const nonce = randomUUID();
+  const caminho = "/" + nonce;
+  const servidor = createServer((req, res) => {
+    if (req.method !== "GET" || req.url !== caminho) {
+      res.statusCode = 404;
+      res.setHeader("Cache-Control", "no-store");
+      res.end();
+      return;
+    }
+
+    res.statusCode = 302;
+    res.setHeader("Location", destino);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.end();
+  });
+
+  const fechar = (): Promise<void> =>
+    new Promise((resolve) => {
+      if (!servidor.listening) {
+        resolve();
+        return;
+      }
+      servidor.close(() => resolve());
+    });
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const falhar = (erro: Error) => reject(erro);
+      servidor.once("error", falhar);
+      servidor.listen(0, "127.0.0.1", () => {
+        servidor.off("error", falhar);
+        resolve();
+      });
+    });
+
+    const endereco = servidor.address();
+    if (!endereco || typeof endereco === "string") {
+      await fechar();
+      throw new ErroRenderizacaoDocumento("render_falhou");
+    }
+
+    servidor.unref();
+    return {
+      url: "http://127.0.0.1:" + endereco.port + caminho,
+      fechar,
+    };
+  } catch (erro) {
+    await fechar();
+    if (erro instanceof ErroRenderizacaoDocumento) throw erro;
+    throw new ErroRenderizacaoDocumento("render_falhou");
+  }
 }
 
 function executarChromium(args: string[], timeoutMs: number = RENDER_TIMEOUT_MS): Promise<void> {
@@ -89,8 +169,8 @@ function executarChromium(args: string[], timeoutMs: number = RENDER_TIMEOUT_MS)
  *
  * Não é tool MCP e não recebe URL arbitrária do modelo. O chamador é obrigado a
  * fornecer uma política explícita de allowlist. A URL sensível também não vai na
- * linha de comando do Chromium: ela fica num HTML temporário local, apagado no
- * bloco de limpeza.
+ * linha de comando do Chromium: fica apenas na memória do redirect HTTP loopback,
+ * que é removido assim que a renderização termina.
  */
 export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) => {
   if (!politica.permiteUrl(url)) {
@@ -99,21 +179,14 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
 
   const limite = politica.maxBytes ?? MAX_MEDIA_BYTES;
   const pasta = await mkdtemp(join(tmpdir(), "elus-document-render-"));
-  const entrada = join(pasta, "entrada.html");
   const saida = join(pasta, "documento.pdf");
-  const destinoSerializado = JSON.stringify(url).replace(/</g, "\\u003c");
+  let redirecionamento: RedirectLocalDocumento | null = null;
 
   try {
-    await writeFile(
-      entrada,
-      '<!doctype html><meta charset="utf-8"><script>location.replace(' +
-        destinoSerializado +
-        ")</script>",
-      { encoding: "utf8", mode: 0o600 },
-    );
+    redirecionamento = await abrirRedirectLocalParaDocumento(url);
 
     await executarChromium(
-      argumentosChromiumParaPdf(entrada, saida),
+      argumentosChromiumParaPdfDestino(redirecionamento.url, saida),
       politica.timeoutMs ?? RENDER_TIMEOUT_MS,
     );
 
@@ -126,6 +199,7 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
     if (erro instanceof ErroRenderizacaoDocumento) throw erro;
     throw new ErroRenderizacaoDocumento("render_falhou");
   } finally {
+    await redirecionamento?.fechar().catch(() => undefined);
     await rm(pasta, { recursive: true, force: true }).catch(() => undefined);
   }
 };
