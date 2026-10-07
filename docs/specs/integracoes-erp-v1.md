@@ -141,9 +141,11 @@ o número localizado nos pedidos alimenta `crm_erp_get_invoice`.
 A coordenação do mesmo turno é determinística: uma busca de pedidos por Nome/Razão Social registra
 seu resultado pelo `requestId`. Quando todos os pedidos encontrados carregam a mesma `pessoaID`,
 o backend reutiliza a autoridade de identidade da PR #45: procura vínculo ativo por
-`organization/provider/external_id`, tenta localizar um contato local compatível pelos sinais
-mínimos do pedido e, se não houver, materializa o contact e grava o vínculo pela mesma RPC
-transacional `fn_integracoes_erp_vincular_cliente`. Esse caminho não chama `Pessoas/Pesquisar`.
+`organization/provider/external_id`, tenta localizar um contato local compatível por sinais fortes
+já presentes no pedido (por exemplo e-mail; nome sozinho não é prova) e, se não houver, materializa
+o contact e grava o vínculo pela mesma RPC transacional `fn_integracoes_erp_vincular_cliente`.
+Esse caminho não chama `Pessoas/Pesquisar` e não cria um segundo contact quando já há vínculo
+externo ou contato local inequivocamente compatível.
 A tool devolve `resolucao_cliente.contact_id` junto dos pedidos.
 
 Uma resolução apenas por esse mesmo nome aguarda a busca se ela estiver em andamento. Só quando a
