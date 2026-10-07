@@ -148,6 +148,143 @@ describe("tools ERP READ — comportamento do agente", () => {
     expect(customerResolution.resolverClienteVendaErp).not.toHaveBeenCalled();
   });
 
+  it("coordena também quando a resolução de cliente começa antes da busca de pedidos", async () => {
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+      ok: true,
+      dados: [
+        {
+          pedido: {
+            id: "pedido-eco-inverso",
+            codigo: 103,
+            cliente: "Eco Projetos",
+            status: "Faturado",
+            statusSistema: "faturado",
+            total: 321,
+            data: "2026-10-03T12:00:00Z",
+            finalizado: true,
+            numeroNFe: "9003",
+            dataFaturamento: "2026-10-03T13:00:00Z",
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
+          },
+          identidadeCliente: {
+            pessoaId: "erp-eco",
+            cpfCnpj: "12345678000190",
+            email: "financeiro@eco.test",
+          },
+        } as PedidoErpComIdentidadeInterna,
+      ],
+    });
+    vi.mocked(customerResolution.resolverClienteVendaErpPorPedidos).mockResolvedValue({
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      origem: "provider",
+      materialized: false,
+      externalLabel: "Eco Projetos",
+    });
+    vi.mocked(customerResolution.resolverClienteVendaErp).mockResolvedValue({
+      status: "not_found",
+    });
+
+    const turno = { ...ctx, requestId: "req-erp-ordem-inversa" };
+    const clientePromise = crmErpSearchCustomers.handler(
+      {
+        nome: "Eco Projetos",
+        cpf_cnpj: undefined,
+        email: undefined,
+        cliente_contact_id: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      turno,
+    );
+    const pedidosPromise = crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      turno,
+    );
+
+    const [cliente, pedidos] = await Promise.all([clientePromise, pedidosPromise]);
+
+    expect(pedidos).toMatchObject({
+      resolucao_cliente: {
+        status: "resolved",
+        contact_id: "11111111-1111-4111-8111-111111111111",
+      },
+      pedidos: [expect.objectContaining({ numeroNFe: "9003" })],
+    });
+    expect(cliente).toMatchObject({
+      erro: "resolucao_cliente_desnecessaria_apos_pedidos",
+    });
+    expect(customerResolution.resolverClienteVendaErp).not.toHaveBeenCalled();
+  });
+
+  it("não expõe pedidos quando a identidade encontrada não pode ser provada", async () => {
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+      ok: true,
+      dados: [
+        {
+          pedido: {
+            id: "pedido-sem-identidade",
+            codigo: 104,
+            cliente: "Eco Projetos",
+            status: "Faturado",
+            statusSistema: "faturado",
+            total: 500,
+            data: "2026-10-04T12:00:00Z",
+            finalizado: true,
+            numeroNFe: "9004",
+            dataFaturamento: "2026-10-04T13:00:00Z",
+            chaveAcessoNFe: null,
+            danfeUrl: null,
+            urlSefaz: null,
+          },
+          identidadeCliente: {
+            pessoaId: null,
+            cpfCnpj: "12345678000190",
+            email: "financeiro@eco.test",
+          },
+        } as PedidoErpComIdentidadeInterna,
+      ],
+    });
+    vi.mocked(customerResolution.resolverClienteVendaErpPorPedidos).mockResolvedValue({
+      status: "unresolved",
+      motivo: "identidade_pedido_incompleta",
+    });
+
+    const resultado = await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 10,
+        skip: 0,
+      },
+      { ...ctx, requestId: "req-erp-sem-identidade" },
+    );
+
+    expect(resultado).toMatchObject({
+      erro: "identidade_pedido_nao_confirmada",
+      resolucao_cliente: {
+        status: "unresolved",
+        motivo: "identidade_pedido_incompleta",
+      },
+    });
+    expect(resultado).not.toHaveProperty("pedidos");
+  });
+
   it("busca de pedidos vazia libera resolução do mesmo cliente", async () => {
     vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
       ok: true,
