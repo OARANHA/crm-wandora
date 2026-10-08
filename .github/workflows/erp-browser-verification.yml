@@ -109,7 +109,7 @@ jobs:
 
       - name: Upload visual evidence
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: erp-browser-visual-evidence
           path: test-results
