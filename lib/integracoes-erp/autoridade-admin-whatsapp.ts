@@ -325,9 +325,7 @@ export async function auditarConsultaAdminWhatsapp(input: {
       ...(input.motivo ? { motivo: input.motivo } : {}),
       ...(input.codigoTecnico ? { codigo_tecnico: input.codigoTecnico } : {}),
       ...(etapaAuditavel ? { etapa_renderizacao: input.etapaRenderizacao } : {}),
-      ...(navegacaoAuditavel
-        ? { diagnostico_navegacao: input.diagnosticoNavegacao }
-        : {}),
+      ...(navegacaoAuditavel ? { diagnostico_navegacao: input.diagnosticoNavegacao } : {}),
       ...(typeof input.statusHttp === "number" ? { status_http: input.statusHttp } : {}),
       ...(typeof input.autenticacaoSameOrigin === "boolean"
         ? { autenticacao_same_origin: input.autenticacaoSameOrigin }
@@ -432,9 +430,7 @@ export async function prepararDanfeAdminWhatsapp(
         {
           codigoTecnico: erro.codigo,
           ...(erro.etapa ? { etapaRenderizacao: erro.etapa } : {}),
-          ...(erro.diagnosticoNavegacao
-            ? { diagnosticoNavegacao: erro.diagnosticoNavegacao }
-            : {}),
+          ...(erro.diagnosticoNavegacao ? { diagnosticoNavegacao: erro.diagnosticoNavegacao } : {}),
           ...(typeof erro.status === "number" ? { statusHttp: erro.status } : {}),
           autenticacaoSameOrigin: Boolean(headers),
         },
