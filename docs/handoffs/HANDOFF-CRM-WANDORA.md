@@ -114,6 +114,7 @@ Direção de produto da Wandora:
 O Elus está instalado na VPS do Vigia, não na VPS principal da Wandora.
 
 - Portainer correto: `https://ops-vigia.wandora.com.br/#!/3/docker/stacks`
+- **Runbook canônico do deploy ELUS:** [`docs/runbooks/elus-vigia-portainer.md`](../runbooks/elus-vigia-portainer.md). O conector Portainer central de `portainer.wandora.com.br` **não** aponta para esta instalação e não pode ser usado para redeploy do ELUS sem nova comprovação.
 - Stack: `elus`
 - Rede externa usada pelo app: `vigia-edge`
 - Domínio público: `https://elus.wandora.com.br`
