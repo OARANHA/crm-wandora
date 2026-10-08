@@ -167,7 +167,17 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
 
   it("exige a chave fiscal exata da NFe no DOM, não apenas a palavra Nota Fiscal", async () => {
     const env = ambientePdf();
-    const chave = ["35", "2610", "12345678000190", "55", "001", "064996397", "1", "12345678", "0"].join("");
+    const chave = [
+      "35",
+      "2610",
+      "12345678000190",
+      "55",
+      "001",
+      "064996397",
+      "1",
+      "12345678",
+      "0",
+    ].join("");
     await renderizarUrlParaPdfControlado(danfe, {
       ...policy,
       chaveFiscalEsperada: chave,
@@ -188,7 +198,11 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(checar(chave)).toBe(false);
     Object.defineProperty(document.body, "innerText", {
       configurable: true,
-      value: "DANFE NOTA FISCAL CHAVE DE ACESSO " + chave.match(/.{1,4}/g)?.join(" ") + " " + "teste ".repeat(20),
+      value:
+        "DANFE NOTA FISCAL CHAVE DE ACESSO " +
+        chave.match(/.{1,4}/g)?.join(" ") +
+        " " +
+        "teste ".repeat(20),
     });
     expect(checar(chave)).toBe(true);
     delete (document.body as HTMLElement & { innerText?: string }).innerText;
