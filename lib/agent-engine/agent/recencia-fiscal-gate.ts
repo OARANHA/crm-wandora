@@ -37,3 +37,10 @@ export function recenciaFiscalComprovada(resultado: unknown): boolean {
       nota.dataEmissao.length > 0,
   );
 }
+
+/** Somente números que a busca fiscal certificou entram no preparo de DANFE. */
+export function numerosDaBuscaFiscalComprovada(resultado: unknown): string[] {
+  if (!recenciaFiscalComprovada(resultado)) return [];
+  const notas = (resultado as { notas: Array<{ numeroNFe: string }> }).notas;
+  return notas.map((n) => n.numeroNFe);
+}
