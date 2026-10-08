@@ -1,0 +1,50 @@
+name: DANFE Chromium worker offline probe
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/danfe-chromium-worker-offline.yml"
+      - "scripts/diagnostics/danfe-chromium-offline.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium-offline:
+    name: Chromium in published Alpine worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout diagnostic fixture
+        uses: actions/checkout@v4
+
+      - name: Validate Node diagnostic syntax
+        run: node --check scripts/diagnostics/danfe-chromium-offline.mjs
+
+      - name: Pull published worker image without building
+        run: docker pull ghcr.io/oaranha/elus-worker@sha256:014356698243e79a295e26af01e16e29cbfc78e0b1be1ba847bc6220a5b7a0a1
+
+      - name: Exercise offline 302 and slow SPA in exact worker image
+        run: |
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --memory 1024m \
+            --cpus 2 \
+            --pids-limit 256 \
+            --shm-size 256m \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount type=bind,source="$GITHUB_WORKSPACE/scripts/diagnostics/danfe-chromium-offline.mjs",target=/probe.mjs,readonly \
+            --entrypoint node \
+            ghcr.io/oaranha/elus-worker@sha256:014356698243e79a295e26af01e16e29cbfc78e0b1be1ba847bc6220a5b7a0a1 \
+            /probe.mjs
+
+      - name: Scope statement
+        if: always()
+        run: |
+          echo "Only local synthetic HTML was tested, without ERP access."
+          echo "This workflow does not prove that real DANFE delivery works."
+          echo "No deployment or canary is authorized by this test."
