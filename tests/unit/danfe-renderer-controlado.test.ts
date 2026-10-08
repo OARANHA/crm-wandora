@@ -205,7 +205,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
         "teste ".repeat(20),
     });
     expect(checar(chave)).toBe(true);
-    delete (document.body as HTMLElement & { innerText?: string }).innerText;
+    Reflect.deleteProperty(document.body, "innerText");
   });
 
   it("recusa PDF sem assinatura completa", async () => {
