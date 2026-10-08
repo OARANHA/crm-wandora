@@ -163,6 +163,11 @@ import {
   provideCaseUpdateInputSchema,
 } from './human-cases';
 import { buildMcpTurnTools } from '../edge/crm/mcp-tools';
+import {
+  AVISO_SEM_RECENCIA_FISCAL,
+  pedidoDeNfeMaisRecente,
+  recenciaFiscalComprovada,
+} from './recencia-fiscal-gate';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
 import { cancelPendingCronsForLead } from '../cron/scheduler';
 import {
@@ -2723,6 +2728,9 @@ async function executarTurnoDoAgente(
   // as tools do modelo rodam em passos anteriores do mesmo loop, o valor já está certo
   // quando o modelo decide mandar a resposta.
   let agendaToolCalledThisTurn = false;
+  // Prova fiscal vem somente da tool de NFes por período executada neste turno.
+  // Histórico, NFe antiga e busca de pedidos não certificam "última nota".
+  let recenciaFiscalComprovadaNesteTurno = false;
   const outcomes: ChannelSendResult[] = [];
   // Citações acumuladas por buscas de conhecimento DESTE turno — anexadas à
   // próxima outbound enviada (shape de lib/ai/citations/types, que a UI já lê).
@@ -3031,6 +3039,23 @@ async function executarTurnoDoAgente(
     send_message: tool({
       ...AGENT_TOOL_DEFS.send_message,
       execute: async ({ body, produto_codigo }) => {
+        // Falha fechada: enquanto o agente não publicar a capacidade fiscal
+        // (ou a busca não concluir o ranking), NUNCA atribuir recência a uma
+        // nota conhecida do histórico nem enviar uma DANFE preparada sem prova.
+        // Somente agente com ERP configurado; pedido de NFe específica não é afetado.
+        if (
+          agentConfig?.toolIds.some(
+            (id) => id === 'crm_erp_search_orders' || id === 'crm_erp_search_recent_invoices',
+          ) &&
+          pedidoDeNfeMaisRecente(mensagemDoJob) &&
+          !recenciaFiscalComprovadaNesteTurno
+        ) {
+          body = AVISO_SEM_RECENCIA_FISCAL;
+          documentoAdminPreparado = null;
+          runLog.warn('recência fiscal não comprovada — resposta e anexo protegidos', {
+            job_id: liveJob().id,
+          });
+        }
         // CORPO VAZIO NÃO SAI. Medido ao vivo (2026-09-19): o `gpt-4o-mini`
         // chamou `send_message` várias vezes com corpo que virou vazio e o
         // WhatsApp do cliente recebeu bolhas em branco. O schema garante
@@ -3964,7 +3989,20 @@ async function executarTurnoDoAgente(
             if (name in rawTools) continue;
             // Marca a EXECUÇÃO (não só a decisão de chamar) — é isso que o agendaStallGate
             // precisa saber para não vetar um turno que já checou a agenda de verdade.
-            if (AGENDA_TOOL_NAMES.has(name) && typeof mcpTool.execute === 'function') {
+            if (name === 'crm_erp_search_recent_invoices' && typeof mcpTool.execute === 'function') {
+              const executarConsultaFiscal = mcpTool.execute.bind(mcpTool);
+              rawTools[name] = {
+                ...mcpTool,
+                execute: (async (...args: Parameters<typeof executarConsultaFiscal>) => {
+                  const resultado = await executarConsultaFiscal(...args);
+                  // Apenas uma resposta estruturalmente completa da capability
+                  // certifica o turno. Um erro ou lista vazia nunca libera egress.
+                  if (recenciaFiscalComprovada(resultado))
+                    recenciaFiscalComprovadaNesteTurno = true;
+                  return resultado;
+                }) as typeof mcpTool.execute,
+              };
+            } else if (AGENDA_TOOL_NAMES.has(name) && typeof mcpTool.execute === 'function') {
               const executeOriginal = mcpTool.execute.bind(mcpTool);
               rawTools[name] = {
                 ...mcpTool,
