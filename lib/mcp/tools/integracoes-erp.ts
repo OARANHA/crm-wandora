@@ -615,7 +615,7 @@ async function ordenarUltimasNotas(
 export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
   name: "crm_erp_search_orders",
   description:
-    "Procura pedidos e localiza NFe/NFCe relacionadas no ERP. Quando a solicitação JÁ é sobre pedidos, compras, notas ou NFes de um cliente e você só tem o nome/razão social, use esta ferramenta DIRETAMENTE com cliente; crm_erp_search_customers NÃO é pré-requisito. Para 'última nota' ou 'últimas N notas', informe ultimas_notas=N: a capability pagina o conjunto, considera somente pedidos com NFe, comprova a data fiscal e devolve as NFes mais recentes em ordem decrescente. Se o cliente já foi resolvido e existe cliente_contact_id, prefira esse id.",
+    "Procura pedidos e localiza NFe/NFCe relacionadas no ERP. Quando a solicitação JÁ é sobre pedidos, compras, notas ou NFes de um cliente e você só tem o nome/razão social, use esta ferramenta DIRETAMENTE com cliente; crm_erp_search_customers NÃO é pré-requisito. Para 'última nota' ou 'últimas N notas', informe ultimas_notas=N: a capability pagina o conjunto, considera somente pedidos com NFe, comprova a data fiscal e devolve as NFes mais recentes em ordem decrescente. Se o cliente já foi resolvido e existe cliente_contact_id, prefira esse id. Se uma tentativa por cliente com ultimas_notas=N não trouxe resultados e você continuar com cliente_contact_id, mantenha ultimas_notas=N; jamais infira as últimas notas a partir de limite ou skip. Caso receba continuacao_notas_sem_ranking, repita a consulta com ultimas_notas_necessarias.",
   inputSchema: pedidosInputShape,
   category: "read",
   requiresRole: "agent",
