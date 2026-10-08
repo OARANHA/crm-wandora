@@ -101,8 +101,7 @@ export async function buscarUltimasNfesFiscais(
         break;
       }
     }
-    if (!completa)
-      return { ok: false, motivo: "consulta_parcial", detalhes: { mesesConsultados } };
+    if (!completa) return { ok: false, motivo: "consulta_parcial", detalhes: { mesesConsultados } };
     mesesConsultados.push(mes.codigo);
     let selecionadas: NotaFiscalPeriodoErp[];
     try {
