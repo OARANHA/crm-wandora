@@ -65,11 +65,10 @@ export async function materializarDanfeNaConversa(
 
   let documento;
   try {
-    documento = await materializarDanfeExterno(
-      danfeUrl,
-      undefined,
-      { ...(headers ? { headers } : {}), chaveFiscalEsperada },
-    );
+    documento = await materializarDanfeExterno(danfeUrl, undefined, {
+      ...(headers ? { headers } : {}),
+      chaveFiscalEsperada,
+    });
   } catch (erro) {
     if (erro instanceof ErroDanfeExterno) {
       return {
