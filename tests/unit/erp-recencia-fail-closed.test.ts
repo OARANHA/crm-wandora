@@ -51,7 +51,6 @@ describe("ISIS — gate de recência fiscal comprovada", () => {
     }
   });
 
-
   it.each([
     ["ISIS, traga a última nota emitida para a Eco Projetos", 1],
     ["Me traga as últimas duas notas da Eco Projetos", 2],
