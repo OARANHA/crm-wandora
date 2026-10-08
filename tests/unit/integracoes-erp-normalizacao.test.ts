@@ -24,6 +24,7 @@ describe("adapter seguro do VendaERP", () => {
       pedidosPesquisar: "/api/request/Pedidos/Pesquisar",
       fiscalInformacoesVenda: "/api/request/Fiscal/InformacoesVenda",
       fiscalConsultarNfe: "/api/request/Fiscal/ConsultarNFE",
+      fiscalConsultarNfePeriodo: "/api/request/Fiscal/ConsultarNfePeriodo",
     });
   });
 
