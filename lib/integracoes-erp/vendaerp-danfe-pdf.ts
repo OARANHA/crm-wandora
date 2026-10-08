@@ -1,4 +1,5 @@
-import { renderizarUrlParaPdf, type RenderizadorUrlPdf } from "@/lib/documentos/renderizar-url-pdf";
+import { type RenderizadorUrlPdf } from "@/lib/documentos/renderizar-url-pdf";
+import { renderizarUrlParaPdfControlado } from "@/lib/documentos/renderizar-url-pdf-controlado";
 import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
 
 const VENDAERP_DANFE_HOST = "app.vendaerp.com.br";
@@ -50,7 +51,7 @@ export function ehUrlDanfePublicoVendaErp(urlBruta: string): boolean {
  */
 export async function renderizarDanfeVendaErpParaPdf(
   url: string,
-  renderizador: RenderizadorUrlPdf = renderizarUrlParaPdf,
+  renderizador: RenderizadorUrlPdf = renderizarUrlParaPdfControlado,
 ): Promise<Buffer> {
   return renderizador(url, {
     nome: "erp.vendaerp.danfe_to_pdf",
