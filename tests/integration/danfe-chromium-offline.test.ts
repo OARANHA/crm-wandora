@@ -6,6 +6,8 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { extractPdfText } from "@/lib/ai/rag/extractors/pdf";
+
 import {
   argumentosChromiumParaPdf,
   renderizarUrlParaPdf,
@@ -125,6 +127,15 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
         const pdf = await readFile(saida);
         expect(pdf.subarray(0, 1024).includes(Buffer.from("%PDF-"))).toBe(true);
         expect(pdf.length).toBeGreaterThan(1_000);
+        // Assinatura %PDF- e execução do JS não garantem que o PDF levou
+        // o conteúdo final da SPA. Reaproveita o extrator canônico em processo
+        // isolado (seguro também sob tsx no worker), sem provider real.
+        const texto = await extractPdfText(pdf, {
+          estrategia: "processo-a-parte",
+          timeoutMs: 20_000,
+        });
+        expect(texto).toContain("DANFE sintetica pronta");
+        expect(texto).not.toContain("Carregando");
         expect(hits.html).toBeGreaterThan(0);
         expect(hits.script).toBeGreaterThan(0);
         expect(hits.executed).toBeGreaterThan(0);
@@ -143,6 +154,15 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
 
       expect(pdf.subarray(0, 1024).includes(Buffer.from("%PDF-"))).toBe(true);
       expect(pdf.length).toBeGreaterThan(1_000);
+      // Assinatura %PDF- e execução do JS não garantem que o PDF levou
+      // o conteúdo final da SPA. Reaproveita o extrator canônico em processo
+      // isolado (seguro também sob tsx no worker), sem provider real.
+      const texto = await extractPdfText(pdf, {
+        estrategia: "processo-a-parte",
+        timeoutMs: 20_000,
+      });
+      expect(texto).toContain("DANFE sintetica pronta");
+      expect(texto).not.toContain("Carregando");
       expect(hits.html).toBeGreaterThan(0);
       expect(hits.script).toBeGreaterThan(0);
       expect(hits.executed).toBeGreaterThan(0);
