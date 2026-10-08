@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { chaveFiscalComprovadaDaNota } from "@/lib/integracoes-erp/chave-fiscal-comprovada";
 
 const numero = 64_996_397;
-const chave = ["35", "2610", "12345678000190", "55", "001", "064996397", "1", "12345678", "0"].join("");
+const chave = ["35", "2610", "12345678000190", "55", "001", "064996397", "1", "12345678", "0"].join(
+  "",
+);
 
 describe("identidade fiscal da DANFE", () => {
   it("usa nNF da chave e não confunde número da nota com código de pedido", () => {
