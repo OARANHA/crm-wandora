@@ -18,18 +18,22 @@ const LIMITE_TOTAL_MS = 28_000;
 const LIMITE_ETAPA_MS = 8_000;
 
 /**
- * page.pdf() não tem opção timeout em playwright-core 1.63.
- * A espera é limitada pelo próprio runtime; o finally do caller fecha
- * o Browser via API pública, interrompendo também uma impressão pendente.
+ * Limite por operação, inclusive nas chamadas Playwright que não oferecem
+ * timeout nativo (ex.: PDF, context.newPage e encerramento).
+ * Promise.race limita a espera do chamador, mas NÃO encerra sozinho uma
+ * operação pendente. O finally fecha o Browser pela API oficial.
  */
-export async function imprimirPdfComPrazo(
-  imprimir: () => Promise<Buffer>,
+async function executarDentroDoPrazo<T>(
+  executar: () => Promise<T>,
   prazoMs: number,
-): Promise<Buffer> {
+): Promise<T> {
+  if (prazoMs <= 0 || !Number.isFinite(prazoMs)) {
+    throw new ErroRenderizacaoDocumento("timeout");
+  }
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      imprimir(),
+      executar(),
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new ErroRenderizacaoDocumento("timeout")), prazoMs);
       }),
@@ -37,6 +41,14 @@ export async function imprimirPdfComPrazo(
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+/** page.pdf() não aceita 'timeout' nas opções de Playwright-core 1.63. */
+export async function imprimirPdfComPrazo(
+  imprimir: () => Promise<Buffer>,
+  prazoMs: number,
+): Promise<Buffer> {
+  return executarDentroDoPrazo(imprimir, prazoMs);
 }
 
 /**
@@ -66,20 +78,8 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     throw new ErroRenderizacaoDocumento("destino_inseguro");
   }
 
-  // DNS: confirmar todos os IPs e piná-los no Chromium antes de qualquer
-  // navegação para fechar a janela de DNS rebinding.
-  const ipv4 = await resolverIpPublicoFixadoParaBrowser(origem.hostname);
-  if (!ipv4) throw new ErroRenderizacaoDocumento("destino_inseguro");
-
-  // Identidade fiscal só pode vir da leitura estruturada ERP. Uma chave inválida
-  // não autoriza renderizar e entregar um PDF visualmente plausível.
-  if (
-    politica.chaveFiscalEsperada !== undefined &&
-    !/^\d{44}$/.test(politica.chaveFiscalEsperada)
-  ) {
-    throw new ErroRenderizacaoDocumento("render_falhou");
-  }
-
+  // O prazo total inclui o DNS: anteriormente o relógio só começava
+  // DEPOIS da resolução, deixando o pedido travar sem deadline.
   const maxBytes = politica.maxBytes ?? MAX_MEDIA_BYTES;
   const limiteMs = Math.min(politica.timeoutMs ?? LIMITE_TOTAL_MS, LIMITE_TOTAL_MS);
   const deadline = Date.now() + limiteMs;
@@ -88,6 +88,23 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     if (ms <= 0) throw new ErroRenderizacaoDocumento("timeout");
     return ms;
   };
+
+  // DNS: confirmar todos os IPs e piná-los no Chromium antes de navegar.
+  // A consulta DNS subjacente pode terminar tardiamente, porém a resposta
+  // atrasada jamais será usada depois de expirar o prazo.
+  const ipv4 = await executarDentroDoPrazo(
+    () => resolverIpPublicoFixadoParaBrowser(origem.hostname),
+    Math.min(3_000, restante()),
+  );
+  if (!ipv4) throw new ErroRenderizacaoDocumento("destino_inseguro");
+
+  // Identidade fiscal só pode vir da leitura estruturada ERP.
+  if (
+    politica.chaveFiscalEsperada !== undefined &&
+    !/^\d{44}$/.test(politica.chaveFiscalEsperada)
+  ) {
+    throw new ErroRenderizacaoDocumento("render_falhou");
+  }
 
   let browser: Browser | null = null;
   let redirect: Awaited<ReturnType<typeof abrirRedirectLocalParaDocumento>> | null = null;
@@ -117,45 +134,60 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       },
     });
 
-    const context = await browser.newContext({
-      serviceWorkers: "block",
-      acceptDownloads: false,
-      javaScriptEnabled: true,
-      bypassCSP: false,
-    });
+    const context = await executarDentroDoPrazo(
+      () =>
+        browser!.newContext({
+          serviceWorkers: "block",
+          acceptDownloads: false,
+          javaScriptEnabled: true,
+          bypassCSP: false,
+        }),
+      restante(),
+    );
 
     // WebRTC não atravessa context.route("**/*"). A DANFE não necessita
     // PeerConnection; desabilitar antes de executar qualquer script da SPA.
-    await context.addInitScript(() => {
-      Object.defineProperty(window, "RTCPeerConnection", {
-        value: undefined,
-        configurable: false,
-        writable: false,
-      });
-      Object.defineProperty(window, "webkitRTCPeerConnection", {
-        value: undefined,
-        configurable: false,
-        writable: false,
-      });
-    });
+    await executarDentroDoPrazo(
+      () =>
+        context.addInitScript(() => {
+          Object.defineProperty(window, "RTCPeerConnection", {
+            value: undefined,
+            configurable: false,
+            writable: false,
+          });
+          Object.defineProperty(window, "webkitRTCPeerConnection", {
+            value: undefined,
+            configurable: false,
+            writable: false,
+          });
+        }),
+      restante(),
+    );
 
     // Playwright intercepta requests antes do socket; nenhuma URL de rede
     // interna, segundo host ou POST pode ser consumida pelo Chrome.
-    await context.route("**/*", async (route) => {
-      const permitido = recursoPermitidoNoBrowserDeDocumento(
-        route.request().url(),
-        origem.origin,
-        redirect!.url,
-        route.request().method(),
-      );
-      if (!permitido) return route.abort("blockedbyclient");
-      return route.continue();
-    });
+    await executarDentroDoPrazo(
+      () =>
+        context.route("**/*", async (route) => {
+          const permitido = recursoPermitidoNoBrowserDeDocumento(
+            route.request().url(),
+            origem.origin,
+            redirect!.url,
+            route.request().method(),
+          );
+          if (!permitido) return route.abort("blockedbyclient");
+          return route.continue();
+        }),
+      restante(),
+    );
 
     // A API de routeWebSocket não depende do route HTTP e bloqueia egress
     // paralelo criado por JavaScript da SPA para destinos de rede internos.
-    await context.routeWebSocket("**/*", (socket) => socket.close());
-    const page = await context.newPage();
+    await executarDentroDoPrazo(
+      () => context.routeWebSocket("**/*", (socket) => socket.close()),
+      restante(),
+    );
+    const page = await executarDentroDoPrazo(() => context.newPage(), restante());
     const resposta = await page.goto(redirect.url, {
       waitUntil: "domcontentloaded",
       timeout: restante(),
@@ -219,13 +251,20 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   } finally {
     if (browser) {
       try {
-        // API pública do Playwright fecha browser, contextos e processo. Evitar
-        // cast para process() privado, que não existe no contrato Browser.
-        await browser.close();
+        // Limita a espera do chamador sem usar API privada de processo.
+        // browser.close() continua em andamento caso o prazo expire; um
+        // timeout aqui NÃO comprova que o subprocesso terminou.
+        await executarDentroDoPrazo(() => browser!.close(), 2_000);
       } catch {
-        // Falha de teardown não mascara erro de renderização já classificado.
+        // Cleanup best-effort; nunca expor logs/argumentos do navegador.
       }
     }
-    await redirect?.fechar().catch(() => undefined);
+    if (redirect) {
+      try {
+        await executarDentroDoPrazo(() => redirect!.fechar(), 2_000);
+      } catch {
+        // Não manter o turno preso em conexões HTTP remanescentes.
+      }
+    }
   }
 };
