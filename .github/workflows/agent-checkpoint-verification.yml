@@ -6,6 +6,8 @@ on:
       - ".github/workflows/agent-checkpoint-verification.yml"
       - "lib/agent-engine/agent/abertura/**"
       - "lib/agent-engine/agent/inbound-turn.ts"
+      - "lib/agent-engine/agent/recencia-fiscal-gate.ts"
+      - "tests/unit/erp-recencia-fail-closed.test.ts"
       - "lib/agent-engine/agent/declaracao.ts"
       - "tests/unit/checkpoint-*.test.ts"
       - "tests/unit/declaracao-do-turno.test.ts"
@@ -48,6 +50,8 @@ jobs:
           pnpm exec eslint
           lib/agent-engine/agent/abertura/checkpoint.ts
           lib/agent-engine/agent/inbound-turn.ts
+          lib/agent-engine/agent/recencia-fiscal-gate.ts
+          tests/unit/erp-recencia-fail-closed.test.ts
           tests/unit/checkpoint-recuperacao-local.test.ts
 
       - name: Check formatting of focused changes
@@ -55,11 +59,14 @@ jobs:
           pnpm exec prettier --check
           lib/agent-engine/agent/abertura/checkpoint.ts
           tests/unit/checkpoint-recuperacao-local.test.ts
+          lib/agent-engine/agent/recencia-fiscal-gate.ts
+          tests/unit/erp-recencia-fail-closed.test.ts
 
       - name: Checkpoint regression tests
         run: >-
           pnpm exec vitest run
           tests/unit/checkpoint-recuperacao-local.test.ts
+          tests/unit/erp-recencia-fail-closed.test.ts
           tests/unit/declaracao-do-turno.test.ts
           tests/unit/recorte-1-build-opening.test.ts
           --maxWorkers=2
