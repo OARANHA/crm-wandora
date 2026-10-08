@@ -18,6 +18,7 @@ export const CAPACIDADE_ERP_ADMIN_READ = "erp.admin.read" as const;
 const FERRAMENTAS_ERP_ADMIN = new Set([
   "crm_erp_search_customers",
   "crm_erp_search_orders",
+  "crm_erp_search_recent_invoices",
   "crm_erp_get_invoice",
   "crm_erp_prepare_admin_danfe",
   "crm_erp_send_danfe_to_invoice_customer",
@@ -287,6 +288,7 @@ const EVIDENCIAS_PDF_AUDITAVEIS = new Set<EvidenciaPdfAoExpirar>([
 const RECURSO_POR_TOOL: Record<string, string> = {
   crm_erp_search_customers: "erp_customer",
   crm_erp_search_orders: "erp_order",
+  crm_erp_search_recent_invoices: "erp_invoice",
   crm_erp_get_invoice: "erp_invoice",
   crm_erp_prepare_admin_danfe: "erp_danfe",
   crm_erp_send_danfe_to_invoice_customer: "erp_danfe_delivery",

@@ -4,6 +4,7 @@ import { motivoDaRecusaDeDestino } from "@/lib/automation/destinos-internos-auto
 import { logger } from "@/lib/logger";
 
 import { carregarConexaoVendaErp, dadosCifradosVendaErp } from "./credenciais";
+import { normalizarNfesPeriodoVendaErp, type NotaFiscalPeriodoErp } from "./notas-fiscais-periodo";
 import type {
   ClienteErp,
   ConexaoErpSegura,
@@ -20,6 +21,7 @@ import {
   ErroVendaErp,
   consultarInformacoesVendaVendaErp,
   consultarNfeVendaErp,
+  consultarNfesPeriodoVendaErp,
   lerEstoqueVendaErp,
   listarDepositosVendaErp,
   pesquisarClientesVendaErp,
@@ -530,4 +532,24 @@ export async function obterInformacaoFiscalDaVendaErp(
       await consultarInformacoesVendaVendaErp(credenciais, codigoVenda),
     ),
   );
+}
+
+/**
+ * Leitura fiscal isolada, com filtragem do XML no servidor e sem retorno de PII
+ * ao modelo. A paginação é conduzida pela capability, não pelo LLM.
+ */
+export async function buscarNfesPeriodoErp(
+  admin: SupabaseClient,
+  organizationId: string,
+  filtros: { dataInicial: string; dataFinal: string; pageSize: number; skip: number },
+): Promise<ConsultaErpResultado<{ notas: NotaFiscalPeriodoErp[]; retornados: number }>> {
+  return executarLeituraVendaErp(admin, organizationId, async (credenciais) => {
+    const resposta = await consultarNfesPeriodoVendaErp(credenciais, filtros);
+    try {
+      const notas = normalizarNfesPeriodoVendaErp(resposta);
+      return { notas, retornados: (resposta as unknown[]).length };
+    } catch {
+      throw new ErroVendaErp("invalid_response");
+    }
+  });
 }

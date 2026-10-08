@@ -53,6 +53,17 @@ export const TOOLS_INTEGRACOES_ERP = declararTools([
     modulo: "integracoes_erp",
   },
   {
+    name: "crm_erp_search_recent_invoices",
+    category: "read",
+    rotulo: "Encontrar as notas fiscais mais recentes",
+    explicacao:
+      "Encontra até três notas fiscais recentes por data de emissão comprovada, com opção de filtrar por cliente. Para mais notas, pede o mês desejado antes de pesquisar.",
+    oQueToca: "Notas fiscais emitidas no sistema de gestão",
+    risco: "seguro",
+    pacotes: ["organizar"],
+    modulo: "integracoes_erp",
+  },
+  {
     name: "crm_erp_get_invoice",
     category: "read",
     rotulo: "Consultar nota fiscal no sistema de gestão",

@@ -1022,16 +1022,23 @@ export function blocosDeAgendaResidentes(toolIds: readonly string[]): string[] {
  */
 export function blocosErpResidentes(toolIds: readonly string[]): string[] {
   const orders = "crm_erp_search_orders";
+  const recent = "crm_erp_search_recent_invoices";
   const customers = "crm_erp_search_customers";
   const invoice = "crm_erp_get_invoice";
 
-  if (!toolIds.includes(orders)) return [];
+  if (!toolIds.includes(orders) && !toolIds.includes(recent)) return [];
 
   let bloco =
     "## ERP — pedidos e notas por cliente\n" +
-    "Se o administrador pedir pedidos, compras, notas ou NFes de um cliente e informar apenas o " +
+    (toolIds.includes(recent)
+      ? "Se o administrador pedir pedidos ou compras de um cliente e informar apenas o "
+      : "Se o administrador pedir pedidos, compras, notas ou NFes de um cliente e informar apenas o ") +
     "nome ou a razão social, chame crm_erp_search_orders DIRETAMENTE com cliente antes de responder. " +
     "Se já houver um cliente_contact_id resolvido nesta conversa, prefira esse id. ";
+
+  if (toolIds.includes(recent)) {
+    bloco += "PRIORIDADE PARA NOTAS RECENTES: sempre use crm_erp_search_recent_invoices (não a lista de pedidos) quando o administrador pedir as últimas notas emitidas, com ou sem nome do cliente. Até 3 notas, sem mês; por padrão são 3. Acima de 3, informe ao administrador que é necessário mês/ano e só então consulte com mes_ano=AAAA-MM. Se o período automático não provar a recência, peça um mês; nunca invente ausência de NFe. ";
+  }
 
   if (toolIds.includes(customers)) {
     bloco +=
@@ -1047,7 +1054,9 @@ export function blocosErpResidentes(toolIds: readonly string[]): string[] {
   if (toolIds.includes("crm_erp_prepare_admin_danfe")) {
     bloco +=
       "REGRA DE ENTREGA: quando o administrador pedir a última nota ou as últimas N notas, entenda que ele quer também os PDFs das DANFEs nesta própria conversa. " +
-      "Chame crm_erp_search_orders com ultimas_notas=N; se a busca por cliente não trouxer pedidos e você continuar pelo cliente_contact_id vinculado, REPITA a consulta com o mesmo ultimas_notas=N. " +
+      (toolIds.includes(recent)
+        ? "Para últimas NFes, use crm_erp_search_recent_invoices com quantidade=N e cliente (se informado). Nunca use pedidos comuns como ranking fiscal. "
+        : "Chame crm_erp_search_orders com ultimas_notas=N; se a busca por cliente não trouxer pedidos e você continuar pelo cliente_contact_id vinculado, REPITA a consulta com o mesmo ultimas_notas=N. ") +
       "Se a ferramenta retornar continuacao_notas_sem_ranking, repita com ultimas_notas_necessarias, mantendo a identidade já comprovada. Nunca trate limite=20 ou a ordem de pedidos como recência fiscal. " +
       "Para cada NFe comprovada retornada, em ordem, faça crm_erp_prepare_admin_danfe e IMEDIATAMENTE depois send_message para anexar aquele PDF antes de preparar a próxima. " +
       "Não prepare duas DANFEs seguidas sem enviar a primeira, porque o documento preparado pertence à próxima send_message. " +
