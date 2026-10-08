@@ -22,7 +22,7 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
   () => {
     let servidor: Server;
     let urlFixture: string;
-    const hits = { html: 0, script: 0 };
+    const hits = { html: 0, script: 0, executed: 0 };
 
     beforeAll(async () => {
       servidor = createServer((req, res) => {
@@ -42,6 +42,11 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
           );
           return;
         }
+        if (req.url === "/js-executed") {
+          hits.executed += 1;
+          res.writeHead(204, { "Cache-Control": "no-store" }).end();
+          return;
+        }
         if (req.url === "/app.js") {
           hits.script += 1;
           res.writeHead(200, {
@@ -49,7 +54,8 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
             "Cache-Control": "no-store",
           });
           res.end(
-            'document.getElementById("danfe").textContent="DANFE sintetica pronta";',
+            'document.getElementById("danfe").textContent="DANFE sintetica pronta";' +
+              'const sinal = new Image(); sinal.src="/js-executed"; document.body.append(sinal);',
           );
           return;
         }
@@ -67,6 +73,7 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
     beforeEach(() => {
       hits.html = 0;
       hits.script = 0;
+      hits.executed = 0;
     });
 
     afterAll(async () => {
@@ -120,6 +127,7 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
         expect(pdf.length).toBeGreaterThan(1_000);
         expect(hits.html).toBeGreaterThan(0);
         expect(hits.script).toBeGreaterThan(0);
+        expect(hits.executed).toBeGreaterThan(0);
       } finally {
         await rm(pasta, { recursive: true, force: true });
       }
@@ -137,6 +145,7 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
       expect(pdf.length).toBeGreaterThan(1_000);
       expect(hits.html).toBeGreaterThan(0);
       expect(hits.script).toBeGreaterThan(0);
+        expect(hits.executed).toBeGreaterThan(0);
     }, 35_000);
   },
 );
