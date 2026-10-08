@@ -109,7 +109,7 @@ describe("materialização segura do DANFE", () => {
       throw new Error("fetch não deveria ser chamado para DANFE VendaERP");
     }) as unknown as typeof fetch;
     const renderizadorVendaErp = vi.fn(async () => {
-      throw new ErroRenderizacaoDocumento("timeout", "chromium_apos_redirect", "resposta_http_5xx");
+      throw new ErroRenderizacaoDocumento("timeout", "chromium_apos_redirect");
     });
 
     await expect(
@@ -117,7 +117,6 @@ describe("materialização segura do DANFE", () => {
     ).rejects.toMatchObject({
       codigo: "timeout",
       etapa: "chromium_apos_redirect",
-      diagnosticoNavegacao: "resposta_http_5xx",
       message: "timeout",
     });
     expect(fetcher).not.toHaveBeenCalled();
