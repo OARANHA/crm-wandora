@@ -234,6 +234,7 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
 | `app/api/v1/health/route.ts` | Health check (Supabase + Redis + WAHA) |
 | `supabase/migrations/` | Schema versionado |
 | `docs/runbooks/deploy.md` | **Deploy em produção — leia ANTES de mexer na VPS** |
+| `docs/runbooks/elus-vigia-portainer.md` | **Fork ELUS — autoridade do deploy na VPS do Vigia, Portainer `ops-vigia.wandora.com.br`. Não confundir com o Portainer da Wandora.** |
 
 ---
 
