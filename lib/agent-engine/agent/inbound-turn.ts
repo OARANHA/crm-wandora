@@ -168,6 +168,7 @@ import {
   pedidoDeNfeMaisRecente,
   recenciaFiscalComprovada,
   numerosDaBuscaFiscalComprovada,
+  quantidadeDeNotasMaisRecentesPedida,
 } from './recencia-fiscal-gate';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
 import { cancelPendingCronsForLead } from '../cron/scheduler';
@@ -3999,10 +4000,19 @@ async function executarTurnoDoAgente(
                   const resultado = await executarConsultaFiscal(...args);
                   // Apenas uma resposta estruturalmente completa da capability
                   // certifica o turno. Um erro ou lista vazia nunca libera egress.
+                  // Cada tentativa invalida a prova anterior. Um erro, ou uma
+                  // nova pesquisa de outro destinatário, não herda autorização
+                  // fiscal de uma pesquisa antiga do mesmo turno.
+                  recenciaFiscalComprovadaNesteTurno = false;
+                  numerosNfeFiscaisComprovados.clear();
                   if (recenciaFiscalComprovada(resultado)) {
-                    recenciaFiscalComprovadaNesteTurno = true;
-                    for (const numero of numerosDaBuscaFiscalComprovada(resultado))
-                      numerosNfeFiscaisComprovados.add(numero);
+                    const limite = quantidadeDeNotasMaisRecentesPedida(mensagemDoJob);
+                    const maisRecentes = numerosDaBuscaFiscalComprovada(resultado).slice(0, limite);
+                    if (maisRecentes.length === limite) {
+                      recenciaFiscalComprovadaNesteTurno = true;
+                      for (const numero of maisRecentes)
+                        numerosNfeFiscaisComprovados.add(numero);
+                    }
                   }
                   return resultado;
                 }) as typeof mcpTool.execute,
