@@ -4001,14 +4001,12 @@ async function executarTurnoDoAgente(
               rawTools[name] = {
                 ...mcpTool,
                 execute: (async (...args: Parameters<typeof executarConsultaFiscal>) => {
-                  const resultado = await executarConsultaFiscal(...args);
-                  // Apenas uma resposta estruturalmente completa da capability
-                  // certifica o turno. Um erro ou lista vazia nunca libera egress.
-                  // Cada tentativa invalida a prova anterior. Um erro, ou uma
-                  // nova pesquisa de outro destinatário, não herda autorização
-                  // fiscal de uma pesquisa antiga do mesmo turno.
+                  // Invalida ANTES da chamada: até exceção do provider
+                  // não pode reusar prova fiscal de uma consulta anterior.
                   recenciaFiscalComprovadaNesteTurno = false;
                   numerosNfeFiscaisComprovados.clear();
+                  const resultado = await executarConsultaFiscal(...args);
+                  // Somente um retorno completo libera afirmação de recência.
                   if (recenciaFiscalComprovada(resultado)) {
                     const limite = quantidadeDeNotasMaisRecentesPedida(mensagemDoJob);
                     const maisRecentes = numerosDaBuscaFiscalComprovada(resultado).slice(0, limite);
