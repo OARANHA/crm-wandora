@@ -104,8 +104,6 @@ export function selecionarNotasRecentes(
     unicas.set(nota.chave, nota);
   }
   return [...unicas.values()]
-    .sort(
-      (a, b) => b.instanteFiscal - a.instanteFiscal || a.chave.localeCompare(b.chave),
-    )
+    .sort((a, b) => b.instanteFiscal - a.instanteFiscal || a.chave.localeCompare(b.chave))
     .slice(0, quantidade);
 }
