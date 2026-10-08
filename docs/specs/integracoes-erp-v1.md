@@ -313,6 +313,18 @@ Cada consulta administrativa gera `integracao_erp.admin_consulta` com
 desfecho. Telefone, valor pesquisado, token ERP, XML e URL de DANFE não entram
 nessa linha.
 
+Quando `crm_erp_prepare_admin_danfe` expirar no Chromium, o renderizador
+pode registrar na mesma auditoria privada o `diagnostico_navegacao`,
+restrito aos valores `requisicao_externa`, `resposta_http_2xx`,
+`resposta_http_3xx`, `resposta_http_4xx`, `resposta_http_5xx`,
+`falha_transporte` e `pagina_carregada`. Esse diagnóstico é obtido por
+pipe de depuração privado do **mesmo processo Chromium**, sem porta externa,
+sem body, cookies, cabeçalhos, URL de origem, query ou token em auditoria.
+Ausência do campo significa **não observado**, jamais sucesso ou ausência
+de documento. Mesmo `pagina_carregada` comprova somente o evento de carga
+do navegador, não que a SPA montou uma DANFE fiscalmente correta. O sender,
+a autorização WhatsApp e a regra read-only continuam inalterados.
+
 A tabela `erp_admin_whatsapp_bindings` é parte do próprio módulo
 `integracoes_erp` e segue a ADR-0002: server-only, RLS ligada, sem grants para
 `anon/authenticated`, provisionada somente onde o módulo foi instalado.
