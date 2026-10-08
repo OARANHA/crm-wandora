@@ -10,6 +10,8 @@ on:
       - "components/inbox/ErpDanfeCard.tsx"
       - "components/integracoes-erp/**"
       - "lib/integracoes-erp/**"
+      - "scripts/elus-vendaerp-danfe-admin-canary.ts"
+      - "Dockerfile.danfe-admin-canary"
       - "lib/mcp/tools/integracoes-erp.ts"
       - "lib/mcp/tools/catalogo/integracoes-erp.ts"
       - "lib/mcp/tools/index.ts"
@@ -76,6 +78,7 @@ jobs:
           app/app/integracoes-erp
           components/inbox/ErpDanfeCard.tsx
           lib/integracoes-erp
+          scripts/elus-vendaerp-danfe-admin-canary.ts
           lib/mcp/tools/integracoes-erp.ts
           lib/mcp/tools/catalogo/integracoes-erp.ts
           tests/unit/integracoes-erp-*.test.ts
@@ -93,6 +96,7 @@ jobs:
           "app/app/integracoes-erp/**/*.{ts,tsx}"
           "components/inbox/ErpDanfeCard.tsx"
           "lib/integracoes-erp/**/*.ts"
+          "scripts/elus-vendaerp-danfe-admin-canary.ts"
           "lib/mcp/tools/integracoes-erp.ts"
           "lib/mcp/tools/catalogo/integracoes-erp.ts"
           "tests/unit/integracoes-erp-*.test.ts"
@@ -117,6 +121,7 @@ jobs:
           tests/unit/integracoes-erp-danfe-authority.test.ts
           tests/unit/integracoes-erp-documento-cliente.test.ts
           tests/unit/integracoes-erp-admin-whatsapp.test.ts
+          tests/unit/integracoes-erp-canario-danfe-admin.test.ts
           lib/agent-engine/agent/governed-conversation-delivery.test.ts
           lib/agent-engine/agent/approved-reply-governed-delivery.test.ts
           tests/unit/before-send-chain-shape.test.ts
