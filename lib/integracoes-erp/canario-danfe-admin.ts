@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { EtapaRenderizacaoDocumento } from "@/lib/documentos/renderizar-url-pdf";
+
 import {
   auditarConsultaAdminWhatsapp,
   resolverAutoridadeAdminWhatsapp,
@@ -43,8 +45,7 @@ export type ResultadoCanarioDanfeAdmin =
       ok: false;
       code: FalhaCanarioAdmin;
       codigo_tecnico?: ErroDanfeExterno["codigo"];
-      etapa_renderizacao?: "loopback_inicializacao" | "chromium_antes_redirect" |
-        "chromium_apos_redirect" | "pdf_leitura" | "pdf_validacao";
+      etapa_renderizacao?: EtapaRenderizacaoDocumento;
       whatsapp_sent: false;
       vendaerp_writes: 0;
     };
@@ -94,11 +95,16 @@ export async function executarCanarioDanfeAdmin(
     return falhar("invalid_scope");
   }
 
-  const conversa = await db
-    .from("conversations")
-    .select("id, organization_id, contact_id")
-    .eq("id", input.conversationId)
-    .maybeSingle();
+  let conversa;
+  try {
+    conversa = await db
+      .from("conversations")
+      .select("id, organization_id, contact_id")
+      .eq("id", input.conversationId)
+      .maybeSingle();
+  } catch {
+    return falhar("crm_read_failed");
+  }
   if (conversa.error) return falhar("crm_read_failed");
   const row = conversa.data;
   if (!row?.organization_id || !row.contact_id) return falhar("conversation_not_found");
@@ -121,7 +127,7 @@ export async function executarCanarioDanfeAdmin(
     success: boolean,
     motivo?: string,
     codigoTecnico?: ErroDanfeExterno["codigo"],
-    etapaRenderizacao?: ResultadoCanarioDanfeAdmin extends never ? never : string,
+    etapaRenderizacao?: EtapaRenderizacaoDocumento,
   ): Promise<boolean> => {
     try {
       await deps.auditar({
@@ -133,9 +139,7 @@ export async function executarCanarioDanfeAdmin(
         ...(motivo ? { motivo } : {}),
         ...(codigoTecnico ? { codigoTecnico } : {}),
         ...(etapaRenderizacao && ETAPAS.has(etapaRenderizacao)
-          ? { etapaRenderizacao: etapaRenderizacao as NonNullable<
-              Parameters<typeof auditarConsultaAdminWhatsapp>[0]["etapaRenderizacao"]
-            > }
+          ? { etapaRenderizacao }
           : {}),
       });
       return true;
@@ -173,8 +177,8 @@ export async function executarCanarioDanfeAdmin(
     return (await registrar(false, "danfe_unavailable")) ? falhar("danfe_unavailable") : falhar("audit_failed");
   }
 
-  const headers = cabecalhosDanfeVendaErp(conexao.credenciais, nota.dados.danfeUrl);
   try {
+    const headers = cabecalhosDanfeVendaErp(conexao.credenciais, nota.dados.danfeUrl);
     const doc = await deps.renderizar(nota.dados.danfeUrl, headers);
     if (doc.mime !== "application/pdf" || doc.sizeBytes < 5 ||
         !doc.buffer.subarray(0, Math.min(doc.buffer.length, 1024)).includes(Buffer.from("%PDF-"))) {
