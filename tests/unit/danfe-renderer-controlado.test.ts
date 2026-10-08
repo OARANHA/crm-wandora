@@ -208,6 +208,34 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     Reflect.deleteProperty(document.body, "innerText");
   });
 
+  it("limita o DNS pendente sem iniciar navegador nem URL externa", async () => {
+    mocks.resolver.mockImplementationOnce(() => new Promise<string | null>(() => undefined));
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 35 }),
+    ).rejects.toMatchObject({ codigo: "timeout" });
+    expect(mocks.launch).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("limita inicialização do contexto, fecha browser e bootstrap", async () => {
+    const env = ambientePdf();
+    env.browser.newContext.mockImplementationOnce(() => new Promise(() => undefined));
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 35 }),
+    ).rejects.toMatchObject({ codigo: "timeout" });
+    expect(env.browser.close).toHaveBeenCalledTimes(1);
+    expect(env.fechar).toHaveBeenCalledTimes(1);
+  });
+
+  it("não mantém o turno preso se browser.close não resolve", async () => {
+    const env = ambientePdf();
+    env.browser.close.mockImplementationOnce(() => new Promise<void>(() => undefined));
+    const inicio = Date.now();
+    await expect(renderizarUrlParaPdfControlado(danfe, policy)).resolves.toEqual(env.pdf);
+    expect(Date.now() - inicio).toBeLessThan(3_500);
+    expect(env.fechar).toHaveBeenCalledTimes(1);
+  });
+
   it("recusa PDF sem assinatura completa", async () => {
     const env = ambientePdf();
     env.page.pdf.mockResolvedValueOnce(Buffer.from("%PDF-1.7\nsem fim"));
