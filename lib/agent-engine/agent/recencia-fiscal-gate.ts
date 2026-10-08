@@ -73,6 +73,19 @@ export function quantidadeDeNotasMaisRecentesPedida(texto: string): number {
   }
   // "A última nota" significa uma. "As últimas notas" segue o default
   // contratual do provider (até três) quando não há N explícito.
-  if (/\\bultim[ao]\\b|\\bmais\\s+recente\\b/.test(normalizado)) return 1;
+  if (/\bultim[ao]\b|\bmais\s+recente\b/.test(normalizado)) return 1;
   return 3;
+}
+
+/**
+ * Não deixe o modelo alegar "última NFe #X" com um número fora do
+ * subconjunto efetivamente ranqueado pela consulta fiscal deste turno.
+ */
+export function mencionaNfeNaoComprovada(texto: string, numerosAutorizados: ReadonlySet<string>): boolean {
+  const padrao = /\b(?:nf[\s.-]*e|nota(?:\s+fiscal)?)\s*(?:n[ºo°.]*(?:\s+de\s+numero)?\s*)?[:#-]?\s*(\d{3,12})\b/gi;
+  for (const match of texto.matchAll(padrao)) {
+    const numero = (match[1] ?? "").replace(/^0+(?=\d)/, "");
+    if (numero && !numerosAutorizados.has(numero)) return true;
+  }
+  return false;
 }
