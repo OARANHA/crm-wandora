@@ -1,0 +1,71 @@
+name: DANFE controlled renderer safety
+
+on:
+  pull_request:
+    paths:
+      - "lib/documentos/egress-browser-pdf.ts"
+      - "lib/documentos/renderizar-url-pdf-controlado.ts"
+      - "lib/integracoes-erp/vendaerp-danfe-pdf.ts"
+      - "tests/unit/danfe-browser-egress.test.ts"
+      - "tests/unit/danfe-renderer-controlado.test.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "Dockerfile"
+      - ".github/workflows/danfe-controlled-renderer-safety.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  safe-renderer:
+    name: Renderer safety and TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript type checking
+        run: pnpm exec tsc --noEmit
+
+      - name: Focused formatting
+        run: >-
+          pnpm exec prettier --check
+          lib/documentos/egress-browser-pdf.ts
+          lib/documentos/renderizar-url-pdf-controlado.ts
+          lib/integracoes-erp/vendaerp-danfe-pdf.ts
+          tests/unit/danfe-browser-egress.test.ts
+          tests/unit/danfe-renderer-controlado.test.ts
+
+      - name: Focused lint
+        run: >-
+          pnpm exec eslint
+          lib/documentos/egress-browser-pdf.ts
+          lib/documentos/renderizar-url-pdf-controlado.ts
+          lib/integracoes-erp/vendaerp-danfe-pdf.ts
+          tests/unit/danfe-browser-egress.test.ts
+          tests/unit/danfe-renderer-controlado.test.ts
+
+      - name: Unit guards and regression tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/danfe-browser-egress.test.ts
+          tests/unit/danfe-renderer-controlado.test.ts
+          tests/unit/documentos-renderizar-url-pdf.test.ts
+          --maxWorkers=2
+
+      - name: Scope statement
+        run: |
+          echo "This PR does not authorize a real VendaERP canary or deployment."
+          echo "A passing build and synthetic guard tests do not prove fiscal correctness."
