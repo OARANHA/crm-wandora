@@ -6,7 +6,10 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
 }));
 
-vi.mock("node:dns/promises", () => ({ lookup: mocks.lookup }));
+vi.mock("node:dns/promises", async (importOriginal) => {
+  const original = await importOriginal<typeof import("node:dns/promises")>();
+  return { ...original, lookup: mocks.lookup };
+});
 vi.mock("playwright-core", () => ({ chromium: { launch: mocks.launch } }));
 vi.mock("@/lib/documentos/renderizar-url-pdf", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/documentos/renderizar-url-pdf")>();
