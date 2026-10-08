@@ -158,6 +158,9 @@ export async function abrirRedirectLocalParaDocumento(
         return;
       }
       servidor.close(() => resolve());
+      // Impede que sockets HTTP ainda ativos mantenham o bootstrap de 302
+      // aberto depois do prazo de renderização (Node 22).
+      servidor.closeAllConnections();
     });
 
   try {
