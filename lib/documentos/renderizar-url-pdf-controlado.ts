@@ -71,6 +71,15 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   const ipv4 = await resolverIpPublicoFixadoParaBrowser(origem.hostname);
   if (!ipv4) throw new ErroRenderizacaoDocumento("destino_inseguro");
 
+  // Identidade fiscal só pode vir da leitura estruturada ERP. Uma chave inválida
+  // não autoriza renderizar e entregar um PDF visualmente plausível.
+  if (
+    politica.chaveFiscalEsperada !== undefined &&
+    !/^\\d{44}$/.test(politica.chaveFiscalEsperada)
+  ) {
+    throw new ErroRenderizacaoDocumento("render_falhou");
+  }
+
   const maxBytes = politica.maxBytes ?? MAX_MEDIA_BYTES;
   const limiteMs = Math.min(politica.timeoutMs ?? LIMITE_TOTAL_MS, LIMITE_TOTAL_MS);
   const deadline = Date.now() + limiteMs;
@@ -164,11 +173,17 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     // Não imprimir uma SPA vazia, "Carregando..." ou tela de autenticação.
     // A prontidão é medida no browser; nunca exportar texto fiscal para logs.
     await page.waitForFunction(
-      () => {
+      (chaveEsperada) => {
         const texto = document.body?.innerText ?? "";
-        return texto.trim().length >= 80 && /DANFE|NOTA FISCAL|CHAVE DE ACESSO/i.test(texto);
+        if (texto.trim().length < 80 || !/DANFE|NOTA FISCAL|CHAVE DE ACESSO/i.test(texto)) {
+          return false;
+        }
+        // DOM de erro/"nota indisponível" não basta: a chave de 44 dígitos
+        // da NFe realmente consultada precisa existir na DANFE antes do PDF.
+        // Nenhum texto fiscal é devolvido ao Node, logs, auditoria ou modelo.
+        return !chaveEsperada || texto.replace(/\\D/g, "").includes(chaveEsperada);
       },
-      undefined,
+      politica.chaveFiscalEsperada ?? null,
       { timeout: restante() },
     );
 
