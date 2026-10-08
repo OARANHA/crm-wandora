@@ -127,7 +127,7 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
         expect(pdf.length).toBeGreaterThan(1_000);
         expect(hits.html).toBeGreaterThan(0);
         expect(hits.script).toBeGreaterThan(0);
-        expect(hits.executed).toBeGreaterThan(0);
+      expect(hits.executed).toBeGreaterThan(0);
       } finally {
         await rm(pasta, { recursive: true, force: true });
       }
