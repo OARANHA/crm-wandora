@@ -53,10 +53,23 @@ export function numerosDaBuscaFiscalComprovada(resultado: unknown): string[] {
  * antigo da mesma página só porque ele aparece no retorno.
  */
 export function quantidadeDeNotasMaisRecentesPedida(texto: string): number {
-  const normalizado = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const normalizado = texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
   const quantidadePorPalavra: Record<string, number> = {
-    um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4,
-    cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10,
+    um: 1,
+    uma: 1,
+    dois: 2,
+    duas: 2,
+    tres: 3,
+    quatro: 4,
+    cinco: 5,
+    seis: 6,
+    sete: 7,
+    oito: 8,
+    nove: 9,
+    dez: 10,
   };
   const numero = "(\\d{1,2}|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez)";
   const padroes = [
@@ -81,8 +94,12 @@ export function quantidadeDeNotasMaisRecentesPedida(texto: string): number {
  * Não deixe o modelo alegar "última NFe #X" com um número fora do
  * subconjunto efetivamente ranqueado pela consulta fiscal deste turno.
  */
-export function mencionaNfeNaoComprovada(texto: string, numerosAutorizados: ReadonlySet<string>): boolean {
-  const padrao = /\b(?:nf[\s.-]*e|nota(?:\s+fiscal)?)\s*(?:n[ºo°.]*(?:\s+de\s+numero)?\s*)?[:#-]?\s*(\d{3,12})\b/gi;
+export function mencionaNfeNaoComprovada(
+  texto: string,
+  numerosAutorizados: ReadonlySet<string>,
+): boolean {
+  const padrao =
+    /\b(?:nf[\s.-]*e|nota(?:\s+fiscal)?)\s*(?:n[ºo°.]*(?:\s+de\s+numero)?\s*)?[:#-]?\s*(\d{3,12})\b/gi;
   for (const match of texto.matchAll(padrao)) {
     const numero = (match[1] ?? "").replace(/^0+(?=\d)/, "");
     if (numero && !numerosAutorizados.has(numero)) return true;
