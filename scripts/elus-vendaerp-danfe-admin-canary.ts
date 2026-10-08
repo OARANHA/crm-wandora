@@ -1,5 +1,3 @@
-import { executarCanarioDanfeAdmin } from "@/lib/integracoes-erp/canario-danfe-admin";
-
 const scope = {
   conversationId: process.env.ELUS_ADMIN_CANARY_CONVERSATION_ID ?? "",
   codigoNfe: Number(process.env.ELUS_ADMIN_CANARY_CODIGO_NFE ?? ""),
@@ -33,7 +31,10 @@ async function main(): Promise<never> {
     if (!(process.env[name] ?? "").trim()) process.env[name] = "canary-not-used";
   }
   try {
-    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const [{ createAdminClient }, { executarCanarioDanfeAdmin }] = await Promise.all([
+      import("@/lib/supabase/admin"),
+      import("@/lib/integracoes-erp/canario-danfe-admin"),
+    ]);
     const result = await executarCanarioDanfeAdmin(createAdminClient(), scope);
     emit(result, result.ok ? 0 : 2);
   } catch {
