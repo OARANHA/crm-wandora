@@ -1,0 +1,50 @@
+name: DANFE controlled Chromium offline experiment
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/danfe-controlled-print-offline.yml"
+      - "scripts/diagnostics/danfe-controlled-print-offline.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controlled-print:
+    name: Browser-controlled PDF with pending asset
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout synthetic test
+        uses: actions/checkout@v4
+
+      - name: Check Node syntax
+        run: node --check scripts/diagnostics/danfe-controlled-print-offline.mjs
+
+      - name: Pull exact published Alpine ELUS worker
+        run: docker pull ghcr.io/oaranha/elus-worker@sha256:014356698243e79a295e26af01e16e29cbfc78e0b1be1ba847bc6220a5b7a0a1
+
+      - name: Playwright controlled print without external network
+        run: |
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --memory 1024m \
+            --cpus 2 \
+            --pids-limit 256 \
+            --shm-size 256m \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount type=bind,source="$GITHUB_WORKSPACE/scripts/diagnostics/danfe-controlled-print-offline.mjs",target=/probe.mjs,readonly \
+            --entrypoint node \
+            ghcr.io/oaranha/elus-worker@sha256:014356698243e79a295e26af01e16e29cbfc78e0b1be1ba847bc6220a5b7a0a1 \
+            /probe.mjs
+
+      - name: Scope and boundaries
+        if: always()
+        run: |
+          echo "Experiment on synthetic localhost fixture only; no VendaERP or customer data."
+          echo "No image build, production change, WhatsApp message or external network."
+          echo "A successful test is NOT approval to deploy a new renderer."
