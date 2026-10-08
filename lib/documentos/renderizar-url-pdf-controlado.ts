@@ -93,6 +93,21 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       bypassCSP: false,
     });
 
+    // WebRTC não atravessa context.route("**/*"). A DANFE não necessita
+    // PeerConnection; desabilitar antes de executar qualquer script da SPA.
+    await context.addInitScript(() => {
+      Object.defineProperty(window, "RTCPeerConnection", {
+        value: undefined,
+        configurable: false,
+        writable: false,
+      });
+      Object.defineProperty(window, "webkitRTCPeerConnection", {
+        value: undefined,
+        configurable: false,
+        writable: false,
+      });
+    });
+
     // Playwright intercepta requests antes do socket; nenhuma URL de rede
     // interna, segundo host ou POST pode ser consumida pelo Chrome.
     await context.route("**/*", async (route) => {
