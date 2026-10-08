@@ -16,7 +16,7 @@ export class GuardaFalhaDanfeNoTurno {
   avisoEnviado = false;
 
   iniciarTentativa(numero: string): boolean {
-    if (!/^\\d+$/.test(numero) || this.numerosTentados.has(numero)) return false;
+    if (!/^[0-9]+$/.test(numero) || this.numerosTentados.has(numero)) return false;
     this.numerosTentados.add(numero);
     return true;
   }
