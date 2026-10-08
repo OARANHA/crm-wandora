@@ -1,0 +1,148 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  lookup: vi.fn(),
+  launch: vi.fn(),
+  redirect: vi.fn(),
+}));
+
+vi.mock("node:dns/promises", () => ({ lookup: mocks.lookup }));
+vi.mock("playwright-core", () => ({ chromium: { launch: mocks.launch } }));
+vi.mock("@/lib/documentos/renderizar-url-pdf", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/documentos/renderizar-url-pdf")>();
+  return { ...original, abrirRedirectLocalParaDocumento: mocks.redirect };
+});
+
+import { ErroRenderizacaoDocumento } from "@/lib/documentos/renderizar-url-pdf";
+import { renderizarUrlParaPdfControlado } from "@/lib/documentos/renderizar-url-pdf-controlado";
+
+const danfe =
+  "https://app.vendaerp.com.br/v3/public/NFe/Danfe?Cod=abcdef123456abcdef123456&g=12345678-1234-4123-8123-123456789abc";
+const local = "http://127.0.0.1:42311/nonce-sintetico";
+
+function ambientePdf() {
+  const pdf = Buffer.from("%PDF-1.7\nPDF DE TESTE SINTETICO\n%%EOF\n");
+  const page = {
+    goto: vi.fn().mockResolvedValue({ ok: () => true }),
+    url: vi.fn().mockReturnValue(danfe),
+    waitForFunction: vi.fn().mockResolvedValue(true),
+    pdf: vi.fn().mockResolvedValue(pdf),
+  };
+  const context = {
+    route: vi.fn().mockResolvedValue(undefined),
+    routeWebSocket: vi.fn().mockResolvedValue(undefined),
+    newPage: vi.fn().mockResolvedValue(page),
+  };
+  const browser = {
+    newContext: vi.fn().mockResolvedValue(context),
+    close: vi.fn().mockResolvedValue(undefined),
+    process: vi.fn().mockReturnValue(null),
+  };
+  mocks.lookup.mockResolvedValue([{ address: "8.8.8.8" }]);
+  mocks.launch.mockResolvedValue(browser);
+  const fechar = vi.fn().mockResolvedValue(undefined);
+  mocks.redirect.mockResolvedValue({
+    url: local,
+    fechar,
+    houveRedirecionamento: () => true,
+  });
+  return { pdf, page, browser, context, fechar };
+}
+
+const policy = {
+  nome: "erp.vendaerp.danfe_to_pdf",
+  permiteUrl: (url: string) => url === danfe,
+  maxBytes: 2_000_000,
+  timeoutMs: 60_000,
+};
+
+describe("renderer controlado DANFE — fronteiras seguras", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("não abre navegador nem resolve DNS se a policy recusa o endereço", async () => {
+    await expect(
+      renderizarUrlParaPdfControlado("https://privado.invalid/", policy),
+    ).rejects.toMatchObject({ codigo: "destino_inseguro" });
+    expect(mocks.lookup).not.toHaveBeenCalled();
+    expect(mocks.launch).not.toHaveBeenCalled();
+  });
+
+  it("barra DNS privado ou misto antes da primeira navegação", async () => {
+    mocks.lookup.mockResolvedValue([{ address: "8.8.8.8" }, { address: "127.0.0.1" }]);
+    await expect(renderizarUrlParaPdfControlado(danfe, policy)).rejects.toMatchObject({
+      codigo: "destino_inseguro",
+    });
+    expect(mocks.launch).not.toHaveBeenCalled();
+  });
+
+  it("usa Playwright sem URL fiscal nem segredos em argv/env e fecha browser + loopback", async () => {
+    const env = ambientePdf();
+    const anterior = process.env.CHAVE_ERP_TESTE;
+    process.env.CHAVE_ERP_TESTE = "segredo-que-nao-pode-ser-passado";
+    try {
+      const resultado = await renderizarUrlParaPdfControlado(danfe, policy);
+      expect(resultado).toEqual(env.pdf);
+      const options = mocks.launch.mock.calls[0]?.[0];
+      expect(options).toBeDefined();
+      expect(JSON.stringify(options.args)).not.toContain(danfe);
+      expect(JSON.stringify(options.env)).not.toContain("segredo-que-nao-pode-ser-passado");
+      expect(options.env.HOME).toBe("/tmp");
+      expect(options.args.some((x: string) => x.includes("MAP app.vendaerp.com.br 8.8.8.8"))).toBe(true);
+      expect(env.page.goto).toHaveBeenCalledWith(local, expect.objectContaining({
+        waitUntil: "domcontentloaded",
+      }));
+      expect(env.context.routeWebSocket).toHaveBeenCalled();
+      expect(env.browser.close).toHaveBeenCalledTimes(1);
+      expect(env.fechar).toHaveBeenCalledTimes(1);
+    } finally {
+      if (anterior === undefined) delete process.env.CHAVE_ERP_TESTE;
+      else process.env.CHAVE_ERP_TESTE = anterior;
+    }
+  });
+
+  it("route intercepta e nega URL de intranet e POST mesmo depois do redirect", async () => {
+    const env = ambientePdf();
+    await renderizarUrlParaPdfControlado(danfe, policy);
+    const handler = env.context.route.mock.calls[0]?.[1];
+    expect(typeof handler).toBe("function");
+    const abort = vi.fn();
+    const next = vi.fn();
+    await handler({ request: () => ({ url: () => "http://169.254.169.254/latest", method: () => "GET" }), abort, continue: next });
+    expect(abort).toHaveBeenCalledWith("blockedbyclient");
+    expect(next).not.toHaveBeenCalled();
+
+    const abortPost = vi.fn();
+    await handler({
+      request: () => ({ url: () => "https://app.vendaerp.com.br/api", method: () => "POST" }),
+      abort: abortPost,
+      continue: vi.fn(),
+    });
+    expect(abortPost).toHaveBeenCalledWith("blockedbyclient");
+  });
+
+  it("não propaga erro com URL sensível quando a impressão falha", async () => {
+    const env = ambientePdf();
+    env.page.pdf.mockRejectedValueOnce(new Error("browser fatal em " + danfe));
+    let falha: unknown;
+    try {
+      await renderizarUrlParaPdfControlado(danfe, policy);
+    } catch (err) {
+      falha = err;
+    }
+    expect(falha).toBeInstanceOf(ErroRenderizacaoDocumento);
+    expect(falha).toMatchObject({ codigo: "render_falhou" });
+    expect(String(falha)).not.toContain(danfe);
+    expect(env.browser.close).toHaveBeenCalledTimes(1);
+    expect(env.fechar).toHaveBeenCalledTimes(1);
+  });
+
+  it("recusa PDF sem assinatura completa", async () => {
+    const env = ambientePdf();
+    env.page.pdf.mockResolvedValueOnce(Buffer.from("%PDF-1.7\nsem fim"));
+    await expect(renderizarUrlParaPdfControlado(danfe, policy)).rejects.toMatchObject({
+      codigo: "tipo_nao_pdf",
+    });
+  });
+});
