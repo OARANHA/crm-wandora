@@ -75,7 +75,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   // não autoriza renderizar e entregar um PDF visualmente plausível.
   if (
     politica.chaveFiscalEsperada !== undefined &&
-    !/^\\d{44}$/.test(politica.chaveFiscalEsperada)
+    !/^\d{44}$/.test(politica.chaveFiscalEsperada)
   ) {
     throw new ErroRenderizacaoDocumento("render_falhou");
   }
@@ -181,7 +181,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
         // DOM de erro/"nota indisponível" não basta: a chave de 44 dígitos
         // da NFe realmente consultada precisa existir na DANFE antes do PDF.
         // Nenhum texto fiscal é devolvido ao Node, logs, auditoria ou modelo.
-        return !chaveEsperada || texto.replace(/\\D/g, "").includes(chaveEsperada);
+        return !chaveEsperada || texto.replace(/\D/g, "").includes(chaveEsperada);
       },
       politica.chaveFiscalEsperada ?? null,
       { timeout: restante() },
