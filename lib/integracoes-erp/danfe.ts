@@ -1,7 +1,10 @@
 import { fetchParaDestinoDaOrganizacao } from "@/lib/automation/destinos-internos-autorizados";
 import { MAX_MEDIA_BYTES, extFromMime } from "@/lib/messaging/media/types";
 import { validateOutboundMedia } from "@/lib/messaging/media/upload-validation";
-import { ErroRenderizacaoDocumento } from "@/lib/documentos/renderizar-url-pdf";
+import {
+  ErroRenderizacaoDocumento,
+  type EtapaRenderizacaoDocumento,
+} from "@/lib/documentos/renderizar-url-pdf";
 
 import { ehUrlDanfePublicoVendaErp, renderizarDanfeVendaErpParaPdf } from "./vendaerp-danfe-pdf";
 
@@ -21,6 +24,7 @@ export class ErroDanfeExterno extends Error {
   constructor(
     public readonly codigo: CodigoErroDanfeExterno,
     public readonly status?: number,
+    public readonly etapa?: EtapaRenderizacaoDocumento,
   ) {
     super(codigo);
     this.name = "ErroDanfeExterno";
@@ -41,18 +45,21 @@ function mapearErroRenderizacao(erro: unknown): ErroDanfeExterno {
     return new ErroDanfeExterno("download_falhou");
   }
 
+  const mapear = (codigo: CodigoErroDanfeExterno) =>
+    new ErroDanfeExterno(codigo, undefined, erro.etapa);
+
   switch (erro.codigo) {
     case "destino_inseguro":
-      return new ErroDanfeExterno("destino_inseguro");
+      return mapear("destino_inseguro");
     case "timeout":
-      return new ErroDanfeExterno("timeout");
+      return mapear("timeout");
     case "arquivo_grande":
-      return new ErroDanfeExterno("arquivo_grande");
+      return mapear("arquivo_grande");
     case "tipo_nao_pdf":
-      return new ErroDanfeExterno("tipo_nao_documento");
+      return mapear("tipo_nao_documento");
     case "render_falhou":
     default:
-      return new ErroDanfeExterno("download_falhou");
+      return mapear("download_falhou");
   }
 }
 
