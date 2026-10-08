@@ -171,6 +171,7 @@ import {
   quantidadeDeNotasMaisRecentesPedida,
   mencionaNfeNaoComprovada,
 } from './recencia-fiscal-gate';
+import { AVISO_FALHA_DANFE, GuardaFalhaDanfeNoTurno } from './danfe-failure-guard';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
 import { cancelPendingCronsForLead } from '../cron/scheduler';
 import {
@@ -2735,6 +2736,9 @@ async function executarTurnoDoAgente(
   // Histórico, NFe antiga e busca de pedidos não certificam "última nota".
   let recenciaFiscalComprovadaNesteTurno = false;
   const numerosNfeFiscaisComprovados = new Set<string>();
+  // Estado apenas deste job: DANFE com falha não dispara quatro renderizações
+  // iguais nem promessas de entrega futura inexistente.
+  const guardaDanfe = new GuardaFalhaDanfeNoTurno();
   const outcomes: ChannelSendResult[] = [];
   // Citações acumuladas por buscas de conhecimento DESTE turno — anexadas à
   // próxima outbound enviada (shape de lib/ai/citations/types, que a UI já lê).
@@ -3063,6 +3067,26 @@ async function executarTurnoDoAgente(
             job_id: liveJob().id,
           });
         }
+        // Falhou a materialização: não prometer envio em segundo plano.
+        // Não encobre uma recência ainda não comprovada e não interfere
+        // em um PDF de outra NFe que já tenha sido preparado corretamente.
+        if (
+          !preview &&
+          (!pedidoDeNfeMaisRecente(mensagemDoJob) || recenciaFiscalComprovadaNesteTurno) &&
+          guardaDanfe.deveInformarFalha(documentoAdminPreparado !== null)
+        ) {
+          if (guardaDanfe.avisoEnviado) {
+            return {
+              ok: false,
+              error: {
+                code: 'danfe_falha_ja_comunicada',
+                message: 'A falha do PDF já foi informada nesta conversa. Não prometa envio posterior nem mande outro texto neste turno.',
+              },
+            };
+          }
+          body = AVISO_FALHA_DANFE;
+        }
+        const avisoFalhaDanfeCandidato = body === AVISO_FALHA_DANFE;
         // CORPO VAZIO NÃO SAI. Medido ao vivo (2026-09-19): o `gpt-4o-mini`
         // chamou `send_message` várias vezes com corpo que virou vazio e o
         // WhatsApp do cliente recebeu bolhas em branco. O schema garante
@@ -3460,6 +3484,10 @@ async function executarTurnoDoAgente(
           }
           const outcome = chain.outcome;
           outcomes.push(outcome);
+          if (
+            avisoFalhaDanfeCandidato &&
+            (outcome.kind === 'sent' || outcome.kind === 'already_sent' || outcome.kind === 'queued')
+          ) guardaDanfe.avisoEnviado = true;
           if (outcome.kind === 'sent' && pendingCitations.length > 0) {
             try {
               await pool.query(
@@ -4045,7 +4073,28 @@ async function executarTurnoDoAgente(
                       };
                     }
                   }
-                  return prepararDanfe(...args);
+                  const numero = String(
+                    (args[0] as { codigo_nfe?: number } | undefined)?.codigo_nfe ?? '',
+                  );
+                  // Registra ANTES da execução: chamadas paralelas da mesma NFe
+                  // também são bloqueadas, sem segunda ida ao renderer.
+                  if (!guardaDanfe.iniciarTentativa(numero)) {
+                    return {
+                      ok: false,
+                      error: {
+                        code: 'danfe_tentativa_repetida_no_turno',
+                        message: 'A preparação desta DANFE já foi tentada neste atendimento. Não repita a renderização; se falhou, comunique a falha técnica sem prometer envio posterior.',
+                      },
+                    };
+                  }
+                  try {
+                    const resultado = await prepararDanfe(...args);
+                    guardaDanfe.registrarResultado(resultado);
+                    return resultado;
+                  } catch (erro) {
+                    guardaDanfe.registrarExcecao();
+                    throw erro;
+                  }
                 }) as typeof mcpTool.execute,
               };
             } else if (AGENDA_TOOL_NAMES.has(name) && typeof mcpTool.execute === 'function') {
