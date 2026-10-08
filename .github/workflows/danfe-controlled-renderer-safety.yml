@@ -6,8 +6,14 @@ on:
       - "lib/documentos/egress-browser-pdf.ts"
       - "lib/documentos/renderizar-url-pdf-controlado.ts"
       - "lib/integracoes-erp/vendaerp-danfe-pdf.ts"
+      - "lib/integracoes-erp/chave-fiscal-comprovada.ts"
+      - "lib/integracoes-erp/danfe.ts"
+      - "lib/integracoes-erp/danfe-conversa.ts"
+      - "lib/integracoes-erp/autoridade-admin-whatsapp.ts"
+      - "app/api/v1/conversations/**/erp/route.ts"
       - "tests/unit/danfe-browser-egress.test.ts"
       - "tests/unit/danfe-renderer-controlado.test.ts"
+      - "tests/unit/danfe-identidade-fiscal.test.ts"
       - "package.json"
       - "pnpm-lock.yaml"
       - "Dockerfile"
@@ -45,8 +51,10 @@ jobs:
           lib/documentos/egress-browser-pdf.ts
           lib/documentos/renderizar-url-pdf-controlado.ts
           lib/integracoes-erp/vendaerp-danfe-pdf.ts
+          lib/integracoes-erp/chave-fiscal-comprovada.ts
           tests/unit/danfe-browser-egress.test.ts
           tests/unit/danfe-renderer-controlado.test.ts
+          tests/unit/danfe-identidade-fiscal.test.ts
 
       - name: Focused lint
         run: >-
@@ -54,14 +62,17 @@ jobs:
           lib/documentos/egress-browser-pdf.ts
           lib/documentos/renderizar-url-pdf-controlado.ts
           lib/integracoes-erp/vendaerp-danfe-pdf.ts
+          lib/integracoes-erp/chave-fiscal-comprovada.ts
           tests/unit/danfe-browser-egress.test.ts
           tests/unit/danfe-renderer-controlado.test.ts
+          tests/unit/danfe-identidade-fiscal.test.ts
 
       - name: Unit guards and regression tests
         run: >-
           pnpm exec vitest run
           tests/unit/danfe-browser-egress.test.ts
           tests/unit/danfe-renderer-controlado.test.ts
+          tests/unit/danfe-identidade-fiscal.test.ts
           tests/unit/documentos-renderizar-url-pdf.test.ts
           --maxWorkers=2
 
