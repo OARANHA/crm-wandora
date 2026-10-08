@@ -34,7 +34,8 @@ export function instanteFiscalVendaErp(valor: unknown): number | null {
     data.getUTCDate() !== dia ||
     data.getUTCHours() !== hora ||
     data.getUTCMinutes() !== minuto
-  ) return null;
+  )
+    return null;
   return data.getTime();
 }
 
@@ -61,11 +62,16 @@ export function normalizarNfesPeriodoVendaErp(resposta: unknown): NotaFiscalPeri
     const instante = instanteFiscalVendaErp(item.DataEmissao);
     if (
       ![11, 14].includes(documento.length) ||
-      typeof numero !== "number" || !Number.isSafeInteger(numero) || numero <= 0 ||
-      typeof serie !== "string" || !serie.trim() ||
-      typeof chave !== "string" || !/^\d{44}$/.test(chave) ||
+      typeof numero !== "number" ||
+      !Number.isSafeInteger(numero) ||
+      numero <= 0 ||
+      typeof serie !== "string" ||
+      !serie.trim() ||
+      typeof chave !== "string" ||
+      !/^\d{44}$/.test(chave) ||
       instante === null
-    ) throw new Error("invalid_response");
+    )
+      throw new Error("invalid_response");
     notas.push({
       numero,
       serie: serie.trim(),
@@ -73,7 +79,8 @@ export function normalizarNfesPeriodoVendaErp(resposta: unknown): NotaFiscalPeri
       dataEmissao: (item.DataEmissao as string).trim(),
       instanteFiscal: instante,
       documentoDestinatario: documento,
-      danfeDisponivel: typeof item.UrlImpressaoUrl === "string" && item.UrlImpressaoUrl.trim().length > 0,
+      danfeDisponivel:
+        typeof item.UrlImpressaoUrl === "string" && item.UrlImpressaoUrl.trim().length > 0,
     });
   }
   return notas;
@@ -90,11 +97,16 @@ export function selecionarNotasRecentes(
   for (const nota of notas) {
     if (alvo && nota.documentoDestinatario !== alvo) continue;
     const anterior = unicas.get(nota.chave);
-    if (anterior && (anterior.numero !== nota.numero || anterior.instanteFiscal !== nota.instanteFiscal))
+    if (
+      anterior &&
+      (anterior.numero !== nota.numero || anterior.instanteFiscal !== nota.instanteFiscal)
+    )
       throw new Error("invalid_response");
     unicas.set(nota.chave, nota);
   }
-  return [...unicas.values()].sort((a, b) =>
-    b.instanteFiscal - a.instanteFiscal || a.chave.localeCompare(b.chave)
-  ).slice(0, quantidade);
+  return [...unicas.values()]
+    .sort(
+      (a, b) => b.instanteFiscal - a.instanteFiscal || a.chave.localeCompare(b.chave),
+    )
+    .slice(0, quantidade);
 }
