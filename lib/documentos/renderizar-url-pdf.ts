@@ -7,11 +7,6 @@ import { join } from "node:path";
 
 import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
 
-import {
-  observarNavegacaoChromium,
-  type DiagnosticoNavegacaoDocumento,
-} from "./observar-navegacao-chromium";
-
 const RENDER_TIMEOUT_MS = 35_000;
 
 export type CodigoErroRenderizacaoDocumento =
@@ -28,7 +23,6 @@ export class ErroRenderizacaoDocumento extends Error {
   constructor(
     public readonly codigo: CodigoErroRenderizacaoDocumento,
     public readonly etapa?: EtapaRenderizacaoDocumento,
-    public readonly diagnosticoNavegacao?: DiagnosticoNavegacaoDocumento,
   ) {
     super(codigo);
     this.name = "ErroRenderizacaoDocumento";
@@ -40,8 +34,6 @@ export interface PoliticaRenderizacaoUrlPdf {
   permiteUrl: (url: string) => boolean;
   maxBytes?: number;
   timeoutMs?: number;
-  /** Apenas telemetria enum via pipe privado; não modifica PDF/navegação. */
-  observarNavegacao?: boolean;
 }
 
 export type RenderizadorUrlPdf = (
@@ -152,15 +144,11 @@ export async function abrirRedirectLocalParaDocumento(
   }
 }
 
-function executarChromium(
-  args: string[],
-  timeoutMs: number = RENDER_TIMEOUT_MS,
-  destinoObservado?: string,
-): Promise<void> {
+function executarChromium(args: string[], timeoutMs: number = RENDER_TIMEOUT_MS): Promise<void> {
   return new Promise((resolve, reject) => {
     const binario = process.env.CHROMIUM_PATH?.trim() || "/usr/bin/chromium-browser";
     const filho = spawn(binario, args, {
-      stdio: destinoObservado ? ["ignore", "ignore", "ignore", "pipe", "pipe"] : "ignore",
+      stdio: "ignore",
       env: {
         NODE_ENV: process.env.NODE_ENV ?? "production",
         PATH: process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
@@ -168,31 +156,12 @@ function executarChromium(
       },
     });
 
-    // Os FDs 3/4 pertencem somente a este filho. Nenhuma porta de debug é aberta.
-    // O observador lê somente status/etapas e nunca devolve a URL ou corpo.
-    let observador: ReturnType<typeof observarNavegacaoChromium> | null = null;
-    if (destinoObservado && filho.stdio[3] && filho.stdio[4]) {
-      try {
-        observador = observarNavegacaoChromium(
-          filho.stdio[3] as import("node:stream").Writable,
-          filho.stdio[4] as import("node:stream").Readable,
-          destinoObservado,
-        );
-      } catch {
-        // Telemetria best-effort: jamais falhar documento por diagnóstico.
-      }
-    }
-
     let finalizado = false;
     const concluir = (erro?: Error) => {
       if (finalizado) return;
       finalizado = true;
       clearTimeout(timer);
-      const diagnostico = observador?.diagnostico();
-      observador?.fechar();
-      if (erro instanceof ErroRenderizacaoDocumento) {
-        reject(new ErroRenderizacaoDocumento(erro.codigo, erro.etapa, diagnostico));
-      } else if (erro) reject(erro);
+      if (erro) reject(erro);
       else resolve();
     };
 
@@ -232,23 +201,9 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
     redirecionamento = await abrirRedirectLocalParaDocumento(url);
     etapa = "chromium_antes_redirect";
 
-    const argumentos = argumentosChromiumParaPdfDestino(redirecionamento.url, saida);
-    if (politica.observarNavegacao) {
-      // Pipe CDP via FDs privados; nunca passa a URL externa no argv.
-      // Chrome 136+ recusa depuração no perfil padrão. Um perfil exclusivo
-      // elimina também qualquer disputa entre renderizações simultâneas.
-      // O caminho temporário não contém URLs nem dados fiscais e é expurgado.
-      argumentos.splice(
-        argumentos.length - 1,
-        0,
-        "--remote-debugging-pipe",
-        "--user-data-dir=" + join(pasta, "chromium-profile"),
-      );
-    }
     await executarChromium(
-      argumentos,
+      argumentosChromiumParaPdfDestino(redirecionamento.url, saida),
       politica.timeoutMs ?? RENDER_TIMEOUT_MS,
-      politica.observarNavegacao ? url : undefined,
     );
 
     etapa = "pdf_leitura";
@@ -265,11 +220,7 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
         ? "chromium_apos_redirect"
         : etapa;
     if (erro instanceof ErroRenderizacaoDocumento) {
-      throw new ErroRenderizacaoDocumento(
-        erro.codigo,
-        erro.etapa ?? etapaSegura,
-        erro.diagnosticoNavegacao,
-      );
+      throw new ErroRenderizacaoDocumento(erro.codigo, erro.etapa ?? etapaSegura);
     }
     throw new ErroRenderizacaoDocumento("render_falhou", etapaSegura);
   } finally {
