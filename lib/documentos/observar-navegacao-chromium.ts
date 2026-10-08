@@ -105,7 +105,7 @@ export function observarNavegacaoChromium(
     if (msg.method === "Target.attachedToTarget") {
       const sessao = p.sessionId;
       if (typeof sessao === "string") {
-        enviar("Network.enable", { maxTotalBufferSize: 0, maxResourceBufferSize: 0 }, sessao);
+        enviar("Network.enable", {}, sessao);
         enviar("Page.enable", {}, sessao);
       }
       return;
@@ -170,8 +170,8 @@ export function observarNavegacaoChromium(
     fechar: () => {
       desativado = true;
       leitura.off("data", dados);
-      leitura.off("error", ignorarErro);
-      escrita.off("error", ignorarErro);
+      // Mantém handlers silenciosos até o fechamento físico dos FDs:
+      // Chromium pode emitir EPIPE após SIGKILL no timeout.
       parcial = "";
       requisicoes.clear();
       observados.clear();
