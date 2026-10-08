@@ -4,7 +4,10 @@ import { motivoDaRecusaDeDestino } from "@/lib/automation/destinos-internos-auto
 import { logger } from "@/lib/logger";
 
 import { carregarConexaoVendaErp, dadosCifradosVendaErp } from "./credenciais";
-import { normalizarNfesPeriodoVendaErp, type NotaFiscalPeriodoErp } from "./notas-fiscais-periodo";
+import {
+  normalizarNfesPeriodoVendaErp,
+  type NotaFiscalPeriodoErp,
+} from "./notas-fiscais-periodo";
 import type {
   ClienteErp,
   ConexaoErpSegura,
@@ -533,7 +536,6 @@ export async function obterInformacaoFiscalDaVendaErp(
     ),
   );
 }
-
 
 /**
  * Leitura fiscal isolada, com filtragem do XML no servidor e sem retorno de PII
