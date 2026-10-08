@@ -6,8 +6,6 @@ import {
   type EtapaRenderizacaoDocumento,
 } from "@/lib/documentos/renderizar-url-pdf";
 
-import type { DiagnosticoNavegacaoDocumento } from "@/lib/documentos/observar-navegacao-chromium";
-
 import { ehUrlDanfePublicoVendaErp, renderizarDanfeVendaErpParaPdf } from "./vendaerp-danfe-pdf";
 
 const DANFE_TIMEOUT_MS = 20_000;
@@ -27,7 +25,6 @@ export class ErroDanfeExterno extends Error {
     public readonly codigo: CodigoErroDanfeExterno,
     public readonly status?: number,
     public readonly etapa?: EtapaRenderizacaoDocumento,
-    public readonly diagnosticoNavegacao?: DiagnosticoNavegacaoDocumento,
   ) {
     super(codigo);
     this.name = "ErroDanfeExterno";
@@ -49,7 +46,7 @@ function mapearErroRenderizacao(erro: unknown): ErroDanfeExterno {
   }
 
   const mapear = (codigo: CodigoErroDanfeExterno) =>
-    new ErroDanfeExterno(codigo, undefined, erro.etapa, erro.diagnosticoNavegacao);
+    new ErroDanfeExterno(codigo, undefined, erro.etapa);
 
   switch (erro.codigo) {
     case "destino_inseguro":
