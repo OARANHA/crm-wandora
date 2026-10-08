@@ -165,6 +165,35 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(env.fechar).toHaveBeenCalledTimes(1);
   });
 
+  it("exige a chave fiscal exata da NFe no DOM, não apenas a palavra Nota Fiscal", async () => {
+    const env = ambientePdf();
+    const chave = ["35", "2610", "12345678000190", "55", "001", "064996397", "1", "12345678", "0"].join("");
+    await renderizarUrlParaPdfControlado(danfe, {
+      ...policy,
+      chaveFiscalEsperada: chave,
+    });
+    const [predicado, argumento] = env.page.waitForFunction.mock.calls[0] ?? [];
+    expect(argumento).toBe(chave);
+    const checar = predicado as (esperada: string) => boolean;
+
+    Object.defineProperty(document.body, "innerText", {
+      configurable: true,
+      value: "Nota Fiscal indisponível para consulta. " + "erro ".repeat(40),
+    });
+    expect(checar(chave)).toBe(false);
+    Object.defineProperty(document.body, "innerText", {
+      configurable: true,
+      value: "DANFE NOTA FISCAL CHAVE DE ACESSO " + "9".repeat(44) + " " + "teste ".repeat(20),
+    });
+    expect(checar(chave)).toBe(false);
+    Object.defineProperty(document.body, "innerText", {
+      configurable: true,
+      value: "DANFE NOTA FISCAL CHAVE DE ACESSO " + chave.match(/.{1,4}/g)?.join(" ") + " " + "teste ".repeat(20),
+    });
+    expect(checar(chave)).toBe(true);
+    delete (document.body as HTMLElement & { innerText?: string }).innerText;
+  });
+
   it("recusa PDF sem assinatura completa", async () => {
     const env = ambientePdf();
     env.page.pdf.mockResolvedValueOnce(Buffer.from("%PDF-1.7\nsem fim"));
