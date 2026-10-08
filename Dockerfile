@@ -82,7 +82,7 @@ RUN PDFJS_DIR=$(basename node_modules/.pnpm/pdfjs-dist@*) && \
 # no worker). O Next/Turbopack pode não rastrear o cliente de automação
 # carregado dinamicamente: copie o pacote runtime de forma explícita, sem
 # baixar navegadores de teste ou instalar Chromium duplicado.
-RUN mkdir -p ".next/standalone/node_modules/playwright-core" && \\
+RUN mkdir -p ".next/standalone/node_modules/playwright-core" && \
     cp -a node_modules/playwright-core/. ".next/standalone/node_modules/playwright-core/"
 
 # ---- runner: imagem slim de produção ----
