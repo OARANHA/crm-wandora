@@ -4,6 +4,7 @@ import { validateOutboundMedia } from "@/lib/messaging/media/upload-validation";
 import {
   ErroRenderizacaoDocumento,
   type EtapaRenderizacaoDocumento,
+  type DiagnosticoNavegacaoDocumento,
 } from "@/lib/documentos/renderizar-url-pdf";
 
 import { ehUrlDanfePublicoVendaErp, renderizarDanfeVendaErpParaPdf } from "./vendaerp-danfe-pdf";
@@ -25,6 +26,7 @@ export class ErroDanfeExterno extends Error {
     public readonly codigo: CodigoErroDanfeExterno,
     public readonly status?: number,
     public readonly etapa?: EtapaRenderizacaoDocumento,
+    public readonly diagnosticoNavegacao?: DiagnosticoNavegacaoDocumento,
   ) {
     super(codigo);
     this.name = "ErroDanfeExterno";
@@ -46,7 +48,7 @@ function mapearErroRenderizacao(erro: unknown): ErroDanfeExterno {
   }
 
   const mapear = (codigo: CodigoErroDanfeExterno) =>
-    new ErroDanfeExterno(codigo, undefined, erro.etapa);
+    new ErroDanfeExterno(codigo, undefined, erro.etapa, erro.diagnosticoNavegacao);
 
   switch (erro.codigo) {
     case "destino_inseguro":
