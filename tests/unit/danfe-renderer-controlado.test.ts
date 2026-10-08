@@ -155,6 +155,16 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(env.fechar).toHaveBeenCalledTimes(1);
   });
 
+  it("encerra o navegador se page.pdf ficar pendente após o prazo", async () => {
+    const env = ambientePdf();
+    env.page.pdf.mockImplementationOnce(() => new Promise<Buffer>(() => undefined));
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 40 }),
+    ).rejects.toMatchObject({ codigo: "timeout" });
+    expect(env.browser.close).toHaveBeenCalledTimes(1);
+    expect(env.fechar).toHaveBeenCalledTimes(1);
+  });
+
   it("recusa PDF sem assinatura completa", async () => {
     const env = ambientePdf();
     env.page.pdf.mockResolvedValueOnce(Buffer.from("%PDF-1.7\nsem fim"));
