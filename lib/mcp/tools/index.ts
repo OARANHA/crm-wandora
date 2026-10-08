@@ -59,6 +59,7 @@ import {
   crmErpSearchOrders,
   crmErpSearchProducts,
 } from "./integracoes-erp";
+import { crmErpSearchRecentInvoices } from "./notas-recentes-fiscais";
 import { crmDescribeExternalData, crmQueryExternalData } from "./dados-externos";
 import { crmListPrivacyRequests } from "./privacidade";
 import {
@@ -134,6 +135,7 @@ export const allTools: ReadonlyArray<McpToolDefinition> = [
   crmErpReadStock,
   crmErpSearchCustomers,
   crmErpSearchOrders,
+  crmErpSearchRecentInvoices,
   crmErpGetInvoice,
   crmPrepararProposta,
   crmDescribeExternalData,
