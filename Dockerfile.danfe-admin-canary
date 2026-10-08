@@ -1,0 +1,25 @@
+FROM node:22-alpine
+WORKDIR /app
+
+# O diagnóstico deve usar o mesmo Chromium do renderer em produção.
+RUN apk add --no-cache chromium font-liberation && \
+    CHROMIUM_BIN="$(command -v chromium || command -v chromium-browser)" && \
+    test -n "$CHROMIUM_BIN" && \
+    ln -s "$CHROMIUM_BIN" /usr/local/bin/elus-chromium
+
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+COPY package.json pnpm-lock.yaml ./
+COPY patches ./patches
+RUN pnpm install --frozen-lockfile
+COPY . .
+
+ARG SOURCE_REVISION=unknown
+LABEL org.opencontainers.image.source="https://github.com/OARANHA/crm-wandora" \
+      org.opencontainers.image.revision=$SOURCE_REVISION \
+      org.opencontainers.image.title="Elus ISIS DANFE admin diagnostic candidate"
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    CHROMIUM_PATH=/usr/local/bin/elus-chromium
+
+CMD ["pnpm", "exec", "tsx", "scripts/elus-vendaerp-danfe-admin-canary.ts"]
