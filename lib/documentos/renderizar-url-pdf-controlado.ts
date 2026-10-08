@@ -90,9 +90,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
         XDG_CONFIG_HOME: "/tmp",
         XDG_CACHE_HOME: "/tmp",
         NODE_ENV: process.env.NODE_ENV ?? "production",
-        PATH:
-          process.env.PATH ??
-          "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        PATH: process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
       },
     });
 
@@ -167,8 +165,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       throw new ErroRenderizacaoDocumento(erro.codigo, erro.etapa ?? etapa);
     }
     const timeout =
-      erro instanceof Error &&
-      (erro.name === "TimeoutError" || Date.now() >= deadline);
+      erro instanceof Error && (erro.name === "TimeoutError" || Date.now() >= deadline);
     // Nunca repassar a mensagem original: Playwright inclui endereço visitado,
     // detalhes da navegação e argv (possível token na query).
     throw new ErroRenderizacaoDocumento(timeout ? "timeout" : "render_falhou", etapa);
