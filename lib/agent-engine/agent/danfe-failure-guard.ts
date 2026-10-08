@@ -26,7 +26,8 @@ export class GuardaFalhaDanfeNoTurno {
       resultado === null ||
       typeof resultado !== "object" ||
       (resultado as { ok?: unknown }).ok !== true
-    ) this.falhou = true;
+    )
+      this.falhou = true;
   }
 
   registrarExcecao(): void {
