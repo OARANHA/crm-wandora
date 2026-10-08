@@ -12,8 +12,18 @@ const RENDER_TIMEOUT_MS = 35_000;
 export type CodigoErroRenderizacaoDocumento =
   "destino_inseguro" | "timeout" | "render_falhou" | "arquivo_grande" | "tipo_nao_pdf";
 
+export type EtapaRenderizacaoDocumento =
+  | "loopback_inicializacao"
+  | "chromium_antes_redirect"
+  | "chromium_apos_redirect"
+  | "pdf_leitura"
+  | "pdf_validacao";
+
 export class ErroRenderizacaoDocumento extends Error {
-  constructor(public readonly codigo: CodigoErroRenderizacaoDocumento) {
+  constructor(
+    public readonly codigo: CodigoErroRenderizacaoDocumento,
+    public readonly etapa?: EtapaRenderizacaoDocumento,
+  ) {
     super(codigo);
     this.name = "ErroRenderizacaoDocumento";
   }
@@ -34,6 +44,7 @@ export type RenderizadorUrlPdf = (
 export interface RedirectLocalDocumento {
   url: string;
   fechar: () => Promise<void>;
+  houveRedirecionamento: () => boolean;
 }
 
 function parecePdf(buffer: Buffer): boolean {
@@ -78,6 +89,7 @@ export async function abrirRedirectLocalParaDocumento(
 ): Promise<RedirectLocalDocumento> {
   const nonce = randomUUID();
   const caminho = "/" + nonce;
+  let redirecionou = false;
   const servidor = createServer((req, res) => {
     if (req.method !== "GET" || req.url !== caminho) {
       res.statusCode = 404;
@@ -86,6 +98,7 @@ export async function abrirRedirectLocalParaDocumento(
       return;
     }
 
+    redirecionou = true;
     res.statusCode = 302;
     res.setHeader("Location", destino);
     res.setHeader("Cache-Control", "no-store");
@@ -122,6 +135,7 @@ export async function abrirRedirectLocalParaDocumento(
     return {
       url: "http://127.0.0.1:" + endereco.port + caminho,
       fechar,
+      houveRedirecionamento: () => redirecionou,
     };
   } catch (erro) {
     await fechar();
@@ -181,23 +195,34 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
   const pasta = await mkdtemp(join(tmpdir(), "elus-document-render-"));
   const saida = join(pasta, "documento.pdf");
   let redirecionamento: RedirectLocalDocumento | null = null;
+  let etapa: EtapaRenderizacaoDocumento = "loopback_inicializacao";
 
   try {
     redirecionamento = await abrirRedirectLocalParaDocumento(url);
+    etapa = "chromium_antes_redirect";
 
     await executarChromium(
       argumentosChromiumParaPdfDestino(redirecionamento.url, saida),
       politica.timeoutMs ?? RENDER_TIMEOUT_MS,
     );
 
+    etapa = "pdf_leitura";
     const buffer = await readFile(saida);
+    etapa = "pdf_validacao";
     if (!buffer.length) throw new ErroRenderizacaoDocumento("render_falhou");
     if (buffer.length > limite) throw new ErroRenderizacaoDocumento("arquivo_grande");
     if (!parecePdf(buffer)) throw new ErroRenderizacaoDocumento("tipo_nao_pdf");
     return buffer;
   } catch (erro) {
-    if (erro instanceof ErroRenderizacaoDocumento) throw erro;
-    throw new ErroRenderizacaoDocumento("render_falhou");
+    // Só a etapa atravessa as camadas: jamais registrar URL, argv, stderr ou token.
+    const etapaSegura =
+      etapa === "chromium_antes_redirect" && redirecionamento?.houveRedirecionamento()
+        ? "chromium_apos_redirect"
+        : etapa;
+    if (erro instanceof ErroRenderizacaoDocumento) {
+      throw new ErroRenderizacaoDocumento(erro.codigo, erro.etapa ?? etapaSegura);
+    }
+    throw new ErroRenderizacaoDocumento("render_falhou", etapaSegura);
   } finally {
     await redirecionamento?.fechar().catch(() => undefined);
     await rm(pasta, { recursive: true, force: true }).catch(() => undefined);
