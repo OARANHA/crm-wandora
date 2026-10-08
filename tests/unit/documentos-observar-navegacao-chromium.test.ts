@@ -121,10 +121,12 @@ describe("observador CDP privado do documento", () => {
     try {
       expect(() => c.evento("evento", { outro: "x".repeat(300_000) })).not.toThrow();
       expect(c.observador.diagnostico()).toBeUndefined();
-      expect(() => c.evento("Network.responseReceived", {
-        type: "Document",
-        response: { url: URL_COM_SEGREDO, status: 200 },
-      })).not.toThrow();
+      expect(() =>
+        c.evento("Network.responseReceived", {
+          type: "Document",
+          response: { url: URL_COM_SEGREDO, status: 200 },
+        }),
+      ).not.toThrow();
       expect(c.observador.diagnostico()).toBeUndefined();
     } finally {
       c.fechar();
