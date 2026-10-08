@@ -340,3 +340,47 @@ significa **não medido**, não ausência de PDF.
 A tabela `erp_admin_whatsapp_bindings` é parte do próprio módulo
 `integracoes_erp` e segue a ADR-0002: server-only, RLS ligada, sem grants para
 `anon/authenticated`, provisionada somente onde o módulo foi instalado.
+
+
+## ISIS — busca fiscal regressiva de NFes (2026-10-08)
+
+Complemento READ-ONLY ao provider existente. O Swagger entregue nesta data documenta
+GET /api/request/Fiscal/ConsultarNfePeriodo, com DataInicial e DataFinal
+em mm-dd-aaaa, máximo de **um mês por chamada**, pageSize até 50 e skip.
+A chave do VendaERP aceita até 1.000 requisições/hora. O Swagger **não fornece**
+filtro por destinatário nem ordenação garantida no endpoint fiscal. O corpo HTTP
+200 não tem schema, mas o exemplo real fornecido pelo proprietário contém Tipo,
+Numero, Serie, ChaveAcesso, DataEmissao, XML e UrlImpressaoUrl.
+
+Para o administrador WhatsApp com erp.admin.read, a nova ferramenta
+crm_erp_search_recent_invoices é a autoridade para **últimas notas emitidas**.
+crm_erp_search_orders permanece a capability de busca de pedidos, inclusive
+seu parâmetro legado ultimas_notas=N; o agente deve preferir a busca fiscal
+para recência de NFe e não inferir emissão pela posição em pedidos.
+
+Política:
+- quantidade omitida: **3**; quantidade de 1 a 3: consulta automaticamente
+  mês corrente e, se faltar quantidade, retrocede até seis meses anteriores;
+- quantidade de 4 a 20: exige mes_ano=AAAA-MM antes de qualquer consulta;
+- mês explícito: consulta somente aquele mês; nenhuma chamada cruza meses;
+- paginação completa do mês até retorno menor que 50; por chamada, no máximo
+  12 páginas/mês e 24 páginas totais; limite atingido retorna
+  consulta_parcial, **nunca** conclusão silenciosa;
+- a seleção filtra NFes autorizadas e distintas por chave de acesso, ordena
+  pelo DataEmissao fiscal validado; não ordena por número, pedido ou ordem
+  fornecida pelo ERP;
+- nome/CPF/CNPJ/contato vinculado passam pela resolução existente. Quando há
+  destinatário indicado, a tool exige CPF/CNPJ confirmado pelo cadastro Pessoa
+  e compara localmente com o documento do XML da NFe. Ambiguidade falha fechado;
+- o XML, documento destinatário e URL externa do DANFE **não chegam ao LLM**.
+  O adapter projeta somente metadados necessários e descarta os demais campos;
+- entrega DANFE continua por crm_erp_prepare_admin_danfe e send_message
+  sequencial, com controles atuais de sender, Storage privado, auditoria e egress;
+- a busca pode falhar fechada quando excede sete meses, o mês retorna volume
+  excessivo, o schema está incompleto ou o fornecedor não comprova a emissão.
+  Nesse caso ISIS pede mês/ano; não declara ausência de NFes.
+
+**Não incluído neste slice:** atualização de telefone em contatos já existentes
+ou criação de contato de terceiro com telefone obrigatório; exige reconciliação
+da migration/RPC local e gate de privacidade próprios, sem qualquer escrita
+em Pessoas/Salvar do VendaERP.
