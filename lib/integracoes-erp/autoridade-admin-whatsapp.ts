@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { audit } from "@/lib/audit";
+import type { EtapaRenderizacaoDocumento } from "@/lib/documentos/renderizar-url-pdf";
 import { canonicalPhoneBR } from "@/lib/channels/phone-variants";
 
 import { ErroDanfeExterno, materializarDanfeExterno } from "./danfe";
@@ -263,6 +264,14 @@ export async function removerVinculoAdminWhatsappDoUsuario(
   return typeof data?.id === "string" ? data.id : null;
 }
 
+const ETAPAS_RENDERIZACAO_AUDITAVEIS = new Set<EtapaRenderizacaoDocumento>([
+  "loopback_inicializacao",
+  "chromium_antes_redirect",
+  "chromium_apos_redirect",
+  "pdf_leitura",
+  "pdf_validacao",
+]);
+
 const RECURSO_POR_TOOL: Record<string, string> = {
   crm_erp_search_customers: "erp_customer",
   crm_erp_search_orders: "erp_order",
@@ -280,6 +289,7 @@ export async function auditarConsultaAdminWhatsapp(input: {
   codigoTecnico?: string | null;
   statusHttp?: number | null;
   autenticacaoSameOrigin?: boolean | null;
+  etapaRenderizacao?: EtapaRenderizacaoDocumento | null;
 }): Promise<void> {
   if (!ferramentaErpExigeAutoridadeAdminWhatsapp(input.toolName)) return;
   await audit({
@@ -296,6 +306,10 @@ export async function auditarConsultaAdminWhatsapp(input: {
       success: input.success,
       ...(input.motivo ? { motivo: input.motivo } : {}),
       ...(input.codigoTecnico ? { codigo_tecnico: input.codigoTecnico } : {}),
+      ...(input.etapaRenderizacao &&
+      ETAPAS_RENDERIZACAO_AUDITAVEIS.has(input.etapaRenderizacao)
+        ? { etapa_renderizacao: input.etapaRenderizacao }
+        : {}),
       ...(typeof input.statusHttp === "number" ? { status_http: input.statusHttp } : {}),
       ...(typeof input.autenticacaoSameOrigin === "boolean"
         ? { autenticacao_same_origin: input.autenticacaoSameOrigin }
@@ -348,6 +362,7 @@ export async function prepararDanfeAdminWhatsapp(
       codigoTecnico?: string | null;
       statusHttp?: number | null;
       autenticacaoSameOrigin?: boolean | null;
+      etapaRenderizacao?: EtapaRenderizacaoDocumento | null;
     },
   ): Promise<PrepararDanfeAdminWhatsappResultado> => {
     await auditarConsultaAdminWhatsapp({
@@ -357,6 +372,9 @@ export async function prepararDanfeAdminWhatsapp(
       success: false,
       motivo,
       ...(diagnostico?.codigoTecnico ? { codigoTecnico: diagnostico.codigoTecnico } : {}),
+      ...(diagnostico?.etapaRenderizacao
+        ? { etapaRenderizacao: diagnostico.etapaRenderizacao }
+        : {}),
       ...(typeof diagnostico?.statusHttp === "number"
         ? { statusHttp: diagnostico.statusHttp }
         : {}),
@@ -391,6 +409,7 @@ export async function prepararDanfeAdminWhatsapp(
         erro.codigo === "destino_inseguro" ? "danfe_inseguro" : "danfe_download_failed",
         {
           codigoTecnico: erro.codigo,
+          ...(erro.etapa ? { etapaRenderizacao: erro.etapa } : {}),
           ...(typeof erro.status === "number" ? { statusHttp: erro.status } : {}),
           autenticacaoSameOrigin: Boolean(headers),
         },
