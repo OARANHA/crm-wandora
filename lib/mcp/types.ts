@@ -78,8 +78,12 @@ export interface McpToolDefinition<TInput extends z.ZodRawShape = z.ZodRawShape>
    * transformaria comportamento normal em alarme.
    */
   motivoDoVazio?: (resultado: unknown) => string | null;
-  handler: (
-    input: z.infer<z.ZodObject<TInput>>,
-    ctx: McpContext,
-  ) => Promise<unknown>;
+  /**
+   * Resultado estruturado de ERRO, mesmo que o handler tenha retornado normalmente.
+   * Deve devolver somente um código estático e allowlisted — nunca a mensagem,
+   * identificador, documento fiscal ou qualquer campo bruto do provider.
+   * Ausente = preservar a classificação pré-existente desta tool.
+   */
+  erroParaAuditoria?: (resultado: unknown) => string | null;
+  handler: (input: z.infer<z.ZodObject<TInput>>, ctx: McpContext) => Promise<unknown>;
 }

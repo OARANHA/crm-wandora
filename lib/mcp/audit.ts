@@ -28,17 +28,11 @@ interface AuditMcpToolCallInput {
    * "a busca não achou" de "a busca quebrou" no dado gravado; separar os dois na
    * TELA pede um contador novo naquela função — migration, trabalho do mantenedor.
    */
-  desfecho?: "sem_resultado";
+  desfecho?: "sem_resultado" | "erro_resultado";
   motivo?: string;
 }
 
-const ARGS_REDACT_KEYS = new Set([
-  "authorization",
-  "api_key",
-  "token",
-  "password",
-  "cpf",
-]);
+const ARGS_REDACT_KEYS = new Set(["authorization", "api_key", "token", "password", "cpf"]);
 
 function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -55,8 +49,17 @@ function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
 }
 
 export async function auditMcpToolCall(input: AuditMcpToolCallInput): Promise<void> {
-  const { ctx, toolName, args, durationMs, success, errorMessage, resultSummary, desfecho, motivo } =
-    input;
+  const {
+    ctx,
+    toolName,
+    args,
+    durationMs,
+    success,
+    errorMessage,
+    resultSummary,
+    desfecho,
+    motivo,
+  } = input;
 
   const metadata: Record<string, unknown> = {
     actor_type: ctx.actor.type,
