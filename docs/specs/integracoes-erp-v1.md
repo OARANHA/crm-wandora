@@ -341,7 +341,6 @@ A tabela `erp_admin_whatsapp_bindings` é parte do próprio módulo
 `integracoes_erp` e segue a ADR-0002: server-only, RLS ligada, sem grants para
 `anon/authenticated`, provisionada somente onde o módulo foi instalado.
 
-
 ## ISIS — busca fiscal regressiva de NFes (2026-10-08)
 
 Complemento READ-ONLY ao provider existente. O Swagger entregue nesta data documenta
@@ -359,6 +358,7 @@ seu parâmetro legado ultimas_notas=N; o agente deve preferir a busca fiscal
 para recência de NFe e não inferir emissão pela posição em pedidos.
 
 Política:
+
 - quantidade omitida: **3**; quantidade de 1 a 3: consulta automaticamente
   mês corrente e, se faltar quantidade, retrocede até seis meses anteriores;
 - quantidade de 4 a 20: exige mes_ano=AAAA-MM antes de qualquer consulta;
