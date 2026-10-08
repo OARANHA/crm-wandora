@@ -22,4 +22,5 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     CHROMIUM_PATH=/usr/local/bin/elus-chromium
 
+USER node
 CMD ["pnpm", "exec", "tsx", "scripts/elus-vendaerp-danfe-admin-canary.ts"]
