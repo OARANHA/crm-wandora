@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/danfe-worker-runtime-parity.yml"
       - "tests/integration/danfe-chromium-offline.test.ts"
+      - "lib/documentos/renderizar-url-pdf.ts"
+      - "tests/unit/documentos-renderizar-url-pdf.test.ts"
   workflow_dispatch:
 
 permissions:
@@ -45,8 +47,9 @@ jobs:
         run: |
           set -euo pipefail
           # tests/ é excluído da imagem de produção pelo .dockerignore.
-          # Monta SOMENTE testes do checkout, em read-only. No network:
-          # o servidor SPA e o redirect usam o loopback dentro do container.
+          # Monta SOMENTE testes e renderer do checkout em read-only, para
+          # provar a revisão real da PR com o Chromium Alpine já publicado.
+          # No network: SPA e redirect usam apenas loopback no container.
           docker run --rm --pull=never \
             --network none \
             --cap-drop ALL \
@@ -56,8 +59,10 @@ jobs:
             --cpus 2 \
             --tmpfs /tmp:rw,nosuid,nodev,size=536870912 \
             --mount "type=bind,source=$PWD/tests,target=/app/tests,readonly" \
+            --mount "type=bind,source=$PWD/lib/documentos,target=/app/lib/documentos,readonly" \
             --env ELUS_DANFE_CHROMIUM_OFFLINE=1 \
             "$WORKER_IMAGE" \
             node /app/node_modules/vitest/vitest.mjs run \
               tests/integration/danfe-chromium-offline.test.ts \
+              tests/unit/documentos-renderizar-url-pdf.test.ts \
               --maxWorkers=1
