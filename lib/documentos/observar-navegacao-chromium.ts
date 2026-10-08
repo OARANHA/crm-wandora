@@ -84,7 +84,10 @@ export function observarNavegacaoChromium(
   const enviar = (method: string, params: Record<string, unknown>, sessionId?: string) => {
     if (desativado || escrita.destroyed || !escrita.writable) return;
     try {
-      escrita.write(JSON.stringify({ id: ++sequencia, method, params, ...(sessionId ? { sessionId } : {}) }) + "\u0000");
+      escrita.write(
+        JSON.stringify({ id: ++sequencia, method, params, ...(sessionId ? { sessionId } : {}) }) +
+          "\u0000",
+      );
     } catch {
       // Best-effort; nenhuma exceção ou objeto do Chromium atravessa o renderer.
     }
