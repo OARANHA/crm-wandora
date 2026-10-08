@@ -44,6 +44,8 @@ export interface PoliticaRenderizacaoUrlPdf {
   permiteUrl: (url: string) => boolean;
   maxBytes?: number;
   timeoutMs?: number;
+  /** Chave fiscal comprovada, somente quando fornecida por leitura estruturada ERP. */
+  chaveFiscalEsperada?: string;
 }
 
 export type RenderizadorUrlPdf = (
