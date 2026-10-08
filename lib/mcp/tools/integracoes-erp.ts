@@ -646,8 +646,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
       if (quantidadePendente !== null && !input.ultimas_notas) {
         return {
           erro: "continuacao_notas_sem_ranking",
-          mensagem:
-            `A solicitação ainda exige as últimas ${quantidadePendente} NFes. Confirme que cliente_contact_id corresponde ao cliente solicitado e repita crm_erp_search_orders com cliente_contact_id e ultimas_notas=${quantidadePendente}. Não use uma lista comum de pedidos como ranking fiscal e não peça ao administrador o número/data da outra NFe.`,
+          mensagem: `A solicitação ainda exige as últimas ${quantidadePendente} NFes. Confirme que cliente_contact_id corresponde ao cliente solicitado e repita crm_erp_search_orders com cliente_contact_id e ultimas_notas=${quantidadePendente}. Não use uma lista comum de pedidos como ranking fiscal e não peça ao administrador o número/data da outra NFe.`,
           ultimas_notas_necessarias: quantidadePendente,
         };
       }
