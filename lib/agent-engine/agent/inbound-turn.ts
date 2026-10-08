@@ -1030,7 +1030,9 @@ export function blocosErpResidentes(toolIds: readonly string[]): string[] {
 
   let bloco =
     "## ERP — pedidos e notas por cliente\n" +
-    "Se o administrador pedir pedidos, compras, notas ou NFes de um cliente e informar apenas o " +
+    (toolIds.includes(recent)
+      ? "Se o administrador pedir pedidos ou compras de um cliente e informar apenas o "
+      : "Se o administrador pedir pedidos, compras, notas ou NFes de um cliente e informar apenas o ") +
     "nome ou a razão social, chame crm_erp_search_orders DIRETAMENTE com cliente antes de responder. " +
     "Se já houver um cliente_contact_id resolvido nesta conversa, prefira esse id. ";
 
