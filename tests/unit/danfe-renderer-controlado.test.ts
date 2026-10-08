@@ -35,6 +35,7 @@ function ambientePdf() {
     pdf: vi.fn().mockResolvedValue(pdf),
   };
   const context = {
+    addInitScript: vi.fn().mockResolvedValue(undefined),
     route: vi.fn().mockResolvedValue(undefined),
     routeWebSocket: vi.fn().mockResolvedValue(undefined),
     newPage: vi.fn().mockResolvedValue(page),
@@ -104,6 +105,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
           waitUntil: "domcontentloaded",
         }),
       );
+      expect(env.context.addInitScript).toHaveBeenCalledTimes(1);
       expect(env.context.routeWebSocket).toHaveBeenCalled();
       expect(env.browser.close).toHaveBeenCalledTimes(1);
       expect(env.fechar).toHaveBeenCalledTimes(1);
