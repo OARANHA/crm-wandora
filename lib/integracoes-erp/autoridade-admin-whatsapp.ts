@@ -422,11 +422,10 @@ export async function prepararDanfeAdminWhatsapp(
 
   let documento;
   try {
-    documento = await materializarDanfeExterno(
-      nota.danfeUrl,
-      undefined,
-      { ...(headers ? { headers } : {}), chaveFiscalEsperada },
-    );
+    documento = await materializarDanfeExterno(nota.danfeUrl, undefined, {
+      ...(headers ? { headers } : {}),
+      chaveFiscalEsperada,
+    });
   } catch (erro) {
     if (erro instanceof ErroDanfeExterno) {
       return falhar(
