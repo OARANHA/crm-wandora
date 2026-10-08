@@ -1,3 +1,7 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +9,7 @@ import {
   argumentosChromiumParaPdf,
   argumentosChromiumParaPdfDestino,
   ErroRenderizacaoDocumento,
+  evidenciarPdfNoTimeout,
   renderizarUrlParaPdf,
 } from "@/lib/documentos/renderizar-url-pdf";
 
@@ -67,6 +72,24 @@ describe("capability document.render.url_to_pdf", () => {
     } finally {
       if (anterior === undefined) delete process.env.CHROMIUM_PATH;
       else process.env.CHROMIUM_PATH = anterior;
+    }
+  });
+
+  it("classifica apenas marcadores do PDF temporário, sem ler ou registrar conteúdo fiscal", async () => {
+    const pasta = await mkdtemp(join(tmpdir(), "elus-evidencia-pdf-"));
+    const caminho = join(pasta, "documento.pdf");
+    try {
+      expect(await evidenciarPdfNoTimeout(caminho)).toBe("arquivo_ausente");
+      await writeFile(caminho, "");
+      expect(await evidenciarPdfNoTimeout(caminho)).toBe("arquivo_vazio");
+      await writeFile(caminho, "conteudo sem formato pdf");
+      expect(await evidenciarPdfNoTimeout(caminho)).toBe("sem_assinatura_pdf");
+      await writeFile(caminho, "%PDF-1.7\\nconteudo sintético em gravação");
+      expect(await evidenciarPdfNoTimeout(caminho)).toBe("sem_marcador_final");
+      await writeFile(caminho, "%PDF-1.7\\nconteudo sintético\\n%%EOF\\n");
+      expect(await evidenciarPdfNoTimeout(caminho)).toBe("marcadores_pdf_presentes");
+    } finally {
+      await rm(pasta, { recursive: true, force: true });
     }
   });
 
