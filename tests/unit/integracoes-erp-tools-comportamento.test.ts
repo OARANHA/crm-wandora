@@ -708,6 +708,121 @@ describe("tools ERP READ — comportamento do agente", () => {
     expect(resultado).not.toHaveProperty("pedidos");
   });
 
+  it("turno ISIS: fallback por contato não pode perder ultimas_notas após busca vazia por nome", async () => {
+    const turno = { ...ctx, requestId: "req-isis-0817-fallback-notas" };
+    const contatoId = "11111111-1111-4111-8111-111111111111";
+
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValueOnce({
+      ok: true,
+      dados: [],
+    });
+
+    const primeira = await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Eco Projetos",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
+        limite: 10,
+        skip: 0,
+      },
+      turno,
+    );
+    expect(primeira).toEqual({ pedidos: [] });
+
+    const segunda = await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: undefined,
+        cpf_cnpj: undefined,
+        cliente_contact_id: contatoId,
+        status: undefined,
+        numero_nfe: undefined,
+        limite: 20,
+        skip: 0,
+      },
+      turno,
+    );
+    expect(segunda).toMatchObject({
+      erro: "continuacao_notas_sem_ranking",
+      ultimas_notas_necessarias: 2,
+    });
+    // Bloquear uma lista sem ranking não faz outra chamada ao VendaERP.
+    expect(service.buscarPedidosErpComIdentidadeInterna).toHaveBeenCalledTimes(1);
+    expect(identityLinks.carregarVinculoClienteExterno).not.toHaveBeenCalled();
+
+    vi.mocked(identityLinks.carregarVinculoClienteExterno).mockResolvedValue({
+      ok: true,
+      vinculo: {
+        id: "link-isis",
+        organizationId: turno.organizationId,
+        contactId: contatoId,
+        provider: "vendaerp",
+        externalId: "erp-42",
+        externalLabel: "Eco Projetos",
+        externalLabelKey: "eco projetos",
+        providerLookupLabel: "ECO PROJETOS LTDA",
+        resolutionOrigin: "exact_name",
+      },
+    });
+
+    const pedido = (codigo: number, numeroNFe: string, dataFaturamento: string) =>
+      ({
+        pedido: {
+          id: `pedido-${codigo}`,
+          codigo,
+          cliente: "Eco Projetos",
+          status: "Faturado",
+          statusSistema: null,
+          total: 100,
+          data: null,
+          finalizado: true,
+          numeroNFe,
+          dataFaturamento,
+          chaveAcessoNFe: null,
+          danfeUrl: null,
+          urlSefaz: null,
+        },
+        identidadeCliente: { pessoaId: "erp-42", cpfCnpj: null, email: null },
+      }) as PedidoErpComIdentidadeInterna;
+
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna)
+      .mockResolvedValueOnce({
+        ok: true,
+        dados: [
+          pedido(10, "NFE-ANTIGA", "2026-10-06T10:00:00Z"),
+          pedido(11, "NFE-RECENTE", "2026-10-07T10:00:00Z"),
+        ],
+      })
+      .mockResolvedValueOnce({ ok: true, dados: [] });
+
+    const comprovada = await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: undefined,
+        cpf_cnpj: undefined,
+        cliente_contact_id: contatoId,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
+        limite: 20,
+        skip: 0,
+      },
+      turno,
+    );
+    expect(comprovada).toMatchObject({
+      resolucao_cliente: { status: "resolved" },
+      resumo: {
+        quantidadeRetornada: 2,
+        resultadoCompleto: true,
+      },
+      pedidos: [{ numeroNFe: "NFE-RECENTE" }, { numeroNFe: "NFE-ANTIGA" }],
+    });
+  });
+
   it("últimas notas com DANFE ensinam prepare e send sequenciais no próprio turno", () => {
     const [bloco] = blocosErpResidentes([
       "crm_erp_search_orders",
@@ -717,6 +832,8 @@ describe("tools ERP READ — comportamento do agente", () => {
     if (bloco === undefined) throw new Error("bloco ERP ausente");
 
     expect(bloco).toContain("ultimas_notas=N");
+    expect(bloco).toContain("continuacao_notas_sem_ranking");
+    expect(bloco).toContain("cliente_contact_id vinculado");
     expect(bloco).toMatch(/última nota|últimas N notas/);
     expect(bloco).toContain("crm_erp_prepare_admin_danfe");
     expect(bloco).toContain("IMEDIATAMENTE depois send_message");

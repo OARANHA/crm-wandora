@@ -1047,7 +1047,9 @@ export function blocosErpResidentes(toolIds: readonly string[]): string[] {
   if (toolIds.includes("crm_erp_prepare_admin_danfe")) {
     bloco +=
       "REGRA DE ENTREGA: quando o administrador pedir a última nota ou as últimas N notas, entenda que ele quer também os PDFs das DANFEs nesta própria conversa. " +
-      "Chame crm_erp_search_orders com ultimas_notas=N; para cada NFe retornada, em ordem, faça crm_erp_prepare_admin_danfe e IMEDIATAMENTE depois send_message para anexar aquele PDF antes de preparar a próxima. " +
+      "Chame crm_erp_search_orders com ultimas_notas=N; se a busca por cliente não trouxer pedidos e você continuar pelo cliente_contact_id vinculado, REPITA a consulta com o mesmo ultimas_notas=N. " +
+      "Se a ferramenta retornar continuacao_notas_sem_ranking, repita com ultimas_notas_necessarias, mantendo a identidade já comprovada. Nunca trate limite=20 ou a ordem de pedidos como recência fiscal. " +
+      "Para cada NFe comprovada retornada, em ordem, faça crm_erp_prepare_admin_danfe e IMEDIATAMENTE depois send_message para anexar aquele PDF antes de preparar a próxima. " +
       "Não prepare duas DANFEs seguidas sem enviar a primeira, porque o documento preparado pertence à próxima send_message. " +
       "Se uma DANFE falhar, informe exatamente qual NFe não pôde ser anexada e continue somente com as demais que foram comprovadas.";
   }

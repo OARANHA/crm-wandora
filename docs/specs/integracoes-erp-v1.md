@@ -149,6 +149,18 @@ código da venda para obter `dataEmissao`; se nem essa visão fiscal fornecer um
 a consulta falha fechado em vez de usar número de NFe, código do pedido ou ordem do provider
 como aproximação temporal.
 
+O canário de 2026-10-08 às 08h17 demonstrou uma perda de contexto no fallback: o agente chamou
+`crm_erp_search_orders(cliente=..., ultimas_notas=2)` e recebeu conjunto vazio; em seguida
+tentou `crm_erp_search_orders(cliente_contact_id=..., limite=20)` **sem** `ultimas_notas`.
+Um resultado positivo da segunda consulta não comprova recência fiscal. Por isso, quando uma
+busca por nome com `ultimas_notas=N` retornar vazia, a capability preserva temporariamente,
+somente no mesmo `organizationId + requestId`, **a quantidade** pedida, sem gravar nome ou
+identidade em cache. Uma continuação por `cliente_contact_id` que omitir `ultimas_notas`
+recebe `continuacao_notas_sem_ranking`, antes de nova consulta ao ERP, e orienta repetir
+a mesma busca com `ultimas_notas=N` após confirmar o vínculo correto. O guard não inventa
+identidade ou notas, não substitui a validação do vínculo e não considera uma lista limitada
+de pedidos como ranking fiscal.
+
 No WhatsApp administrativo, **última(s) nota(s)** também significa entregar as respectivas
 DANFEs ao administrador na conversa corrente. Para cada NFe selecionada, o agente prepara uma
 DANFE e imediatamente executa o `send_message` que consome aquele documento; só então prepara a
