@@ -1,0 +1,87 @@
+name: ELUS worker Docker 29 containerd unpack
+
+on:
+  pull_request:
+    paths:
+      - "Dockerfile.worker"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "patches/**"
+      - ".github/workflows/elus-worker-containerd-unpack.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  worker-containerd:
+    name: Build, unpack and run worker with Docker 29
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Vigia utiliza Docker 29.1.3 + overlayfs + containerd snapshotter.
+      # Reproduzimos a mesma família de armazenamento num runner isolado.
+      - name: Configure Docker 29 with containerd image store
+        uses: docker/setup-docker-action@v5
+        with:
+          version: v29.1.3
+          daemon-config: |
+            {
+              "features": {
+                "containerd-snapshotter": true
+              }
+            }
+
+      - name: Verify daemon backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version --format '{{.Server.Version}}'
+          docker info --format '{{json .DriverStatus}}' | grep -Fq 'io.containerd.snapshotter.v1'
+          docker info --format '{{.Driver}}' | grep -Fq 'overlayfs'
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Não publica imagem de PR nem executa provider ERP.
+      - name: Build and import worker image into Docker containerd
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: false
+          load: true
+          tags: elus-worker-unpack-test:${{ github.sha }}
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker-unpack
+          provenance: false
+
+      - name: Validate two install layers and runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="elus-worker-unpack-test:${GITHUB_SHA}"
+          docker image inspect "$IMAGE" >/dev/null
+          # Confere duas instruções pnpm; não presume que tamanho sozinho
+          # certifica ausência de bug no snapshotter da VPS.
+          docker history --no-trunc --format '{{.CreatedBy}}' "$IMAGE" > /tmp/worker-history.txt
+          test "$(grep -c 'RUN /bin/sh -c pnpm install --frozen-lockfile' /tmp/worker-history.txt)" -eq 2
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,nosuid,nodev,size=128m \
+            --entrypoint node "$IMAGE" -e '
+              const fs = require("node:fs");
+              for (const p of ["tsx", "playwright-core"]) require.resolve(p);
+              fs.accessSync("/usr/local/bin/elus-chromium", fs.constants.X_OK);
+              console.log("WORKER_CONTAINERD_SMOKE_OK");
+            '
+          echo "Worker image loaded and inspected; no real VendaERP request."
+
+      - name: Safety notice
+        run: |
+          echo "This only verifies unpack/run in the CI runner."
+          echo "It does not prove that the Vigia daemon can pull the new GHCR digest."
+          echo "No deploy, no canary, no change to production was performed."
