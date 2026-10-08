@@ -636,7 +636,7 @@ describe("tools ERP READ — comportamento do agente", () => {
   });
 
   it("últimas notas falham fechado se nem a visão fiscal provar a data ausente", async () => {
-    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValueOnce({
       ok: true,
       dados: [
         {
@@ -662,6 +662,11 @@ describe("tools ERP READ — comportamento do agente", () => {
           },
         },
       ],
+    });
+    // A segunda pagina vazia prova que o unico pedido foi totalmente recuperado.
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+      ok: true,
+      dados: [],
     });
     vi.mocked(customerResolution.resolverClienteVendaErpPorPedidos).mockResolvedValue({
       status: "resolved",
