@@ -169,6 +169,7 @@ import {
   recenciaFiscalComprovada,
   numerosDaBuscaFiscalComprovada,
   quantidadeDeNotasMaisRecentesPedida,
+  mencionaNfeNaoComprovada,
 } from './recencia-fiscal-gate';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
 import { cancelPendingCronsForLead } from '../cron/scheduler';
@@ -3051,7 +3052,10 @@ async function executarTurnoDoAgente(
             (id) => id === 'crm_erp_search_orders' || id === 'crm_erp_search_recent_invoices',
           ) &&
           pedidoDeNfeMaisRecente(mensagemDoJob) &&
-          !recenciaFiscalComprovadaNesteTurno
+          (
+            !recenciaFiscalComprovadaNesteTurno ||
+            mencionaNfeNaoComprovada(body, numerosNfeFiscaisComprovados)
+          )
         ) {
           body = AVISO_SEM_RECENCIA_FISCAL;
           documentoAdminPreparado = null;
