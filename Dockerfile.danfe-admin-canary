@@ -20,7 +20,9 @@ LABEL org.opencontainers.image.source="https://github.com/OARANHA/crm-wandora" \
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
+    TSX_DISABLE_CACHE=1 \
+    HOME=/tmp \
     CHROMIUM_PATH=/usr/local/bin/elus-chromium
 
 USER node
-CMD ["pnpm", "exec", "tsx", "scripts/elus-vendaerp-danfe-admin-canary.ts"]
+CMD ["node", "--import", "tsx", "/app/scripts/elus-vendaerp-danfe-admin-canary.ts"]
