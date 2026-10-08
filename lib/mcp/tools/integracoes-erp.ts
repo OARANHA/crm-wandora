@@ -17,6 +17,11 @@ import {
   type ConsultaErpResultado,
   type PedidoErpComIdentidadeInterna,
 } from "@/lib/integracoes-erp/service";
+import {
+  limparNotasRecentesPendentes,
+  notasRecentesPendentes,
+  registrarNotasRecentesPendentes,
+} from "@/lib/integracoes-erp/continuidade-notas-recentes";
 import { carregarVinculoClienteExterno } from "@/lib/integracoes-erp/identidade-externa-cliente";
 import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
 import {
@@ -276,37 +281,6 @@ function buscarPedidosNoMesmoTurno(requestId: string, nome: unknown): Promise<bo
   if (!chave) return null;
   limparBuscasPedidosExpiradas();
   return buscasPedidosPorTurno.get(chave)?.promessa ?? null;
-}
-
-// Um fallback por contato não pode esquecer a quantidade fiscal solicitada no mesmo turno.
-// Guardamos somente a quantidade, por organização e requestId; nunca nome, identidade ou PII.
-const PENDENCIA_NOTAS_RECENTES_TTL_MS = 120_000;
-const notasRecentesPendentesPorTurno = new Map<string, { quantidade: number; expiraEm: number }>();
-
-function chaveNotasRecentesDoTurno(ctx: McpContext): string {
-  return `${ctx.organizationId}:${ctx.requestId}`;
-}
-
-function registrarNotasRecentesPendentes(ctx: McpContext, quantidade: number): void {
-  const agora = Date.now();
-  for (const [chave, pendencia] of notasRecentesPendentesPorTurno) {
-    if (pendencia.expiraEm <= agora) notasRecentesPendentesPorTurno.delete(chave);
-  }
-  notasRecentesPendentesPorTurno.set(chaveNotasRecentesDoTurno(ctx), {
-    quantidade,
-    expiraEm: agora + PENDENCIA_NOTAS_RECENTES_TTL_MS,
-  });
-}
-
-function notasRecentesPendentes(ctx: McpContext): number | null {
-  const chave = chaveNotasRecentesDoTurno(ctx);
-  const pendencia = notasRecentesPendentesPorTurno.get(chave);
-  if (!pendencia) return null;
-  if (pendencia.expiraEm <= Date.now()) {
-    notasRecentesPendentesPorTurno.delete(chave);
-    return null;
-  }
-  return pendencia.quantidade;
 }
 
 const clientesInputShape = {
@@ -708,7 +682,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
           input.ultimas_notas,
         );
         if (!ranking.ok) return ranking;
-        notasRecentesPendentesPorTurno.delete(chaveNotasRecentesDoTurno(ctx));
+        limparNotasRecentesPendentes(ctx);
         return {
           resolucao_cliente: {
             status: "resolved",
