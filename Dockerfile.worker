@@ -25,7 +25,15 @@ RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 COPY package.json pnpm-lock.yaml ./
 COPY patches ./patches
-RUN pnpm install --frozen-lockfile
+# Remediação conservadora do pull no Docker 29/containerd do Vigia:
+# no build anterior, uma única camada de ~309 MiB comprimidos de node_modules
+# gerou falha de extração de snapshot (ChainID comprovado no incidente ELUS).
+# Dividir o materializado do pnpm em duas etapas reduz o tamanho do delta
+# individual, sem remover devDependencies: tsx continua necessário no runtime.
+# O CI de paridade confere o worker completo com Docker 29 + containerd.
+# Não confundir esta alteração com prova da causa primária do erro de pull.
+RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod=false
 
 COPY . .
 
