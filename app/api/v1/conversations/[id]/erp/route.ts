@@ -11,6 +11,7 @@ import {
   provarPedidoDoContato,
   type ProvaPedidoDoContato,
 } from "@/lib/integracoes-erp/autoridade-documento";
+import { chaveFiscalComprovadaDaNota } from "@/lib/integracoes-erp/chave-fiscal-comprovada";
 import { ErroDanfeExterno, materializarDanfeExterno } from "@/lib/integracoes-erp/danfe";
 import { buscarPedidosErpComIdentidadeInterna, obterNotaErp } from "@/lib/integracoes-erp/service";
 import type { NotaErp, PedidoErp } from "@/lib/integracoes-erp/tipos";
@@ -283,9 +284,21 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     );
   }
 
+  const chaveFiscalEsperada = chaveFiscalComprovadaDaNota(nota);
+  if (!chaveFiscalEsperada) {
+    return fail(
+      "erp_danfe_unavailable",
+      "Os dados fiscais retornados não permitem comprovar a identidade da DANFE.",
+      422,
+      { requestId },
+    );
+  }
+
   let documento;
   try {
-    documento = await materializarDanfeExterno(nota.danfeUrl);
+    documento = await materializarDanfeExterno(nota.danfeUrl, undefined, {
+      chaveFiscalEsperada,
+    });
   } catch (erro) {
     if (erro instanceof ErroDanfeExterno) return falhaDoDanfe(erro, requestId);
     throw erro;
