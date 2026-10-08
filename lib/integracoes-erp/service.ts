@@ -543,11 +543,12 @@ export async function buscarNfesPeriodoErp(
   admin: SupabaseClient,
   organizationId: string,
   filtros: { dataInicial: string; dataFinal: string; pageSize: number; skip: number },
-): Promise<ConsultaErpResultado<NotaFiscalPeriodoErp[]>> {
+): Promise<ConsultaErpResultado<{ notas: NotaFiscalPeriodoErp[]; retornados: number }>> {
   return executarLeituraVendaErp(admin, organizationId, async (credenciais) => {
     const resposta = await consultarNfesPeriodoVendaErp(credenciais, filtros);
     try {
-      return normalizarNfesPeriodoVendaErp(resposta);
+      const notas = normalizarNfesPeriodoVendaErp(resposta);
+      return { notas, retornados: (resposta as unknown[]).length };
     } catch {
       throw new ErroVendaErp("invalid_response");
     }
