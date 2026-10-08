@@ -290,6 +290,7 @@ export async function auditarConsultaAdminWhatsapp(input: {
   statusHttp?: number | null;
   autenticacaoSameOrigin?: boolean | null;
   etapaRenderizacao?: EtapaRenderizacaoDocumento | null;
+  origem?: "agent_inbound_turn" | "canario_admin_readonly";
 }): Promise<void> {
   if (!ferramentaErpExigeAutoridadeAdminWhatsapp(input.toolName)) return;
   const etapaAuditavel = input.etapaRenderizacao
@@ -303,7 +304,7 @@ export async function auditarConsultaAdminWhatsapp(input: {
     requestId: input.requestId,
     metadata: {
       channel: "whatsapp",
-      origem: "agent_inbound_turn",
+      origem: input.origem ?? "agent_inbound_turn",
       capability: input.autoridade.capability,
       tool: input.toolName,
       success: input.success,
