@@ -174,6 +174,7 @@ describe("Admin WhatsApp Read-Only V1", () => {
       success: false,
       motivo: "danfe_download_failed",
       codigoTecnico: "http_invalido",
+      etapaRenderizacao: "chromium_apos_redirect",
       statusHttp: 403,
       autenticacaoSameOrigin: true,
     });
@@ -184,6 +185,7 @@ describe("Admin WhatsApp Read-Only V1", () => {
         metadata: expect.objectContaining({
           motivo: "danfe_download_failed",
           codigo_tecnico: "http_invalido",
+          etapa_renderizacao: "chromium_apos_redirect",
           status_http: 403,
           autenticacao_same_origin: true,
         }),
@@ -194,6 +196,21 @@ describe("Admin WhatsApp Read-Only V1", () => {
     expect(serializado).not.toContain("http://");
     expect(serializado).not.toContain("https://");
     expect(serializado).not.toContain(telefone);
+  });
+
+  it("descarta etapas de diagnóstico arbitrárias antes de gravar a auditoria", async () => {
+    await auditarConsultaAdminWhatsapp({
+      autoridade: resolver() as AutoridadeAdminWhatsapp,
+      toolName: "crm_erp_prepare_admin_danfe",
+      requestId: "run-render-malicioso",
+      success: false,
+      motivo: "danfe_download_failed",
+      etapaRenderizacao: "https://invalido.test?token=segredo" as never,
+    });
+
+    const metadata = vi.mocked(audit).mock.calls[0]?.[0].metadata;
+    expect(metadata).not.toHaveProperty("etapa_renderizacao");
+    expect(JSON.stringify(metadata)).not.toContain("segredo");
   });
 
   it("o bridge administrativo só cria a tool de DANFE para autoridade real e fora de preview", () => {
