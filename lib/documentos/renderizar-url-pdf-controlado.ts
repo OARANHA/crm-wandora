@@ -18,6 +18,28 @@ const LIMITE_TOTAL_MS = 28_000;
 const LIMITE_ETAPA_MS = 8_000;
 
 /**
+ * page.pdf() não tem opção timeout em playwright-core 1.63.
+ * A espera é limitada pelo próprio runtime; o finally do caller fecha
+ * o Browser via API pública, interrompendo também uma impressão pendente.
+ */
+export async function imprimirPdfComPrazo(
+  imprimir: () => Promise<Buffer>,
+  prazoMs: number,
+): Promise<Buffer> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      imprimir(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new ErroRenderizacaoDocumento("timeout")), prazoMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/**
  * Renderização controlada: reutiliza o Chromium e o bootstrap 302 efêmero
  * existentes; não cria fila, sender ou cliente ERP.
  *
@@ -150,12 +172,15 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       { timeout: restante() },
     );
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      displayHeaderFooter: false,
-      timeout: restante(),
-    });
+    const pdf = await imprimirPdfComPrazo(
+      () =>
+        page.pdf({
+          format: "A4",
+          printBackground: true,
+          displayHeaderFooter: false,
+        }),
+      restante(),
+    );
     etapa = "pdf_validacao";
 
     if (!pdf.length) throw new ErroRenderizacaoDocumento("render_falhou");
@@ -178,20 +203,12 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     throw new ErroRenderizacaoDocumento(timeout ? "timeout" : "render_falhou", etapa);
   } finally {
     if (browser) {
-      const instancia = browser;
-      const killer = setTimeout(() => {
-        try {
-          instancia.process()?.kill("SIGKILL");
-        } catch {
-          // Encerramento defensivo, sem propagar erro de cleanup.
-        }
-      }, 2_000);
       try {
-        await instancia.close();
+        // API pública do Playwright fecha browser, contextos e processo. Evitar
+        // cast para process() privado, que não existe no contrato Browser.
+        await browser.close();
       } catch {
         // Falha de teardown não mascara erro de renderização já classificado.
-      } finally {
-        clearTimeout(killer);
       }
     }
     await redirect?.fechar().catch(() => undefined);
