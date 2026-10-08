@@ -216,7 +216,6 @@ export function consultarNfeVendaErp(
   return getVendaErp(credenciais, VENDAERP_ENDPOINTS.fiscalConsultarNfe, { CodigoNFe: codigoNFe });
 }
 
-
 /** Um mês por chamada e no máximo 50 NFes por página (Swagger VendaERP). */
 export function consultarNfesPeriodoVendaErp(
   credenciais: CredenciaisVendaErp,
@@ -225,9 +224,13 @@ export function consultarNfesPeriodoVendaErp(
   if (
     !/^\d{2}-\d{2}-\d{4}$/.test(filtros.dataInicial) ||
     !/^\d{2}-\d{2}-\d{4}$/.test(filtros.dataFinal) ||
-    !Number.isInteger(filtros.pageSize) || filtros.pageSize < 1 || filtros.pageSize > 50 ||
-    !Number.isInteger(filtros.skip) || filtros.skip < 0
-  ) throw new ErroVendaErp("invalid_request");
+    !Number.isInteger(filtros.pageSize) ||
+    filtros.pageSize < 1 ||
+    filtros.pageSize > 50 ||
+    !Number.isInteger(filtros.skip) ||
+    filtros.skip < 0
+  )
+    throw new ErroVendaErp("invalid_request");
   return getVendaErp(credenciais, VENDAERP_ENDPOINTS.fiscalConsultarNfePeriodo, {
     DataInicial: filtros.dataInicial,
     DataFinal: filtros.dataFinal,
