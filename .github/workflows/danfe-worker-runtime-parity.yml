@@ -1,0 +1,63 @@
+name: DANFE worker runtime parity
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/danfe-worker-runtime-parity.yml"
+      - "tests/integration/danfe-chromium-offline.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  chromium-worker-image:
+    name: Chromium Alpine na imagem Worker publicada (sem VendaERP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Commit já publicado/implantado no Vigia. Não usar :main mutável.
+      WORKER_IMAGE: ghcr.io/oaranha/elus-worker:d90afc129bafbffc29373c56dbc150c96809449a
+      EXPECTED_VERSION: d90afc129bafbffc29373c56dbc150c96809449a
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Autenticar no GHCR somente para pull
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Obter imagem publicada e confirmar revisão
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$WORKER_IMAGE"
+          # Exibe apenas a versão esperada, nunca o ambiente inteiro da imagem.
+          docker image inspect "$WORKER_IMAGE" \
+            --format '{{range .Config.Env}}{{println .}}{{end}}' |
+            grep -Fx "APP_VERSION=$EXPECTED_VERSION"
+
+      - name: Executar fixture offline no Chromium Alpine do Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          # tests/ é excluído da imagem de produção pelo .dockerignore.
+          # Monta SOMENTE testes do checkout, em read-only. No network:
+          # o servidor SPA e o redirect usam o loopback dentro do container.
+          docker run --rm --pull=never \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --pids-limit 512 \
+            --memory 2g \
+            --cpus 2 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=536870912 \
+            --mount "type=bind,source=$PWD/tests,target=/app/tests,readonly" \
+            --env ELUS_DANFE_CHROMIUM_OFFLINE=1 \
+            "$WORKER_IMAGE" \
+            node /app/node_modules/vitest/vitest.mjs run \
+              tests/integration/danfe-chromium-offline.test.ts \
+              --maxWorkers=1
