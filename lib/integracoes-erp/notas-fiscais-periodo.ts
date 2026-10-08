@@ -49,8 +49,7 @@ export function normalizarNfesPeriodoVendaErp(resposta: unknown): NotaFiscalPeri
     // NFC-e e outros documentos não se confundem com NF-e.
     if (item.Tipo !== "NFe") continue;
     const xml = item.XML;
-    if (typeof xml !== "string" || xml.length > 1_000_000)
-      throw new Error("invalid_response");
+    if (typeof xml !== "string" || xml.length > 1_000_000) throw new Error("invalid_response");
     const dest = xml.match(/<dest(?:\s[^>]*)?>([\s\S]*?)<\/dest>/i)?.[1];
     const protocolo = xml.match(/<protNFe(?:\s[^>]*)?>([\s\S]*?)<\/protNFe>/i)?.[1];
     if (!dest || !protocolo) throw new Error("invalid_response");
