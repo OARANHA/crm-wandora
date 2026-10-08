@@ -1,5 +1,3 @@
-import { lookup } from "node:dns/promises";
-
 import { chromium, type Browser } from "playwright-core";
 
 import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
@@ -13,7 +11,7 @@ import {
 } from "./renderizar-url-pdf";
 import {
   recursoPermitidoNoBrowserDeDocumento,
-  selecionarIpPublicoFixadoParaBrowser,
+  resolverIpPublicoFixadoParaBrowser,
 } from "./egress-browser-pdf";
 
 const LIMITE_TOTAL_MS = 28_000;
@@ -48,13 +46,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
 
   // DNS: confirmar todos os IPs e piná-los no Chromium antes de qualquer
   // navegação para fechar a janela de DNS rebinding.
-  let enderecos: string[];
-  try {
-    enderecos = (await lookup(origem.hostname, { all: true })).map((item) => item.address);
-  } catch {
-    throw new ErroRenderizacaoDocumento("destino_inseguro");
-  }
-  const ipv4 = selecionarIpPublicoFixadoParaBrowser(enderecos);
+  const ipv4 = await resolverIpPublicoFixadoParaBrowser(origem.hostname);
   if (!ipv4) throw new ErroRenderizacaoDocumento("destino_inseguro");
 
   const maxBytes = politica.maxBytes ?? MAX_MEDIA_BYTES;
