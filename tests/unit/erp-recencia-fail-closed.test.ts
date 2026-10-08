@@ -3,6 +3,9 @@ import {
   AVISO_SEM_RECENCIA_FISCAL,
   pedidoDeNfeMaisRecente,
   recenciaFiscalComprovada,
+  numerosDaBuscaFiscalComprovada,
+  quantidadeDeNotasMaisRecentesPedida,
+  mencionaNfeNaoComprovada,
 } from "@/lib/agent-engine/agent/recencia-fiscal-gate";
 
 describe("ISIS — gate de recência fiscal comprovada", () => {
@@ -46,6 +49,41 @@ describe("ISIS — gate de recência fiscal comprovada", () => {
     ]) {
       expect(recenciaFiscalComprovada(r)).toBe(false);
     }
+  });
+
+
+  it.each([
+    ["ISIS, traga a última nota emitida para a Eco Projetos", 1],
+    ["Me traga as últimas duas notas da Eco Projetos", 2],
+    ["Mostre as duas últimas notas", 2],
+    ["Traga as últimas 3 notas fiscais", 3],
+    ["Quais são as notas fiscais mais recentes?", 3],
+    ["Qual a NF-e mais recente?", 1],
+    ["As últimas cinco notas fiscais", 5],
+  ])("limita ranking fiscal ao pedido: %s", (texto, quantidade) => {
+    expect(quantidadeDeNotasMaisRecentesPedida(texto)).toBe(quantidade);
+  });
+
+  it("não permite a segunda NFe como 'última' nem reusar número do histórico", () => {
+    const fiscais = {
+      notas: [
+        { numeroNFe: "990", dataEmissao: "2026-10-08T12:00:00" },
+        { numeroNFe: "888", dataEmissao: "2026-10-07T12:00:00" },
+        { numeroNFe: "777", dataEmissao: "2026-10-06T12:00:00" },
+      ],
+      resumo: { consultaCompleta: true },
+    };
+    const primeira = new Set(
+      numerosDaBuscaFiscalComprovada(fiscais).slice(
+        0,
+        quantidadeDeNotasMaisRecentesPedida("A última nota fiscal"),
+      ),
+    );
+    expect([...primeira]).toEqual(["990"]);
+    expect(mencionaNfeNaoComprovada("A última NF-e 888 foi emitida", primeira)).toBe(true);
+    expect(mencionaNfeNaoComprovada("Segue a NF-e 990", primeira)).toBe(false);
+    expect(mencionaNfeNaoComprovada("NF-e nº 00000777", primeira)).toBe(true);
+    expect(mencionaNfeNaoComprovada("Segue sua DANFE em PDF", primeira)).toBe(false);
   });
 
   it("nunca inventa a última nota nem expõe identificador fiscal no fallback", () => {
