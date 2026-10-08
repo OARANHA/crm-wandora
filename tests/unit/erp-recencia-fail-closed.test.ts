@@ -39,7 +39,10 @@ describe("ISIS — gate de recência fiscal comprovada", () => {
       { notas: [], resumo: { consultaCompleta: true } },
       { notas: [{ numeroNFe: "123" }], resumo: { consultaCompleta: true } },
       { notas: [{ numeroNFe: "123", dataEmissao: "2026-10-08" }] },
-      { notas: [{ numeroNFe: "123", dataEmissao: "2026-10-08" }], resumo: { consultaCompleta: false } },
+      {
+        notas: [{ numeroNFe: "123", dataEmissao: "2026-10-08" }],
+        resumo: { consultaCompleta: false },
+      },
     ]) {
       expect(recenciaFiscalComprovada(r)).toBe(false);
     }
