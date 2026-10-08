@@ -23,10 +23,7 @@ const LIMITE_ETAPA_MS = 8_000;
  * Promise.race limita a espera do chamador, mas NÃO encerra sozinho uma
  * operação pendente. O finally fecha o Browser pela API oficial.
  */
-async function executarDentroDoPrazo<T>(
-  executar: () => Promise<T>,
-  prazoMs: number,
-): Promise<T> {
+async function executarDentroDoPrazo<T>(executar: () => Promise<T>, prazoMs: number): Promise<T> {
   if (prazoMs <= 0 || !Number.isFinite(prazoMs)) {
     throw new ErroRenderizacaoDocumento("timeout");
   }
