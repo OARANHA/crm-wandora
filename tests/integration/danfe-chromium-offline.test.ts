@@ -150,8 +150,6 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
         permiteUrl: (url) => url === urlFixture,
         timeoutMs: 20_000,
         maxBytes: 5_000_000,
-        // CI exercita o mesmo opt-in de observação privado usado no VendaERP.
-        observarNavegacao: true,
       });
 
       expect(pdf.subarray(0, 1024).includes(Buffer.from("%PDF-"))).toBe(true);
