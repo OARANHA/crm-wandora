@@ -167,6 +167,7 @@ import {
   AVISO_SEM_RECENCIA_FISCAL,
   pedidoDeNfeMaisRecente,
   recenciaFiscalComprovada,
+  numerosDaBuscaFiscalComprovada,
 } from './recencia-fiscal-gate';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
 import { cancelPendingCronsForLead } from '../cron/scheduler';
@@ -2731,6 +2732,7 @@ async function executarTurnoDoAgente(
   // Prova fiscal vem somente da tool de NFes por período executada neste turno.
   // Histórico, NFe antiga e busca de pedidos não certificam "última nota".
   let recenciaFiscalComprovadaNesteTurno = false;
+  const numerosNfeFiscaisComprovados = new Set<string>();
   const outcomes: ChannelSendResult[] = [];
   // Citações acumuladas por buscas de conhecimento DESTE turno — anexadas à
   // próxima outbound enviada (shape de lib/ai/citations/types, que a UI já lê).
@@ -3997,9 +3999,41 @@ async function executarTurnoDoAgente(
                   const resultado = await executarConsultaFiscal(...args);
                   // Apenas uma resposta estruturalmente completa da capability
                   // certifica o turno. Um erro ou lista vazia nunca libera egress.
-                  if (recenciaFiscalComprovada(resultado))
+                  if (recenciaFiscalComprovada(resultado)) {
                     recenciaFiscalComprovadaNesteTurno = true;
+                    for (const numero of numerosDaBuscaFiscalComprovada(resultado))
+                      numerosNfeFiscaisComprovados.add(numero);
+                  }
                   return resultado;
+                }) as typeof mcpTool.execute,
+              };
+            } else if (
+              name === 'crm_erp_prepare_admin_danfe' &&
+              typeof mcpTool.execute === 'function'
+            ) {
+              const prepararDanfe = mcpTool.execute.bind(mcpTool);
+              rawTools[name] = {
+                ...mcpTool,
+                execute: (async (...args: Parameters<typeof prepararDanfe>) => {
+                  if (
+                    pedidoDeNfeMaisRecente(mensagemDoJob) &&
+                    agentConfig?.toolIds.some(
+                      (id) => id === 'crm_erp_search_orders' || id === 'crm_erp_search_recent_invoices',
+                    )
+                  ) {
+                    const dados = args[0] as { codigo_nfe?: number } | undefined;
+                    const numero = String(dados?.codigo_nfe ?? '');
+                    if (!recenciaFiscalComprovadaNesteTurno || !numerosNfeFiscaisComprovados.has(numero)) {
+                      return {
+                        ok: false,
+                        error: {
+                          code: 'recencia_fiscal_nao_comprovada',
+                          message: 'Não prepare esta DANFE como última nota: a busca fiscal por período não comprovou a recência e esse número. Informe ao administrador que falta comprovação fiscal.',
+                        },
+                      };
+                    }
+                  }
+                  return prepararDanfe(...args);
                 }) as typeof mcpTool.execute,
               };
             } else if (AGENDA_TOOL_NAMES.has(name) && typeof mcpTool.execute === 'function') {
