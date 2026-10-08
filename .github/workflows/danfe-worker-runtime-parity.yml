@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/danfe-worker-runtime-parity.yml"
       - "tests/integration/danfe-chromium-offline.test.ts"
+      - "lib/documentos/**"
   workflow_dispatch:
 
 permissions:
@@ -45,8 +46,10 @@ jobs:
         run: |
           set -euo pipefail
           # tests/ é excluído da imagem de produção pelo .dockerignore.
-          # Monta SOMENTE testes do checkout, em read-only. No network:
-          # o servidor SPA e o redirect usam o loopback dentro do container.
+          # Testes e módulo de renderer do checkout montados SOMENTE read-only.
+          # A imagem e Chromium são os publicados, mas a capability exercitada
+          # deve ser a alteração do PR (não o arquivo antigo dentro da imagem).
+          # No network: SPA e redirect permanecem no loopback do container.
           docker run --rm --pull=never \
             --network none \
             --cap-drop ALL \
@@ -56,6 +59,7 @@ jobs:
             --cpus 2 \
             --tmpfs /tmp:rw,nosuid,nodev,size=536870912 \
             --mount "type=bind,source=$PWD/tests,target=/app/tests,readonly" \
+            --mount "type=bind,source=$PWD/lib/documentos,target=/app/lib/documentos,readonly" \
             --env ELUS_DANFE_CHROMIUM_OFFLINE=1 \
             "$WORKER_IMAGE" \
             node /app/node_modules/vitest/vitest.mjs run \
