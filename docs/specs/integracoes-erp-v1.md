@@ -313,6 +313,18 @@ Cada consulta administrativa gera `integracao_erp.admin_consulta` com
 desfecho. Telefone, valor pesquisado, token ERP, XML e URL de DANFE não entram
 nessa linha.
 
+Quando uma renderização expira, a mesma auditoria pode incluir
+`evidencia_pdf_timeout`, restrita às categorias `arquivo_ausente`,
+`arquivo_vazio`, `sem_assinatura_pdf`, `sem_marcador_final`,
+`marcadores_pdf_presentes` ou `inspecao_indisponivel`. A inspeção
+é **passiva**: lê exclusivamente trechos limitados do arquivo PDF temporário
+gerado pelo Chromium após o timeout. Não abre debug/CDP, não altera a
+navegação/impressão e nunca registra bytes da nota, URL, token ou stderr.
+`marcadores_pdf_presentes` **não prova** integridade, identidade fiscal ou
+entrega do documento; somente informa que cabeçalho e terminador aparentes
+estavam presentes no momento da inspeção. Ausência do diagnóstico
+significa **não medido**, não ausência de PDF.
+
 A tabela `erp_admin_whatsapp_bindings` é parte do próprio módulo
 `integracoes_erp` e segue a ADR-0002: server-only, RLS ligada, sem grants para
 `anon/authenticated`, provisionada somente onde o módulo foi instalado.

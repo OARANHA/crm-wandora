@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, open, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,10 +19,20 @@ export type EtapaRenderizacaoDocumento =
   | "pdf_leitura"
   | "pdf_validacao";
 
+/** Retrato dos bytes existentes em disco quando o Chromium expirou: não prova PDF correto. */
+export type EvidenciaPdfAoExpirar =
+  | "arquivo_ausente"
+  | "arquivo_vazio"
+  | "sem_assinatura_pdf"
+  | "sem_marcador_final"
+  | "marcadores_pdf_presentes"
+  | "inspecao_indisponivel";
+
 export class ErroRenderizacaoDocumento extends Error {
   constructor(
     public readonly codigo: CodigoErroRenderizacaoDocumento,
     public readonly etapa?: EtapaRenderizacaoDocumento,
+    public readonly evidenciaPdf?: EvidenciaPdfAoExpirar,
   ) {
     super(codigo);
     this.name = "ErroRenderizacaoDocumento";
@@ -45,6 +55,39 @@ export interface RedirectLocalDocumento {
   url: string;
   fechar: () => Promise<void>;
   houveRedirecionamento: () => boolean;
+}
+
+/**
+ * Apenas a primeira e última parte do arquivo TEMPORÁRIO desta execução.
+ * Não extrai texto nem registra o conteúdo fiscal. A presença dos marcadores
+ * NÃO atesta a validade semântica ou a integridade final da DANFE.
+ */
+export async function evidenciarPdfNoTimeout(caminho: string): Promise<EvidenciaPdfAoExpirar> {
+  let arquivo: Awaited<ReturnType<typeof open>> | undefined;
+  try {
+    arquivo = await open(caminho, "r");
+    const tamanho = (await arquivo.stat()).size;
+    if (tamanho === 0) return "arquivo_vazio";
+
+    const inicio = Buffer.alloc(Math.min(1024, tamanho));
+    const fim = Buffer.alloc(Math.min(2048, tamanho));
+    const primeiro = await arquivo.read(inicio, 0, inicio.length, 0);
+    const ultimo = await arquivo.read(fim, 0, fim.length, tamanho - fim.length);
+    if (!inicio.subarray(0, primeiro.bytesRead).includes(Buffer.from("%PDF-"))) {
+      return "sem_assinatura_pdf";
+    }
+    if (!fim.subarray(0, ultimo.bytesRead).includes(Buffer.from("%%EOF"))) {
+      return "sem_marcador_final";
+    }
+    return "marcadores_pdf_presentes";
+  } catch (erro) {
+    if (typeof erro === "object" && erro !== null && "code" in erro && erro.code === "ENOENT") {
+      return "arquivo_ausente";
+    }
+    return "inspecao_indisponivel";
+  } finally {
+    await arquivo?.close().catch(() => undefined);
+  }
 }
 
 function parecePdf(buffer: Buffer): boolean {
@@ -220,7 +263,9 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
         ? "chromium_apos_redirect"
         : etapa;
     if (erro instanceof ErroRenderizacaoDocumento) {
-      throw new ErroRenderizacaoDocumento(erro.codigo, erro.etapa ?? etapaSegura);
+      const evidenciaPdf =
+        erro.codigo === "timeout" ? await evidenciarPdfNoTimeout(saida) : undefined;
+      throw new ErroRenderizacaoDocumento(erro.codigo, erro.etapa ?? etapaSegura, evidenciaPdf);
     }
     throw new ErroRenderizacaoDocumento("render_falhou", etapaSegura);
   } finally {

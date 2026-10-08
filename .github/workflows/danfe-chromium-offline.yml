@@ -6,6 +6,7 @@ on:
       - ".github/workflows/danfe-chromium-offline.yml"
       - "lib/documentos/renderizar-url-pdf.ts"
       - "tests/integration/danfe-chromium-offline.test.ts"
+      - "tests/unit/documentos-renderizar-url-pdf.test.ts"
   workflow_dispatch:
 
 permissions:
@@ -38,8 +39,22 @@ jobs:
       - name: Verificar tipagem, lint e formatação
         run: |
           pnpm typecheck
-          pnpm exec eslint tests/integration/danfe-chromium-offline.test.ts
-          pnpm exec prettier --check tests/integration/danfe-chromium-offline.test.ts
+          pnpm exec eslint \
+            lib/documentos/renderizar-url-pdf.ts \
+            lib/integracoes-erp/danfe.ts \
+            lib/integracoes-erp/autoridade-admin-whatsapp.ts \
+            tests/integration/danfe-chromium-offline.test.ts \
+            tests/unit/documentos-renderizar-url-pdf.test.ts \
+            tests/unit/integracoes-erp-admin-whatsapp.test.ts \
+            tests/unit/integracoes-erp-danfe.test.ts
+          pnpm exec prettier --check \
+            lib/documentos/renderizar-url-pdf.ts \
+            lib/integracoes-erp/danfe.ts \
+            lib/integracoes-erp/autoridade-admin-whatsapp.ts \
+            tests/integration/danfe-chromium-offline.test.ts \
+            tests/unit/documentos-renderizar-url-pdf.test.ts \
+            tests/unit/integracoes-erp-admin-whatsapp.test.ts \
+            tests/unit/integracoes-erp-danfe.test.ts
 
       - name: Instalar Chromium no runner do CI, não na VPS
         run: pnpm exec playwright install --with-deps chromium
@@ -57,4 +72,5 @@ jobs:
         run: >-
           pnpm exec vitest run
           tests/integration/danfe-chromium-offline.test.ts
+          tests/unit/documentos-renderizar-url-pdf.test.ts
           --maxWorkers=1
