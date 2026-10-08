@@ -175,6 +175,7 @@ describe("Admin WhatsApp Read-Only V1", () => {
       motivo: "danfe_download_failed",
       codigoTecnico: "http_invalido",
       etapaRenderizacao: "chromium_apos_redirect",
+      evidenciaPdf: "arquivo_ausente",
       statusHttp: 403,
       autenticacaoSameOrigin: true,
     });
@@ -186,6 +187,7 @@ describe("Admin WhatsApp Read-Only V1", () => {
           motivo: "danfe_download_failed",
           codigo_tecnico: "http_invalido",
           etapa_renderizacao: "chromium_apos_redirect",
+          evidencia_pdf_timeout: "arquivo_ausente",
           status_http: 403,
           autenticacao_same_origin: true,
         }),
@@ -206,10 +208,12 @@ describe("Admin WhatsApp Read-Only V1", () => {
       success: false,
       motivo: "danfe_download_failed",
       etapaRenderizacao: "https://invalido.test?token=segredo" as never,
+      evidenciaPdf: "https://invalido.test?token=segredo" as never,
     });
 
     const metadata = vi.mocked(audit).mock.calls[0]?.[0].metadata;
     expect(metadata).not.toHaveProperty("etapa_renderizacao");
+    expect(metadata).not.toHaveProperty("evidencia_pdf_timeout");
     expect(JSON.stringify(metadata)).not.toContain("segredo");
   });
 
