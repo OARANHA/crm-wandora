@@ -6,6 +6,8 @@ on:
       - ".github/workflows/danfe-chromium-offline.yml"
       - "lib/documentos/renderizar-url-pdf.ts"
       - "tests/integration/danfe-chromium-offline.test.ts"
+      - "lib/documentos/observar-navegacao-chromium.ts"
+      - "tests/unit/documentos-observar-navegacao-chromium.test.ts"
   workflow_dispatch:
 
 permissions:
@@ -57,4 +59,5 @@ jobs:
         run: >-
           pnpm exec vitest run
           tests/integration/danfe-chromium-offline.test.ts
+          tests/unit/documentos-observar-navegacao-chromium.test.ts
           --maxWorkers=1
