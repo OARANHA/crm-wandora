@@ -1,3 +1,4 @@
+import { lookup } from "node:dns/promises";
 import { isIPv4 } from "node:net";
 
 import { ipEhEspecial } from "@/lib/automation/outbound-ip";
@@ -46,4 +47,17 @@ export function recursoPermitidoNoBrowserDeDocumento(
 export function selecionarIpPublicoFixadoParaBrowser(ips: readonly string[]): string | null {
   if (ips.length === 0 || ips.some((ip) => ipEhEspecial(ip))) return null;
   return ips.find((ip) => isIPv4(ip)) ?? null;
+}
+
+/**
+ * Uma única resolução; o IP retornado é o MESMO valor pinado pelo Chromium.
+ * Erro de DNS, nenhum IPv4 público ou resposta mista público+privado: fail closed.
+ */
+export async function resolverIpPublicoFixadoParaBrowser(hostname: string): Promise<string | null> {
+  try {
+    const respostas = await lookup(hostname, { all: true });
+    return selecionarIpPublicoFixadoParaBrowser(respostas.map((item) => item.address));
+  } catch {
+    return null;
+  }
 }
