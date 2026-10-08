@@ -454,20 +454,24 @@ async function buscarConjuntoCompleto<T>(
   buscar: (pageSize: number, skip: number) => Promise<ConsultaErpResultado<T[]>>,
 ): Promise<ConsultaErpResultado<T[]>> {
   const acumulados: T[] = [];
+  let skip = 0;
 
   for (let pagina = 0; pagina < MAX_PAGINAS_NOTAS_RECENTES; pagina += 1) {
-    const lote = await buscar(
-      TAMANHO_PAGINA_NOTAS_RECENTES,
-      pagina * TAMANHO_PAGINA_NOTAS_RECENTES,
-    );
+    const lote = await buscar(TAMANHO_PAGINA_NOTAS_RECENTES, skip);
     if (!lote.ok) return lote;
-    acumulados.push(...lote.dados);
-    if (lote.dados.length < TAMANHO_PAGINA_NOTAS_RECENTES) {
+    if (lote.dados.length > TAMANHO_PAGINA_NOTAS_RECENTES) {
+      return { ok: false, motivo: "invalid_response" };
+    }
+    if (lote.dados.length === 0) {
       return { ok: true, dados: acumulados };
     }
+
+    // O provider pode limitar pageSize: avancar pelos itens recebidos, nao pelos solicitados.
+    acumulados.push(...lote.dados);
+    skip += lote.dados.length;
   }
 
-  const limiteAnalisado = TAMANHO_PAGINA_NOTAS_RECENTES * MAX_PAGINAS_NOTAS_RECENTES;
+  const limiteAnalisado = skip;
   const provaDeFim = await buscar(1, limiteAnalisado);
   if (!provaDeFim.ok) return provaDeFim;
   if (provaDeFim.dados.length > 0) {
