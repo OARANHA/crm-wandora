@@ -91,8 +91,18 @@ este repositório, para o modelo ou para o WhatsApp.
   Rollback preservado do deploy anterior:
   - app: `ghcr.io/oaranha/elus-app@sha256:06cab8c8ccff032eaedde24ed460d7e6ed645c0fc4c138b80764a02c30985124`;
   - worker: `ghcr.io/oaranha/elus-worker@sha256:c4bbc68c307370a60df485ac5acdc4e0c5858eb0c7bbd01d7f12adc53038e885`.
-  **Status da implantação:** verifique as evidências de execução antes
-  de marcar como concluído; não infira sucesso do merge ou da publicação.
+  **Status da implantação:** **DEPLOY CONCLUÍDO COM SUCESSO** no Portainer
+  local da VPS do Vigia. Execução governada do procedimento
+  `deploy-elus-459a150-safe.mjs`: código de saída `0`,
+  `ok:true`, `stack=5`, `endpoint=3`, `prune:false`.
+  `elus-app` e `elus-worker` running/healthy nas imagens novas;
+  `elus-redis` e `elus-scheduler` healthy; `elus-waha`
+  e `elus-srh` running. Endpoint público
+  `/api/v1/health` HTTP `200`, `data.status=healthy`,
+  `data.version=459a150a5d9e0bc51968fd0cc949d45b33097ed2`,
+  `supabase/redis/waha=ok`. Rollback anterior preservado.
+  **Não significa canário ISIS/DANFE aprovado**; esse aceite exige
+  prova funcional real e entrega dos PDFs no WhatsApp correto.
 
 ## Continuidade
 
