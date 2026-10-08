@@ -292,6 +292,9 @@ export async function auditarConsultaAdminWhatsapp(input: {
   etapaRenderizacao?: EtapaRenderizacaoDocumento | null;
 }): Promise<void> {
   if (!ferramentaErpExigeAutoridadeAdminWhatsapp(input.toolName)) return;
+  const etapaAuditavel = input.etapaRenderizacao
+    ? ETAPAS_RENDERIZACAO_AUDITAVEIS.has(input.etapaRenderizacao)
+    : false;
   await audit({
     action: "integracao_erp.admin_consulta",
     actorUserId: input.autoridade.userId,
@@ -306,10 +309,7 @@ export async function auditarConsultaAdminWhatsapp(input: {
       success: input.success,
       ...(input.motivo ? { motivo: input.motivo } : {}),
       ...(input.codigoTecnico ? { codigo_tecnico: input.codigoTecnico } : {}),
-      ...(input.etapaRenderizacao &&
-      ETAPAS_RENDERIZACAO_AUDITAVEIS.has(input.etapaRenderizacao)
-        ? { etapa_renderizacao: input.etapaRenderizacao }
-        : {}),
+      ...(etapaAuditavel ? { etapa_renderizacao: input.etapaRenderizacao } : {}),
       ...(typeof input.statusHttp === "number" ? { status_http: input.statusHttp } : {}),
       ...(typeof input.autenticacaoSameOrigin === "boolean"
         ? { autenticacao_same_origin: input.autenticacaoSameOrigin }
