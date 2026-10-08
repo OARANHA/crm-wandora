@@ -278,6 +278,37 @@ function buscarPedidosNoMesmoTurno(requestId: string, nome: unknown): Promise<bo
   return buscasPedidosPorTurno.get(chave)?.promessa ?? null;
 }
 
+// Um fallback por contato não pode esquecer a quantidade fiscal solicitada no mesmo turno.
+// Guardamos somente a quantidade, por organização e requestId; nunca nome, identidade ou PII.
+const PENDENCIA_NOTAS_RECENTES_TTL_MS = 120_000;
+const notasRecentesPendentesPorTurno = new Map<string, { quantidade: number; expiraEm: number }>();
+
+function chaveNotasRecentesDoTurno(ctx: McpContext): string {
+  return `${ctx.organizationId}:${ctx.requestId}`;
+}
+
+function registrarNotasRecentesPendentes(ctx: McpContext, quantidade: number): void {
+  const agora = Date.now();
+  for (const [chave, pendencia] of notasRecentesPendentesPorTurno) {
+    if (pendencia.expiraEm <= agora) notasRecentesPendentesPorTurno.delete(chave);
+  }
+  notasRecentesPendentesPorTurno.set(chaveNotasRecentesDoTurno(ctx), {
+    quantidade,
+    expiraEm: agora + PENDENCIA_NOTAS_RECENTES_TTL_MS,
+  });
+}
+
+function notasRecentesPendentes(ctx: McpContext): number | null {
+  const chave = chaveNotasRecentesDoTurno(ctx);
+  const pendencia = notasRecentesPendentesPorTurno.get(chave);
+  if (!pendencia) return null;
+  if (pendencia.expiraEm <= Date.now()) {
+    notasRecentesPendentesPorTurno.delete(chave);
+    return null;
+  }
+  return pendencia.quantidade;
+}
+
 const clientesInputShape = {
   nome: z.string().trim().min(2).max(200).optional(),
   cpf_cnpj: z.string().trim().min(3).max(30).optional(),
@@ -609,6 +640,17 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
     }
 
     if (input.cliente_contact_id) {
+      // O modelo pode mudar para a identidade vinculada após uma busca por nome vazia,
+      // mas não pode transformar "últimas 2" em uma lista arbitrária de 20 pedidos.
+      const quantidadePendente = notasRecentesPendentes(ctx);
+      if (quantidadePendente !== null && !input.ultimas_notas) {
+        return {
+          erro: "continuacao_notas_sem_ranking",
+          mensagem:
+            `A solicitação ainda exige as últimas ${quantidadePendente} NFes. Confirme que cliente_contact_id corresponde ao cliente solicitado e repita crm_erp_search_orders com cliente_contact_id e ultimas_notas=${quantidadePendente}. Não use uma lista comum de pedidos como ranking fiscal e não peça ao administrador o número/data da outra NFe.`,
+          ultimas_notas_necessarias: quantidadePendente,
+        };
+      }
       if (input.cliente || input.cpf_cnpj) {
         return {
           erro: "filtros_cliente_conflitantes",
@@ -667,6 +709,7 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
           input.ultimas_notas,
         );
         if (!ranking.ok) return ranking;
+        notasRecentesPendentesPorTurno.delete(chaveNotasRecentesDoTurno(ctx));
         return {
           resolucao_cliente: {
             status: "resolved",
@@ -722,6 +765,9 @@ export const crmErpSearchOrders: McpToolDefinition<typeof pedidosInputShape> = {
         const pedidos = r.dados.map((item) => item.pedido);
         if (pedidos.length === 0) {
           resolverSequenciamento?.(false);
+          if (input.ultimas_notas) {
+            registrarNotasRecentesPendentes(ctx, input.ultimas_notas);
+          }
           return { pedidos: [] };
         }
 
