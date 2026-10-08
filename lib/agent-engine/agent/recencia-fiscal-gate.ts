@@ -12,15 +12,17 @@ export const AVISO_SEM_RECENCIA_FISCAL =
   "É necessário consultar as NFes por período para concluir com segurança.";
 
 export function pedidoDeNfeMaisRecente(texto: string): boolean {
-  const normalizado = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const normalizado = texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
   const mencionaNota = /\b(?:notas?|nf-?es?)\b/.test(normalizado);
   const mencionaRecencia = /\bultim[ao]s?\b|\bmais\s+recentes?\b/.test(normalizado);
   return mencionaNota && mencionaRecencia;
 }
 
 export function recenciaFiscalComprovada(resultado: unknown): boolean {
-  if (resultado === null || typeof resultado !== "object" || Array.isArray(resultado))
-    return false;
+  if (resultado === null || typeof resultado !== "object" || Array.isArray(resultado)) return false;
   const resposta = resultado as Record<string, unknown>;
   if (!Array.isArray(resposta.notas) || resposta.notas.length === 0) return false;
   const resumo = resposta.resumo;
