@@ -437,7 +437,8 @@ describe("tools ERP READ — comportamento do agente", () => {
 
     vi.mocked(service.buscarPedidosErpComIdentidadeInterna)
       .mockResolvedValueOnce({ ok: true, dados: primeiraPagina })
-      .mockResolvedValueOnce({ ok: true, dados: segundaPagina });
+      .mockResolvedValueOnce({ ok: true, dados: segundaPagina })
+      .mockResolvedValueOnce({ ok: true, dados: [] });
     vi.mocked(service.obterInformacaoFiscalDaVendaErp).mockResolvedValue({
       ok: true,
       dados: {
@@ -513,6 +514,129 @@ describe("tools ERP READ — comportamento do agente", () => {
       1010,
     );
     expect(customerResolution.resolverClienteVendaErpPorPedidos).toHaveBeenCalledTimes(1);
+  });
+
+  it("últimas notas continuam quando o provider limita pageSize abaixo do solicitado", async () => {
+    const registros: PedidoErpComIdentidadeInterna[] = Array.from({ length: 4 }, (_, i) => ({
+      pedido: {
+        id: `pedido-cap-${i}`,
+        codigo: 800 + i,
+        cliente: "Cliente Ficticio",
+        status: "Faturado",
+        statusSistema: "faturado",
+        total: 100,
+        data: "2026-10-01T10:00:00Z",
+        finalizado: true,
+        numeroNFe: String(9000 + i),
+        dataFaturamento: `2026-10-0${i + 1}T11:00:00Z`,
+        chaveAcessoNFe: null,
+        danfeUrl: null,
+        urlSefaz: null,
+      },
+      identidadeCliente: {
+        pessoaId: "erp-ficticio",
+        cpfCnpj: null,
+        email: null,
+      },
+    }));
+
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockImplementation(
+      async (_db, _org, filtros) => ({
+        ok: true,
+        // Simula um provedor que aceita pageSize=100 mas limita cada resposta a 2 itens.
+        dados: registros.slice(filtros.skip ?? 0, (filtros.skip ?? 0) + 2),
+      }),
+    );
+    vi.mocked(customerResolution.resolverClienteVendaErpPorPedidos).mockResolvedValue({
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      origem: "provider",
+      materialized: false,
+      externalLabel: "Cliente Ficticio",
+    });
+
+    const resultado = await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Cliente Ficticio",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
+        limite: 10,
+        skip: 0,
+      },
+      { ...ctx, requestId: "req-ultimas-provider-cap" },
+    );
+
+    expect(resultado).toMatchObject({
+      pedidos: [
+        expect.objectContaining({ numeroNFe: "9003" }),
+        expect.objectContaining({ numeroNFe: "9002" }),
+      ],
+      resumo: {
+        quantidadeEncontrada: 4,
+        quantidadeRetornada: 2,
+        resultadoCompleto: true,
+      },
+    });
+    expect(
+      vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mock.calls.map(
+        ([, , filtros]) => filtros.skip,
+      ),
+    ).toEqual([0, 2, 4]);
+  });
+
+  it("últimas notas falham fechado se o provider ignora o deslocamento skip", async () => {
+    const repetido: PedidoErpComIdentidadeInterna = {
+      pedido: {
+        id: "pedido-offset-ignorado",
+        codigo: 900,
+        cliente: "Cliente Ficticio",
+        status: "Faturado",
+        statusSistema: "faturado",
+        total: 100,
+        data: "2026-10-01T10:00:00Z",
+        finalizado: true,
+        numeroNFe: "9900",
+        dataFaturamento: "2026-10-01T11:00:00Z",
+        chaveAcessoNFe: null,
+        danfeUrl: null,
+        urlSefaz: null,
+      },
+      identidadeCliente: {
+        pessoaId: "erp-ficticio",
+        cpfCnpj: null,
+        email: null,
+      },
+    };
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+      ok: true,
+      dados: [repetido],
+    });
+
+    const resultado = await crmErpSearchOrders.handler(
+      {
+        codigo: undefined,
+        cliente: "Cliente Ficticio",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        status: undefined,
+        numero_nfe: undefined,
+        ultimas_notas: 2,
+        limite: 10,
+        skip: 0,
+      },
+      { ...ctx, requestId: "req-ultimas-offset-ignorado" },
+    );
+
+    expect(resultado).toMatchObject({
+      erro: "consulta_parcial",
+      detalhes: { limiteAnalisado: 5 },
+    });
+    expect(resultado).not.toHaveProperty("pedidos");
+    expect(service.buscarPedidosErpComIdentidadeInterna).toHaveBeenCalledTimes(6);
   });
 
   it("últimas notas falham fechado se nem a visão fiscal provar a data ausente", async () => {
