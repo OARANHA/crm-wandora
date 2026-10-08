@@ -8,6 +8,7 @@ import type {
 } from "@/lib/documentos/renderizar-url-pdf";
 import { canonicalPhoneBR } from "@/lib/channels/phone-variants";
 
+import { chaveFiscalComprovadaDaNota } from "./chave-fiscal-comprovada";
 import { ErroDanfeExterno, materializarDanfeExterno } from "./danfe";
 import { carregarConexaoVendaErp } from "./credenciais";
 import { obterNotaErp } from "./service";
@@ -411,6 +412,8 @@ export async function prepararDanfeAdminWhatsapp(
 
   const nota = notaResultado.dados;
   if (!nota.danfeUrl?.trim()) return falhar("danfe_indisponivel");
+  const chaveFiscalEsperada = chaveFiscalComprovadaDaNota(nota);
+  if (!chaveFiscalEsperada) return falhar("danfe_indisponivel");
 
   const leitura = await carregarConexaoVendaErp(db, autoridade.organizationId);
   if (!leitura.ok) return falhar("erp_read_failed");
@@ -419,11 +422,10 @@ export async function prepararDanfeAdminWhatsapp(
 
   let documento;
   try {
-    documento = await materializarDanfeExterno(
-      nota.danfeUrl,
-      undefined,
-      headers ? { headers } : undefined,
-    );
+    documento = await materializarDanfeExterno(nota.danfeUrl, undefined, {
+      ...(headers ? { headers } : {}),
+      chaveFiscalEsperada,
+    });
   } catch (erro) {
     if (erro instanceof ErroDanfeExterno) {
       return falhar(

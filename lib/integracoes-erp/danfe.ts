@@ -153,6 +153,8 @@ export async function materializarDanfeExterno(
   options?: {
     headers?: Record<string, string>;
     renderizadorVendaErp?: RenderizadorDanfeVendaErp;
+    /** Somente origem fiscal estruturada (nunca input do modelo). */
+    chaveFiscalEsperada?: string;
   },
 ): Promise<DanfeMaterializado> {
   const url = urlBruta.trim();
@@ -163,7 +165,10 @@ export async function materializarDanfeExterno(
   // Chromium. Como a URL já passou pela allowlist estrita desta integração,
   // renderizamos diretamente e preservamos o fetch genérico para os demais ERPs.
   if (ehUrlDanfePublicoVendaErp(url)) {
-    const renderizador = options?.renderizadorVendaErp ?? renderizarDanfeVendaErpParaPdf;
+    const renderizador =
+      options?.renderizadorVendaErp ??
+      ((alvo: string) =>
+        renderizarDanfeVendaErpParaPdf(alvo, undefined, options?.chaveFiscalEsperada));
     return materializarPdfRenderizadoVendaErp(url, renderizador);
   }
 
@@ -220,7 +225,10 @@ export async function materializarDanfeExterno(
     }
 
     if (mime === "text/html" && ehUrlDanfePublicoVendaErp(url)) {
-      const renderizador = options?.renderizadorVendaErp ?? renderizarDanfeVendaErpParaPdf;
+      const renderizador =
+        options?.renderizadorVendaErp ??
+        ((alvo: string) =>
+          renderizarDanfeVendaErpParaPdf(alvo, undefined, options?.chaveFiscalEsperada));
       return materializarPdfRenderizadoVendaErp(url, renderizador);
     }
 

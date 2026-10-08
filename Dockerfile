@@ -78,6 +78,13 @@ RUN PDFJS_DIR=$(basename node_modules/.pnpm/pdfjs-dist@*) && \
     cp "node_modules/.pnpm/$PDFJS_DIR/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs" \
        ".next/standalone/.next/server/chunks/pdf.worker.mjs"
 
+# O browser CDP usa playwright-core em runtime no app standalone (não apenas
+# no worker). O Next/Turbopack pode não rastrear o cliente de automação
+# carregado dinamicamente: copie o pacote runtime de forma explícita, sem
+# baixar navegadores de teste ou instalar Chromium duplicado.
+RUN mkdir -p ".next/standalone/node_modules/playwright-core" && \
+    cp -a node_modules/playwright-core/. ".next/standalone/node_modules/playwright-core/"
+
 # ---- runner: imagem slim de produção ----
 FROM node:22-alpine AS runner
 WORKDIR /app

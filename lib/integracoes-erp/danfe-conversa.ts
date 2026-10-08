@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { carregarConexaoVendaErp } from "./credenciais";
+import { chaveFiscalComprovadaDaNota } from "./chave-fiscal-comprovada";
 import { ErroDanfeExterno, materializarDanfeExterno } from "./danfe";
 import { obterNotaErp } from "./service";
 import { cabecalhosDanfeVendaErp } from "./vendaerp";
@@ -55,6 +56,8 @@ export async function materializarDanfeNaConversa(
   if (!notaResultado.ok) return { ok: false, motivo: "erp_read_failed" };
   const danfeUrl = notaResultado.dados.danfeUrl?.trim();
   if (!danfeUrl) return { ok: false, motivo: "danfe_indisponivel" };
+  const chaveFiscalEsperada = chaveFiscalComprovadaDaNota(notaResultado.dados);
+  if (!chaveFiscalEsperada) return { ok: false, motivo: "danfe_indisponivel" };
 
   const leitura = await carregarConexaoVendaErp(db, input.organizationId);
   if (!leitura.ok) return { ok: false, motivo: "erp_read_failed" };
@@ -62,11 +65,10 @@ export async function materializarDanfeNaConversa(
 
   let documento;
   try {
-    documento = await materializarDanfeExterno(
-      danfeUrl,
-      undefined,
-      headers ? { headers } : undefined,
-    );
+    documento = await materializarDanfeExterno(danfeUrl, undefined, {
+      ...(headers ? { headers } : {}),
+      chaveFiscalEsperada,
+    });
   } catch (erro) {
     if (erro instanceof ErroDanfeExterno) {
       return {
