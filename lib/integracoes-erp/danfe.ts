@@ -226,9 +226,9 @@ export async function materializarDanfeExterno(
 
     if (mime === "text/html" && ehUrlDanfePublicoVendaErp(url)) {
       const renderizador =
-      options?.renderizadorVendaErp ??
-      ((alvo: string) =>
-        renderizarDanfeVendaErpParaPdf(alvo, undefined, options?.chaveFiscalEsperada));
+        options?.renderizadorVendaErp ??
+        ((alvo: string) =>
+          renderizarDanfeVendaErpParaPdf(alvo, undefined, options?.chaveFiscalEsperada));
       return materializarPdfRenderizadoVendaErp(url, renderizador);
     }
 
