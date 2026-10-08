@@ -4,8 +4,9 @@ import { validateOutboundMedia } from "@/lib/messaging/media/upload-validation";
 import {
   ErroRenderizacaoDocumento,
   type EtapaRenderizacaoDocumento,
-  type DiagnosticoNavegacaoDocumento,
 } from "@/lib/documentos/renderizar-url-pdf";
+
+import type { DiagnosticoNavegacaoDocumento } from "@/lib/documentos/observar-navegacao-chromium";
 
 import { ehUrlDanfePublicoVendaErp, renderizarDanfeVendaErpParaPdf } from "./vendaerp-danfe-pdf";
 
