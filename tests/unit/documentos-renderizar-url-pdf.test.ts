@@ -46,13 +46,15 @@ describe("capability document.render.url_to_pdf", () => {
 
     try {
       const token = "segredo-que-nao-pode-vazar";
-      const erro = await renderizarUrlParaPdf(
-        "https://provider.example.test/documento?token=" + token,
-        { nome: "fixture", permiteUrl: () => true },
-      ).then(
-        () => null,
-        (falha: unknown) => falha,
-      );
+      let erro: unknown;
+      try {
+        await renderizarUrlParaPdf("https://provider.example.test/documento?token=" + token, {
+          nome: "fixture",
+          permiteUrl: () => true,
+        });
+      } catch (falha) {
+        erro = falha;
+      }
 
       expect(erro).toBeInstanceOf(ErroRenderizacaoDocumento);
       expect(erro).toMatchObject({
