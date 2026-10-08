@@ -13,6 +13,7 @@ export const VENDAERP_ENDPOINTS = {
   pedidosPesquisar: "/api/request/Pedidos/Pesquisar",
   fiscalInformacoesVenda: "/api/request/Fiscal/InformacoesVenda",
   fiscalConsultarNfe: "/api/request/Fiscal/ConsultarNFE",
+  fiscalConsultarNfePeriodo: "/api/request/Fiscal/ConsultarNfePeriodo",
 } as const;
 
 export interface FiltrosProdutosVendaErp {
@@ -213,4 +214,24 @@ export function consultarNfeVendaErp(
   codigoNFe: number,
 ): Promise<unknown> {
   return getVendaErp(credenciais, VENDAERP_ENDPOINTS.fiscalConsultarNfe, { CodigoNFe: codigoNFe });
+}
+
+
+/** Um mês por chamada e no máximo 50 NFes por página (Swagger VendaERP). */
+export function consultarNfesPeriodoVendaErp(
+  credenciais: CredenciaisVendaErp,
+  filtros: { dataInicial: string; dataFinal: string; pageSize: number; skip: number },
+): Promise<unknown> {
+  if (
+    !/^\d{2}-\d{2}-\d{4}$/.test(filtros.dataInicial) ||
+    !/^\d{2}-\d{2}-\d{4}$/.test(filtros.dataFinal) ||
+    !Number.isInteger(filtros.pageSize) || filtros.pageSize < 1 || filtros.pageSize > 50 ||
+    !Number.isInteger(filtros.skip) || filtros.skip < 0
+  ) throw new ErroVendaErp("invalid_request");
+  return getVendaErp(credenciais, VENDAERP_ENDPOINTS.fiscalConsultarNfePeriodo, {
+    DataInicial: filtros.dataInicial,
+    DataFinal: filtros.dataFinal,
+    pageSize: filtros.pageSize,
+    skip: filtros.skip,
+  });
 }
