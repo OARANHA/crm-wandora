@@ -1,3 +1,6 @@
+import type * as DnsPromises from "node:dns/promises";
+import type * as RenderUrlPdf from "@/lib/documentos/renderizar-url-pdf";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -7,12 +10,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("node:dns/promises", async (importOriginal) => {
-  const original = await importOriginal<typeof import("node:dns/promises")>();
+  const original = await importOriginal<typeof DnsPromises>();
   return { ...original, lookup: mocks.lookup };
 });
 vi.mock("playwright-core", () => ({ chromium: { launch: mocks.launch } }));
 vi.mock("@/lib/documentos/renderizar-url-pdf", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/lib/documentos/renderizar-url-pdf")>();
+  const original = await importOriginal<typeof RenderUrlPdf>();
   return { ...original, abrirRedirectLocalParaDocumento: mocks.redirect };
 });
 
@@ -92,10 +95,15 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
       expect(JSON.stringify(options.args)).not.toContain(danfe);
       expect(JSON.stringify(options.env)).not.toContain("segredo-que-nao-pode-ser-passado");
       expect(options.env.HOME).toBe("/tmp");
-      expect(options.args.some((x: string) => x.includes("MAP app.vendaerp.com.br 8.8.8.8"))).toBe(true);
-      expect(env.page.goto).toHaveBeenCalledWith(local, expect.objectContaining({
-        waitUntil: "domcontentloaded",
-      }));
+      expect(options.args.some((x: string) => x.includes("MAP app.vendaerp.com.br 8.8.8.8"))).toBe(
+        true,
+      );
+      expect(env.page.goto).toHaveBeenCalledWith(
+        local,
+        expect.objectContaining({
+          waitUntil: "domcontentloaded",
+        }),
+      );
       expect(env.context.routeWebSocket).toHaveBeenCalled();
       expect(env.browser.close).toHaveBeenCalledTimes(1);
       expect(env.fechar).toHaveBeenCalledTimes(1);
@@ -112,7 +120,11 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(typeof handler).toBe("function");
     const abort = vi.fn();
     const next = vi.fn();
-    await handler({ request: () => ({ url: () => "http://169.254.169.254/latest", method: () => "GET" }), abort, continue: next });
+    await handler({
+      request: () => ({ url: () => "http://169.254.169.254/latest", method: () => "GET" }),
+      abort,
+      continue: next,
+    });
     expect(abort).toHaveBeenCalledWith("blockedbyclient");
     expect(next).not.toHaveBeenCalled();
 
