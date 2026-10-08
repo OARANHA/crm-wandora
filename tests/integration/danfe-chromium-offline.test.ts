@@ -37,7 +37,7 @@ describe.runIf(process.env.ELUS_DANFE_CHROMIUM_OFFLINE === "1")(
             "Cache-Control": "no-store",
           });
           res.end(
-            '<!doctype html><html><head><title>Fixture local</title></head>' +
+            "<!doctype html><html><head><title>Fixture local</title></head>" +
               '<body><div id="danfe">Carregando</div><script src="/app.js"></script></body></html>',
           );
           return;
