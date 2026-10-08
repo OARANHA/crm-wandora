@@ -46,3 +46,33 @@ export function numerosDaBuscaFiscalComprovada(resultado: unknown): string[] {
   const notas = (resultado as { notas: Array<{ numeroNFe: string }> }).notas;
   return notas.map((n) => n.numeroNFe);
 }
+
+/**
+ * Limite de NFes que podem ser anunciadas como "as últimas" no pedido atual.
+ * A consulta fiscal já ordena por emissão decrescente: jamais usar um item mais
+ * antigo da mesma página só porque ele aparece no retorno.
+ */
+export function quantidadeDeNotasMaisRecentesPedida(texto: string): number {
+  const normalizado = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const quantidadePorPalavra: Record<string, number> = {
+    um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4,
+    cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10,
+  };
+  const numero = "(\\d{1,2}|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez)";
+  const padroes = [
+    new RegExp("\\bultim[ao]s?\\s+" + numero + "\\b"),
+    new RegExp("\\b" + numero + "\\s+ultim[ao]s?\\b"),
+    new RegExp("\\b" + numero + "\\s+notas?\\s+(?:fiscais?\\s+)?mais\\s+recentes?\\b"),
+  ];
+  for (const padrao of padroes) {
+    const encontrado = normalizado.match(padrao);
+    const termo = encontrado?.[1];
+    if (!termo) continue;
+    const quantidade = quantidadePorPalavra[termo] ?? Number(termo);
+    if (Number.isInteger(quantidade) && quantidade >= 1 && quantidade <= 20) return quantidade;
+  }
+  // "A última nota" significa uma. "As últimas notas" segue o default
+  // contratual do provider (até três) quando não há N explícito.
+  if (/\\bultim[ao]\\b|\\bmais\\s+recente\\b/.test(normalizado)) return 1;
+  return 3;
+}
