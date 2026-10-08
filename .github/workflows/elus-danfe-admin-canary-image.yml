@@ -1,0 +1,85 @@
+name: Elus ISIS DANFE admin canary image
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/elus-danfe-admin-canary-image.yml"
+      - "Dockerfile.danfe-admin-canary"
+      - "scripts/elus-vendaerp-danfe-admin-canary.ts"
+      - "lib/integracoes-erp/**"
+      - "lib/documentos/renderizar-url-pdf.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "patches/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/elus-danfe-admin-canary-image.yml"
+      - "Dockerfile.danfe-admin-canary"
+      - "scripts/elus-vendaerp-danfe-admin-canary.ts"
+      - "lib/integracoes-erp/**"
+      - "lib/documentos/renderizar-url-pdf.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "patches/**"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  candidate:
+    name: Build candidate and verify no-secret fail-closed
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login GHCR (main only)
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build candidate (publish only from main)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.danfe-admin-canary
+          load: ${{ github.event_name == 'pull_request' }}
+          push: ${{ github.event_name == 'push' }}
+          tags: ghcr.io/oaranha/elus-danfe-admin-canary:${{ github.sha }}
+          build-args: |
+            SOURCE_REVISION=${{ github.event.pull_request.head.sha || github.sha }}
+          cache-from: type=gha,scope=elus-danfe-admin-canary
+          cache-to: type=gha,mode=max,scope=elus-danfe-admin-canary
+          provenance: true
+
+      - name: Smoke without secrets or network (PR only)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="ghcr.io/oaranha/elus-danfe-admin-canary:${{ github.sha }}"
+          docker run --rm --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=33554432 \
+            --memory 512m --pids-limit 128 "$image" \
+            /usr/local/bin/elus-chromium --version >/dev/null
+          set +e
+          output="$(docker run --rm --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=33554432 \
+            --memory 512m --pids-limit 128 "$image" 2>&1)"
+          status=$?
+          set -e
+          test "$status" -ne 0
+          if ! printf '%s\n' "$output" | grep -Fx '{"ok":false,"code":"invalid_scope"}'; then
+            printf 'unexpected_no_secret_smoke\n'
+            exit 1
+          fi
