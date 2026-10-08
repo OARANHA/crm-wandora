@@ -235,7 +235,15 @@ export const renderizarUrlParaPdf: RenderizadorUrlPdf = async (url, politica) =>
     const argumentos = argumentosChromiumParaPdfDestino(redirecionamento.url, saida);
     if (politica.observarNavegacao) {
       // Pipe CDP via FDs privados; nunca passa a URL externa no argv.
-      argumentos.splice(argumentos.length - 1, 0, "--remote-debugging-pipe");
+      // Chrome 136+ recusa depuração no perfil padrão. Um perfil exclusivo
+      // elimina também qualquer disputa entre renderizações simultâneas.
+      // O caminho temporário não contém URLs nem dados fiscais e é expurgado.
+      argumentos.splice(
+        argumentos.length - 1,
+        0,
+        "--remote-debugging-pipe",
+        "--user-data-dir=" + join(pasta, "chromium-profile"),
+      );
     }
     await executarChromium(
       argumentos,
