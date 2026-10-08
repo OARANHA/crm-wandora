@@ -52,11 +52,13 @@ export function ehUrlDanfePublicoVendaErp(urlBruta: string): boolean {
 export async function renderizarDanfeVendaErpParaPdf(
   url: string,
   renderizador: RenderizadorUrlPdf = renderizarUrlParaPdfControlado,
+  chaveFiscalEsperada?: string,
 ): Promise<Buffer> {
   return renderizador(url, {
     nome: "erp.vendaerp.danfe_to_pdf",
     permiteUrl: ehUrlDanfePublicoVendaErp,
     maxBytes: MAX_MEDIA_BYTES,
     timeoutMs: 60_000,
+    ...(chaveFiscalEsperada ? { chaveFiscalEsperada } : {}),
   });
 }
