@@ -3,7 +3,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { audit } from "@/lib/audit";
 import type { EtapaRenderizacaoDocumento } from "@/lib/documentos/renderizar-url-pdf";
-import type { DiagnosticoNavegacaoDocumento } from "@/lib/documentos/observar-navegacao-chromium";
 import { canonicalPhoneBR } from "@/lib/channels/phone-variants";
 
 import { ErroDanfeExterno, materializarDanfeExterno } from "./danfe";
@@ -273,16 +272,6 @@ const ETAPAS_RENDERIZACAO_AUDITAVEIS = new Set<EtapaRenderizacaoDocumento>([
   "pdf_validacao",
 ]);
 
-const DIAGNOSTICOS_NAVEGACAO_AUDITAVEIS = new Set<DiagnosticoNavegacaoDocumento>([
-  "requisicao_externa",
-  "resposta_http_2xx",
-  "resposta_http_3xx",
-  "resposta_http_4xx",
-  "resposta_http_5xx",
-  "falha_transporte",
-  "pagina_carregada",
-]);
-
 const RECURSO_POR_TOOL: Record<string, string> = {
   crm_erp_search_customers: "erp_customer",
   crm_erp_search_orders: "erp_order",
@@ -301,14 +290,10 @@ export async function auditarConsultaAdminWhatsapp(input: {
   statusHttp?: number | null;
   autenticacaoSameOrigin?: boolean | null;
   etapaRenderizacao?: EtapaRenderizacaoDocumento | null;
-  diagnosticoNavegacao?: DiagnosticoNavegacaoDocumento | null;
 }): Promise<void> {
   if (!ferramentaErpExigeAutoridadeAdminWhatsapp(input.toolName)) return;
   const etapaAuditavel = input.etapaRenderizacao
     ? ETAPAS_RENDERIZACAO_AUDITAVEIS.has(input.etapaRenderizacao)
-    : false;
-  const navegacaoAuditavel = input.diagnosticoNavegacao
-    ? DIAGNOSTICOS_NAVEGACAO_AUDITAVEIS.has(input.diagnosticoNavegacao)
     : false;
   await audit({
     action: "integracao_erp.admin_consulta",
@@ -325,7 +310,6 @@ export async function auditarConsultaAdminWhatsapp(input: {
       ...(input.motivo ? { motivo: input.motivo } : {}),
       ...(input.codigoTecnico ? { codigo_tecnico: input.codigoTecnico } : {}),
       ...(etapaAuditavel ? { etapa_renderizacao: input.etapaRenderizacao } : {}),
-      ...(navegacaoAuditavel ? { diagnostico_navegacao: input.diagnosticoNavegacao } : {}),
       ...(typeof input.statusHttp === "number" ? { status_http: input.statusHttp } : {}),
       ...(typeof input.autenticacaoSameOrigin === "boolean"
         ? { autenticacao_same_origin: input.autenticacaoSameOrigin }
@@ -379,7 +363,6 @@ export async function prepararDanfeAdminWhatsapp(
       statusHttp?: number | null;
       autenticacaoSameOrigin?: boolean | null;
       etapaRenderizacao?: EtapaRenderizacaoDocumento | null;
-      diagnosticoNavegacao?: DiagnosticoNavegacaoDocumento | null;
     },
   ): Promise<PrepararDanfeAdminWhatsappResultado> => {
     await auditarConsultaAdminWhatsapp({
@@ -391,9 +374,6 @@ export async function prepararDanfeAdminWhatsapp(
       ...(diagnostico?.codigoTecnico ? { codigoTecnico: diagnostico.codigoTecnico } : {}),
       ...(diagnostico?.etapaRenderizacao
         ? { etapaRenderizacao: diagnostico.etapaRenderizacao }
-        : {}),
-      ...(diagnostico?.diagnosticoNavegacao
-        ? { diagnosticoNavegacao: diagnostico.diagnosticoNavegacao }
         : {}),
       ...(typeof diagnostico?.statusHttp === "number"
         ? { statusHttp: diagnostico.statusHttp }
@@ -430,7 +410,6 @@ export async function prepararDanfeAdminWhatsapp(
         {
           codigoTecnico: erro.codigo,
           ...(erro.etapa ? { etapaRenderizacao: erro.etapa } : {}),
-          ...(erro.diagnosticoNavegacao ? { diagnosticoNavegacao: erro.diagnosticoNavegacao } : {}),
           ...(typeof erro.status === "number" ? { statusHttp: erro.status } : {}),
           autenticacaoSameOrigin: Boolean(headers),
         },
