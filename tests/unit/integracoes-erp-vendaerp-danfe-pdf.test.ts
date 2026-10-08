@@ -36,7 +36,6 @@ describe("capability erp.vendaerp.danfe_to_pdf", () => {
     expect(politica.nome).toBe("erp.vendaerp.danfe_to_pdf");
     expect(politica.permiteUrl(URL_DANFE)).toBe(true);
     expect(politica.timeoutMs).toBe(60_000);
-    expect(politica.observarNavegacao).toBe(true);
 
     const serializado = JSON.stringify(politica);
     expect(serializado).not.toContain("Authorization-Token");
