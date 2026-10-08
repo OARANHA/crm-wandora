@@ -540,13 +540,12 @@ describe("tools ERP READ — comportamento do agente", () => {
       },
     }));
 
-    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockImplementation(
-      async (_db, _org, filtros) => ({
-        ok: true,
-        // Simula um provedor que aceita pageSize=100 mas limita cada resposta a 2 itens.
-        dados: registros.slice(filtros.skip ?? 0, (filtros.skip ?? 0) + 2),
-      }),
-    );
+    const buscaPaginada = vi.mocked(service.buscarPedidosErpComIdentidadeInterna);
+    buscaPaginada.mockImplementation(async (_db, _org, filtros) => {
+      const skip = filtros.skip ?? 0;
+      // Simula um provedor que limita cada resposta a 2 itens.
+      return { ok: true, dados: registros.slice(skip, skip + 2) };
+    });
     vi.mocked(customerResolution.resolverClienteVendaErpPorPedidos).mockResolvedValue({
       status: "resolved",
       contactId: "11111111-1111-4111-8111-111111111111",
@@ -581,11 +580,8 @@ describe("tools ERP READ — comportamento do agente", () => {
         resultadoCompleto: true,
       },
     });
-    expect(
-      vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mock.calls.map(
-        ([, , filtros]) => filtros.skip,
-      ),
-    ).toEqual([0, 2, 4]);
+    const offsets = buscaPaginada.mock.calls.map((call) => call[2].skip);
+    expect(offsets).toEqual([0, 2, 4]);
   });
 
   it("últimas notas falham fechado se o provider ignora o deslocamento skip", async () => {
