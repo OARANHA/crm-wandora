@@ -47,7 +47,7 @@ jobs:
       - name: Selecionar binário Playwright instalado
         run: |
           set -euo pipefail
-          CHROMIUM_PATH="$(node -e 'process.stdout.write(require("playwright").chromium.executablePath())')"
+          CHROMIUM_PATH="$(node -e 'process.stdout.write(require("@playwright/test").chromium.executablePath())')"
           test -x "$CHROMIUM_PATH"
           echo "CHROMIUM_PATH=$CHROMIUM_PATH" >> "$GITHUB_ENV"
 
