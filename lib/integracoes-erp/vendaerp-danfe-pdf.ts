@@ -57,7 +57,5 @@ export async function renderizarDanfeVendaErpParaPdf(
     permiteUrl: ehUrlDanfePublicoVendaErp,
     maxBytes: MAX_MEDIA_BYTES,
     timeoutMs: 60_000,
-    // Observação local por pipe CDP: somente classe HTTP/etapa, nunca URL ou token.
-    observarNavegacao: true,
   });
 }
