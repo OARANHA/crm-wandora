@@ -1,17 +1,17 @@
-import type * as DnsPromises from "node:dns/promises";
+import type * as BrowserEgress from "@/lib/documentos/egress-browser-pdf";
 import type * as RenderUrlPdf from "@/lib/documentos/renderizar-url-pdf";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  lookup: vi.fn(),
+  resolver: vi.fn(),
   launch: vi.fn(),
   redirect: vi.fn(),
 }));
 
-vi.mock("node:dns/promises", async (importOriginal) => {
-  const original = await importOriginal<typeof DnsPromises>();
-  return { ...original, lookup: mocks.lookup };
+vi.mock("@/lib/documentos/egress-browser-pdf", async (importOriginal) => {
+  const original = await importOriginal<typeof BrowserEgress>();
+  return { ...original, resolverIpPublicoFixadoParaBrowser: mocks.resolver };
 });
 vi.mock("playwright-core", () => ({ chromium: { launch: mocks.launch } }));
 vi.mock("@/lib/documentos/renderizar-url-pdf", async (importOriginal) => {
@@ -44,7 +44,7 @@ function ambientePdf() {
     close: vi.fn().mockResolvedValue(undefined),
     process: vi.fn().mockReturnValue(null),
   };
-  mocks.lookup.mockResolvedValue([{ address: "8.8.8.8" }]);
+  mocks.resolver.mockResolvedValue("8.8.8.8");
   mocks.launch.mockResolvedValue(browser);
   const fechar = vi.fn().mockResolvedValue(undefined);
   mocks.redirect.mockResolvedValue({
@@ -71,12 +71,12 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     await expect(
       renderizarUrlParaPdfControlado("https://privado.invalid/", policy),
     ).rejects.toMatchObject({ codigo: "destino_inseguro" });
-    expect(mocks.lookup).not.toHaveBeenCalled();
+    expect(mocks.resolver).not.toHaveBeenCalled();
     expect(mocks.launch).not.toHaveBeenCalled();
   });
 
   it("barra DNS privado ou misto antes da primeira navegação", async () => {
-    mocks.lookup.mockResolvedValue([{ address: "8.8.8.8" }, { address: "127.0.0.1" }]);
+    mocks.resolver.mockResolvedValue(null);
     await expect(renderizarUrlParaPdfControlado(danfe, policy)).rejects.toMatchObject({
       codigo: "destino_inseguro",
     });
