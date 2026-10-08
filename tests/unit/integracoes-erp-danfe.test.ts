@@ -109,7 +109,11 @@ describe("materialização segura do DANFE", () => {
       throw new Error("fetch não deveria ser chamado para DANFE VendaERP");
     }) as unknown as typeof fetch;
     const renderizadorVendaErp = vi.fn(async () => {
-      throw new ErroRenderizacaoDocumento("timeout", "chromium_apos_redirect", "sem_marcador_final");
+      throw new ErroRenderizacaoDocumento(
+        "timeout",
+        "chromium_apos_redirect",
+        "sem_marcador_final",
+      );
     });
 
     await expect(
