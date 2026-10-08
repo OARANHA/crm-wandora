@@ -27,6 +27,27 @@ let timedOut = false;
 let result = null;
 const startedAt = performance.now();
 
+// Não registrar a mensagem crua do launcher: Chromium pode incluir argv/URLs
+// (no cenário real a URL fiscal pode carregar parâmetros sensíveis).
+function classificarFalhaSegura(error) {
+  const msg = error instanceof Error ? error.message : "";
+  if (error?.name === "TimeoutError") return "stage_timeout";
+  if (/EACCES|EROFS|read.only file system|permission denied|user.data.dir/i.test(msg)) {
+    return "filesystem_not_writable";
+  }
+  if (/ENOENT|executable doesn't exist|no such file or directory/i.test(msg)) {
+    return "executable_not_found";
+  }
+  if (/EPERM|operation not permitted|sandbox/i.test(msg)) return "sandbox_or_permission";
+  if (/missing dependenc|shared librar|error while loading shared/i.test(msg)) {
+    return "runtime_dependency";
+  }
+  if (/target page, context or browser has been closed|browser.*closed|process exited/i.test(msg)) {
+    return "browser_exited";
+  }
+  return "controlled_print_failed";
+}
+
 const watchdog = setTimeout(() => {
   timedOut = true;
   console.log("CDP_PROBE_RESULT " + JSON.stringify({
@@ -80,6 +101,15 @@ try {
     headless: true,
     executablePath: BIN,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
+    // O contêiner CI é read-only, com /tmp tmpfs. O Chromium de CLI do
+    // experimento #75 explicitava HOME=/tmp; o Playwright não fazia isso.
+    // Preservar as demais variáveis evita alterações de runtime e não há log de env.
+    env: {
+      ...process.env,
+      HOME: "/tmp",
+      XDG_CONFIG_HOME: "/tmp",
+      XDG_CACHE_HOME: "/tmp",
+    },
     timeout: 7000,
   });
 
@@ -142,7 +172,7 @@ try {
     pdf_exists: false, pdf_markers_present: false,
     timed_out: timedOut,
     stage: abortStage,
-    code: error?.name === "TimeoutError" ? "stage_timeout" : "controlled_print_failed",
+    code: classificarFalhaSegura(error),
   };
   process.exitCode = 1;
 } finally {
