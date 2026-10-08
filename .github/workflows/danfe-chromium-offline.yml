@@ -1,0 +1,60 @@
+name: DANFE Chromium offline
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/danfe-chromium-offline.yml"
+      - "lib/documentos/renderizar-url-pdf.ts"
+      - "tests/integration/danfe-chromium-offline.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  renderer-offline:
+    name: Chromium real com SPA local (sem VendaERP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verificar tipagem, lint e formatação
+        run: |
+          pnpm typecheck
+          pnpm exec eslint tests/integration/danfe-chromium-offline.test.ts
+          pnpm exec prettier --check tests/integration/danfe-chromium-offline.test.ts
+
+      - name: Instalar Chromium no runner do CI, não na VPS
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Selecionar binário Playwright instalado
+        run: |
+          set -euo pipefail
+          CHROMIUM_PATH="$(node -e 'process.stdout.write(require("@playwright/test").chromium.executablePath())')"
+          test -x "$CHROMIUM_PATH"
+          echo "CHROMIUM_PATH=$CHROMIUM_PATH" >> "$GITHUB_ENV"
+
+      - name: Comparar bootstrap legado e redirect 302 em SPA sintética
+        env:
+          ELUS_DANFE_CHROMIUM_OFFLINE: "1"
+        run: >-
+          pnpm exec vitest run
+          tests/integration/danfe-chromium-offline.test.ts
+          --maxWorkers=1
