@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { McpContext } from "@/lib/mcp/types";
 
 import { classificarResultadoParaAuditoria } from "@/lib/mcp/classificar-resultado-auditoria";
 import {
@@ -55,7 +56,7 @@ const ctx = {
   apiTokenId: "00000000-0000-4000-8000-000000000003",
   requestId: "00000000-0000-4000-8000-000000000004",
   supabase: {},
-} as never;
+} as unknown as McpContext;
 
 const argumentos = { cliente: CPF_TESTE };
 
