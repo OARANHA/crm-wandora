@@ -26,7 +26,10 @@ const LIMITE_ETAPA_MS = 8_000;
  */
 export function pdfImpressoComprovaDanfe(texto: string, chaveEsperada: string): boolean {
   if (!/^\d{44}$/.test(chaveEsperada)) return false;
-  const normalizado = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const normalizado = texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
   if (
     normalizado.length < 80 ||
     !/\bDANFE\b/.test(normalizado) ||
@@ -245,30 +248,32 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     etapa = "chromium_validacao_conteudo";
     try {
       await page.waitForFunction(
-      (chaveEsperada) => {
-        const texto = document.body?.innerText ?? "";
-        const normalizado = texto
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toUpperCase();
-        // Nota Fiscal isolada e a chave repetida por uma tela de erro nao
-        // comprovam que a DANFE esta pronta para impressao.
-        if (
-          normalizado.trim().length < 80 ||
-          !/\bDANFE\b/.test(normalizado) ||
-          !/\bCHAVE\s+DE\s+ACESSO\b/.test(normalizado) ||
-          /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(normalizado) ||
-          /\bERRO\s+AO\s+(?:CARREGAR|CONSULTAR)\b/.test(normalizado)
-        ) {
-          return false;
-        }
-        // Mesmo com marcadores de DANFE, exige a chave exata de 44 digitos
-        // comprovada na leitura estruturada ERP antes de gerar o PDF.
-        // Nenhum texto fiscal é devolvido ao Node, logs, auditoria ou modelo.
-        return !chaveEsperada || texto.replace(/\D/g, "").includes(chaveEsperada);
-      },
-      politica.chaveFiscalEsperada ?? null,
-      { timeout: restante() },
+        (chaveEsperada) => {
+          const texto = document.body?.innerText ?? "";
+          const normalizado = texto
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toUpperCase();
+          // Nota Fiscal isolada e a chave repetida por uma tela de erro nao
+          // comprovam que a DANFE esta pronta para impressao.
+          if (
+            normalizado.trim().length < 80 ||
+            !/\bDANFE\b/.test(normalizado) ||
+            !/\bCHAVE\s+DE\s+ACESSO\b/.test(normalizado) ||
+            /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(
+              normalizado,
+            ) ||
+            /\bERRO\s+AO\s+(?:CARREGAR|CONSULTAR)\b/.test(normalizado)
+          ) {
+            return false;
+          }
+          // Mesmo com marcadores de DANFE, exige a chave exata de 44 digitos
+          // comprovada na leitura estruturada ERP antes de gerar o PDF.
+          // Nenhum texto fiscal é devolvido ao Node, logs, auditoria ou modelo.
+          return !chaveEsperada || texto.replace(/\D/g, "").includes(chaveEsperada);
+        },
+        politica.chaveFiscalEsperada ?? null,
+        { timeout: restante() },
       );
     } catch (erro) {
       // O HTML da SPA pode não expor texto selecionável, mesmo que a impressão
