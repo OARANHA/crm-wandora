@@ -314,4 +314,71 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(env.browser.close).toHaveBeenCalledOnce();
     expect(env.fechar).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    ["nenhum_bloqueio_interceptado", []],
+    ["metodo_nao_permitido", [{ url: "https://app.vendaerp.com.br/api/dados", method: "POST" }]],
+    ["destino_fora_origem", [{ url: "https://externo.example.test/assets.js", method: "GET" }]],
+    [
+      "ambas_classes_bloqueadas",
+      [
+        { url: "https://app.vendaerp.com.br/api/dados", method: "POST" },
+        { url: "https://externo.example.test/assets.js", method: "GET" },
+      ],
+    ],
+  ])("timeout de DOM registra classe finita de bloqueio: %s", async (esperado, requisições) => {
+    const env = ambientePdf();
+    const timeout = Object.assign(new Error("URL confidencial: " + danfe), {
+      name: "TimeoutError",
+    });
+    env.page.waitForFunction.mockImplementationOnce(async () => {
+      const handler = env.context.route.mock.calls[0]?.[1];
+      expect(typeof handler).toBe("function");
+      for (const requisicao of requisições) {
+        const abort = vi.fn();
+        const next = vi.fn();
+        await handler({
+          request: () => ({
+            url: () => requisicao.url,
+            method: () => requisicao.method,
+          }),
+          abort,
+          continue: next,
+        });
+        expect(abort).toHaveBeenCalledWith("blockedbyclient");
+        expect(next).not.toHaveBeenCalled();
+      }
+      throw timeout;
+    });
+
+    let falha: unknown;
+    try {
+      await renderizarUrlParaPdfControlado(danfe, policy);
+    } catch (erro) {
+      falha = erro;
+    }
+    expect(falha).toBeInstanceOf(ErroRenderizacaoDocumento);
+    expect(falha).toMatchObject({
+      codigo: "timeout",
+      etapa: "chromium_validacao_conteudo",
+      evidenciaEgress: esperado,
+    });
+    expect(String(falha)).not.toContain(danfe);
+    expect(JSON.stringify(falha)).not.toContain("externo.example.test");
+    expect(env.page.pdf).not.toHaveBeenCalled();
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("não associa bloqueio de rede ao erro da impressão do PDF", async () => {
+    const env = ambientePdf();
+    env.page.pdf.mockRejectedValueOnce(
+      Object.assign(new Error("PDF indisponível"), { name: "TimeoutError" }),
+    );
+    await expect(renderizarUrlParaPdfControlado(danfe, policy)).rejects.toMatchObject({
+      codigo: "timeout",
+      etapa: "chromium_impressao_pdf",
+      evidenciaEgress: undefined,
+    });
+  });
 });
