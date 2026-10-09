@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 import { buscarUltimasNfesFiscais } from "@/lib/integracoes-erp/busca-notas-recentes-fiscais";
-import { comprovarDocumentoFiscalDoVinculo } from "@/lib/integracoes-erp/identidade-fiscal-vinculo";
+import { comprovarDocumentoFiscalDoVinculo, documentoFiscalValido } from "@/lib/integracoes-erp/identidade-fiscal-vinculo";
 import { carregarVinculoClienteExterno } from "@/lib/integracoes-erp/identidade-externa-cliente";
 import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
 import { resolverClienteVendaErp } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
@@ -82,10 +82,10 @@ export const crmErpSearchRecentInvoices: McpToolDefinition<typeof inputShape> = 
         };
       }
       contactId = resolucao.contactId;
-      documento = resolucao.cliente?.cpfCnpj?.replace(/\D/g, "");
+      documento = documentoFiscalValido(resolucao.cliente?.cpfCnpj);
       if (!documento) {
-        // Vínculos antigos armazenam identidade externa, mas não o documento fiscal.
-        // Revalidar o ID externo com Pessoas/Pesquisar antes de filtrar XML fiscal.
+        // Vínculos antigos armazenam ID externo, mas não o documento fiscal.
+        // Prova estrita: Pessoa.id ou Pedido.pessoaID, nunca rótulo.
         const vinculo = await carregarVinculoClienteExterno(ctx.supabase, {
           organizationId: ctx.organizationId,
           contactId,

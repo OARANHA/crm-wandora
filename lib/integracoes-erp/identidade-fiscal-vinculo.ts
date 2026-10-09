@@ -26,7 +26,7 @@ export type DocumentoFiscalDoVinculo =
         | "erp_read_failed";
     };
 
-function documentoFiscalValido(raw: string | null | undefined): string | null {
+export function documentoFiscalValido(raw: string | null | undefined): string | null {
   const digits = raw?.replace(/\D/g, "") ?? "";
   if (digits.length === 11) return isValidCpf(digits) ? digits : null;
   if (digits.length === 14) return normalizeCnpj(digits);
@@ -54,8 +54,12 @@ export async function comprovarDocumentoFiscalDoVinculo(
   const exatas = pessoas.dados.filter((p) => p.id?.trim() === externalId);
   if (exatas.length > 1) return { ok: false, motivo: "identidade_fiscal_conflitante" };
   if (exatas.length === 1) {
-    const documento = documentoFiscalValido(exatas[0]!.cpfCnpj);
+    const bruto = exatas[0]!.cpfCnpj;
+    const documento = documentoFiscalValido(bruto);
     if (documento) return { ok: true, documento, fonte: "pessoa_id" };
+    if (bruto?.trim()) {
+      return { ok: false, motivo: "identidade_fiscal_nao_confirmada" };
+    }
   }
 
   // Em vínculos antigos, a busca Pessoas por nomefantasia pode não alcançar
@@ -72,7 +76,11 @@ export async function comprovarDocumentoFiscalDoVinculo(
 
     for (const item of pedidos.dados) {
       if (item.identidadeCliente.pessoaId?.trim() !== externalId) continue;
-      const documento = documentoFiscalValido(item.identidadeCliente.cpfCnpj);
+      const bruto = item.identidadeCliente.cpfCnpj;
+      const documento = documentoFiscalValido(bruto);
+      if (bruto?.trim() && !documento) {
+        return { ok: false, motivo: "identidade_fiscal_nao_confirmada" };
+      }
       if (documento) documentos.add(documento);
       if (documentos.size > 1) {
         return { ok: false, motivo: "identidade_fiscal_conflitante" };

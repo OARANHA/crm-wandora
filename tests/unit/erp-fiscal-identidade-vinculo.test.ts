@@ -76,6 +76,26 @@ describe("identidade fiscal dos vínculos VendaERP antigos", () => {
       .toEqual({ ok: false, motivo: "identidade_fiscal_nao_confirmada" });
   });
 
+  it("não confia em documento inválido numa Pessoa com ID confirmado", async () => {
+    vi.mocked(service.buscarClientesErp).mockResolvedValue({
+      ok: true,
+      dados: [{ id: vinculo.externalId, cpfCnpj: "00000000000", nome: null,
+        nomeFantasia: null, razaoSocial: null, email: null,
+        telefone: null, celular: null, cidade: null, uf: null }],
+    });
+    expect(await comprovarDocumentoFiscalDoVinculo(db, org, vinculo))
+      .toEqual({ ok: false, motivo: "identidade_fiscal_nao_confirmada" });
+    expect(service.buscarPedidosErpComIdentidadeInterna).not.toHaveBeenCalled();
+  });
+
+  it("rejeita documento inválido mesmo junto de outro válido nos pedidos", async () => {
+    vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
+      ok: true, dados: [pedido(), pedido(vinculo.externalId, "00000000000")],
+    });
+    expect(await comprovarDocumentoFiscalDoVinculo(db, org, vinculo))
+      .toEqual({ ok: false, motivo: "identidade_fiscal_nao_confirmada" });
+  });
+
   it("página cheia exige paginação e não valida conjunto incompleto", async () => {
     vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
       ok: true, dados: Array.from({ length: 100 }, () => pedido()),
