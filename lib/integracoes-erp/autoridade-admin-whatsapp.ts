@@ -272,6 +272,11 @@ export async function removerVinculoAdminWhatsappDoUsuario(
 const ETAPAS_RENDERIZACAO_AUDITAVEIS = new Set<EtapaRenderizacaoDocumento>([
   "loopback_inicializacao",
   "chromium_antes_redirect",
+  "chromium_lancamento",
+  "chromium_contexto",
+  "chromium_politicas",
+  "chromium_pagina",
+  "chromium_navegacao",
   "chromium_apos_redirect",
   "pdf_leitura",
   "pdf_validacao",

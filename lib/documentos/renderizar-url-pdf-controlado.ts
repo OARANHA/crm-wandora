@@ -108,7 +108,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   let etapa: EtapaRenderizacaoDocumento = "loopback_inicializacao";
   try {
     redirect = await abrirRedirectLocalParaDocumento(url);
-    etapa = "chromium_antes_redirect";
+    etapa = "chromium_lancamento";
 
     // Não propagar process.env inteiro: contêiner tem tokens ERP e chaves privadas.
     browser = await chromium.launch({
@@ -131,6 +131,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       },
     });
 
+    etapa = "chromium_contexto";
     const context = await executarDentroDoPrazo(
       () =>
         browser!.newContext({
@@ -142,6 +143,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       restante(),
     );
 
+    etapa = "chromium_politicas";
     // WebRTC não atravessa context.route("**/*"). A DANFE não necessita
     // PeerConnection; desabilitar antes de executar qualquer script da SPA.
     await executarDentroDoPrazo(
@@ -184,7 +186,9 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       () => context.routeWebSocket("**/*", (socket) => socket.close()),
       restante(),
     );
+    etapa = "chromium_pagina";
     const page = await executarDentroDoPrazo(() => context.newPage(), restante());
+    etapa = "chromium_navegacao";
     const resposta = await page.goto(redirect.url, {
       waitUntil: "domcontentloaded",
       timeout: restante(),

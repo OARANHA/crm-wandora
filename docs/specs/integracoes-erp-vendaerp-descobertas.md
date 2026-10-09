@@ -302,3 +302,22 @@ identidade própria, sem criar um `contacts.kind=person` fictício.
 A RPC `encrypt_cpf` segue não comprovada no banco observado.
 Esse trabalho de schema/enriquecimento continua obrigatório na issue #55 e
 não é declarado resolvido por este slice de desbloqueio fiscal.
+
+## Diagnóstico controlado do Chromium no worker — 09/10/2026
+
+No canário das 10h39, a busca fiscal retornou sucesso, mas as duas
+preparações falharam com `timeout` na etapa agregada
+`chromium_antes_redirect`. Nenhum documento foi enviado.
+
+A rota pública VendaERP utiliza `renderizarUrlParaPdfControlado`
+(Playwright-core). Antes deste slice, o teste Chromium real do CI
+exercitava somente o executor CLI, não o Playwright no Alpine do worker.
+O diagnóstico agora distingue lançamento, criação de contexto,
+configuração de políticas, criação da página e navegação, sem registrar
+URLs, credenciais ou conteúdo fiscal.
+
+Um teste offline constrói a imagem `Dockerfile.worker` apenas no CI e
+executa Chromium/Playwright com 512 MiB e `--network none`, usando
+apenas fixture local. O teste não substitui o gate SSRF e não comprova
+a entrega das duas DANFEs reais. A causa original do timeout segue
+não comprovada até os resultados da investigação.

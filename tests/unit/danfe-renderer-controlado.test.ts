@@ -217,12 +217,30 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
+  it("distingue timeout de lançamento sem redirect", async () => {
+    ambientePdf();
+    mocks.launch.mockImplementationOnce(() => new Promise(() => undefined));
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 35 }),
+    ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_lancamento" });
+  });
+
   it("limita inicialização do contexto, fecha browser e bootstrap", async () => {
     const env = ambientePdf();
     env.browser.newContext.mockImplementationOnce(() => new Promise(() => undefined));
     await expect(
       renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 35 }),
-    ).rejects.toMatchObject({ codigo: "timeout" });
+    ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_contexto" });
+    expect(env.browser.close).toHaveBeenCalledTimes(1);
+    expect(env.fechar).toHaveBeenCalledTimes(1);
+  });
+
+  it("distingue timeout na navegação antes do redirect", async () => {
+    const env = ambientePdf();
+    env.page.goto.mockImplementationOnce(() => new Promise(() => undefined));
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 35 }),
+    ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_navegacao" });
     expect(env.browser.close).toHaveBeenCalledTimes(1);
     expect(env.fechar).toHaveBeenCalledTimes(1);
   });
