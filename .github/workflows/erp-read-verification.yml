@@ -168,6 +168,9 @@ jobs:
           refs/tags/v1.69.0:refs/tags/v1.69.0
           refs/tags/v1.63.0:refs/tags/v1.63.0
 
+      - name: Configure Docker Hub cache on CI runner
+        run: bash scripts/ci-configure-dockerhub-mirror.sh
+
       - name: Baseline install, reapply and invariants
         run: pnpm test:db
         env:
