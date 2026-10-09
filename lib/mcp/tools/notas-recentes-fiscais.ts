@@ -82,7 +82,7 @@ export const crmErpSearchRecentInvoices: McpToolDefinition<typeof inputShape> = 
         };
       }
       contactId = resolucao.contactId;
-      documento = documentoFiscalValido(resolucao.cliente?.cpfCnpj);
+      documento = documentoFiscalValido(resolucao.cliente?.cpfCnpj) ?? undefined;
       if (!documento) {
         // Vínculos antigos armazenam ID externo, mas não o documento fiscal.
         // Prova estrita: Pessoa.id ou Pedido.pessoaID, nunca rótulo.
