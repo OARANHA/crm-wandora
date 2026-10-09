@@ -225,11 +225,23 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     await page.waitForFunction(
       (chaveEsperada) => {
         const texto = document.body?.innerText ?? "";
-        if (texto.trim().length < 80 || !/DANFE|NOTA FISCAL|CHAVE DE ACESSO/i.test(texto)) {
+        const normalizado = texto
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toUpperCase();
+        // Nota Fiscal isolada e a chave repetida por uma tela de erro nao
+        // comprovam que a DANFE esta pronta para impressao.
+        if (
+          normalizado.trim().length < 80 ||
+          !/\bDANFE\b/.test(normalizado) ||
+          !/\bCHAVE\s+DE\s+ACESSO\b/.test(normalizado) ||
+          /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(normalizado) ||
+          /\bERRO\s+AO\s+(?:CARREGAR|CONSULTAR)\b/.test(normalizado)
+        ) {
           return false;
         }
-        // DOM de erro/"nota indisponível" não basta: a chave de 44 dígitos
-        // da NFe realmente consultada precisa existir na DANFE antes do PDF.
+        // Mesmo com marcadores de DANFE, exige a chave exata de 44 digitos
+        // comprovada na leitura estruturada ERP antes de gerar o PDF.
         // Nenhum texto fiscal é devolvido ao Node, logs, auditoria ou modelo.
         return !chaveEsperada || texto.replace(/\D/g, "").includes(chaveEsperada);
       },
