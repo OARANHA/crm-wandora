@@ -11,6 +11,8 @@ const CODIGOS_FISCAIS_PERMITIDOS = new Set([
   "cliente_ambiguo",
   "cliente_nao_resolvido",
   "identidade_fiscal_nao_confirmada",
+  "identidade_fiscal_conflitante",
+  "erp_read_failed",
   "janela_fiscal_insuficiente",
   "consulta_parcial",
   "consulta_inconsistente",

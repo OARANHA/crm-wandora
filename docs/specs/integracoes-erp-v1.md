@@ -399,3 +399,24 @@ Política:
 ou criação de contato de terceiro com telefone obrigatório; exige reconciliação
 da migration/RPC local e gate de privacidade próprios, sem qualquer escrita
 em Pessoas/Salvar do VendaERP.
+
+## Identidade fiscal — recuperação de vínculo legado (slice de segurança)
+
+Em um vínculo antigo `contact_id ↔ Pessoa.id`, nome/razão social **não**
+comprovam CPF/CNPJ. Quando a busca de `Pessoas/Pesquisar` pelo rótulo armazenado
+não retorna o ID externo exato com documento válido, a busca fiscal pode consultar
+`Pedidos/Pesquisar` pelo mesmo rótulo **somente como descoberta**. O documento
+é aceito apenas quando `Pedido.pessoaID === external_id` do vínculo ativo,
+não há documentos divergentes e a paginação limitada chegou ao fim. Quando
+o limite é atingido, responde `consulta_parcial` e não declara recência.
+
+A projeção pública não recebe o documento, os pedidos brutos, o XML nem a URL.
+As duas fontes são GET/read-only e ficam sob o mesmo `organization_id`.
+A validação CPF segue `isValidCpf`; CNPJ exige `normalizeCnpj` canônico
+e também verificação dos dois dígitos verificadores.
+Não confundir esse fallback com **persistência de cadastro mínimo**: contatos PF
+ainda precisam de CPF cifrado + hash, e empresas PJ exigem `companies` e
+identidade própria, sem criar um `contacts.kind=person` fictício.
+A RPC `encrypt_cpf` segue não comprovada no banco observado.
+Esse trabalho de schema/enriquecimento continua obrigatório na issue #55 e
+não é declarado resolvido por este slice de desbloqueio fiscal.
