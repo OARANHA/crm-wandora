@@ -208,6 +208,26 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
         "teste ".repeat(20),
     });
     expect(checar(chave)).toBe(true);
+    // Uma página de erro pode ecoar a chave de acesso solicitada.
+    // Não é DANFE renderizada, mesmo com 44 dígitos corretos e texto longo.
+    Object.defineProperty(document.body, "innerText", {
+      configurable: true,
+      value:
+        "Nota Fiscal indisponível para consulta. " +
+        "Chave informada: " +
+        chave +
+        ". Este documento não pôde ser carregado. " +
+        "Tente novamente. ".repeat(12),
+    });
+    expect(checar(chave)).toBe(false);
+    Object.defineProperty(document.body, "innerText", {
+      configurable: true,
+      value:
+        "DANFE não encontrada. CHAVE DE ACESSO: " +
+        chave.match(/.{1,4}/g)?.join(" ") +
+        ". Tente novamente. ".repeat(12),
+    });
+    expect(checar(chave)).toBe(false);
     Reflect.deleteProperty(document.body, "innerText");
   });
 
