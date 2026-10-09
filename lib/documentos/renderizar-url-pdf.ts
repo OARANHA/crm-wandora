@@ -21,6 +21,8 @@ export type EtapaRenderizacaoDocumento =
   | "chromium_pagina"
   | "chromium_navegacao"
   | "chromium_apos_redirect"
+  | "chromium_validacao_conteudo"
+  | "chromium_impressao_pdf"
   | "pdf_leitura"
   | "pdf_validacao";
 
