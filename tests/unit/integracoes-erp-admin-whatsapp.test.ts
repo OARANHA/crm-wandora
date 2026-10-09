@@ -200,6 +200,24 @@ describe("Admin WhatsApp Read-Only V1", () => {
     expect(serializado).not.toContain(telefone);
   });
 
+  it("audita classe de egress sanitizada sem URL, endpoint ou conteúdo", async () => {
+    await auditarConsultaAdminWhatsapp({
+      autoridade: resolver() as AutoridadeAdminWhatsapp,
+      toolName: "crm_erp_prepare_admin_danfe",
+      requestId: "turno-sintetico",
+      success: false,
+      motivo: "danfe_download_failed",
+      etapaRenderizacao: "chromium_validacao_conteudo",
+      evidenciaEgress: "ambas_classes_bloqueadas",
+    });
+    const metadata = vi.mocked(audit).mock.calls[0]?.[0].metadata;
+    expect(metadata).toHaveProperty("evidencia_egress_browser", "ambas_classes_bloqueadas");
+    const serialized = JSON.stringify(metadata);
+    expect(serialized).not.toContain("http");
+    expect(serialized).not.toContain("Cod=");
+    expect(serialized).not.toContain(telefone);
+  });
+
   it("descarta etapas de diagnóstico arbitrárias antes de gravar a auditoria", async () => {
     await auditarConsultaAdminWhatsapp({
       autoridade: resolver() as AutoridadeAdminWhatsapp,
@@ -209,11 +227,13 @@ describe("Admin WhatsApp Read-Only V1", () => {
       motivo: "danfe_download_failed",
       etapaRenderizacao: "https://invalido.test?token=segredo" as never,
       evidenciaPdf: "https://invalido.test?token=segredo" as never,
+      evidenciaEgress: "https://invalido.test?token=segredo" as never,
     });
 
     const metadata = vi.mocked(audit).mock.calls[0]?.[0].metadata;
     expect(metadata).not.toHaveProperty("etapa_renderizacao");
     expect(metadata).not.toHaveProperty("evidencia_pdf_timeout");
+    expect(metadata).not.toHaveProperty("evidencia_egress_browser");
     expect(JSON.stringify(metadata)).not.toContain("segredo");
   });
 

@@ -346,3 +346,26 @@ chromium_validacao_conteudo e chromium_impressao_pdf ao contrato de erro
 e à allowlist da auditoria. Testes sintéticos offline cobrem falha em cada fase
 e fechamento do browser; nenhuma URL fiscal ou conteúdo do documento é logado.
 Não há novo canário real nem alteração no VendaERP ou no sender WhatsApp.
+
+## Observação offline de recursos bloqueados — 09/10/2026
+
+A fase chromium_validacao_conteudo ainda não prova por que o DOM
+fiscal não chegou ao estado esperado. A policy do browser intercepta
+requisições antes de acessar a rede, bloqueia destinos fora da origem
+HTTPS única e métodos diferentes de GET/HEAD. Esses bloqueios são
+controles obrigatórios de SSRF/egress e **não são afrouxados**.
+
+Para uma falha de timeout nessa fase, o renderer passa a devolver
+apenas uma **classe finita de bloqueios HTTP interceptados**:
+nenhum_bloqueio_interceptado, metodo_nao_permitido,
+destino_fora_origem ou ambas_classes_bloqueadas.
+A classificação nunca contém URL, host, path, método bruto, corpo,
+chave fiscal, token, HTML ou contagem identificadora; segue a auditoria
+administrativa com allowlist e não aparece na mensagem do agente.
+
+**Limites:** nenhum_bloqueio_interceptado não prova que o browser
+realizou toda a rede nem que o provider está saudável.
+Bloqueio observado não estabelece causalidade com o timeout,
+especialmente para scripts de rastreamento opcionais.
+Testes sintéticos cobrem os quatro estados e propagation/censura.
+A causa e a entrega de duas DANFEs reais ainda não foram provadas.

@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import type {
   EtapaRenderizacaoDocumento,
   EvidenciaPdfAoExpirar,
+  EvidenciaEgressBrowserDocumento,
 } from "@/lib/documentos/renderizar-url-pdf";
 import { canonicalPhoneBR } from "@/lib/channels/phone-variants";
 
@@ -284,6 +285,13 @@ const ETAPAS_RENDERIZACAO_AUDITAVEIS = new Set<EtapaRenderizacaoDocumento>([
   "pdf_validacao",
 ]);
 
+const EVIDENCIAS_EGRESS_AUDITAVEIS = new Set<EvidenciaEgressBrowserDocumento>([
+  "nenhum_bloqueio_interceptado",
+  "metodo_nao_permitido",
+  "destino_fora_origem",
+  "ambas_classes_bloqueadas",
+]);
+
 const EVIDENCIAS_PDF_AUDITAVEIS = new Set<EvidenciaPdfAoExpirar>([
   "arquivo_ausente",
   "arquivo_vazio",
@@ -313,6 +321,7 @@ export async function auditarConsultaAdminWhatsapp(input: {
   autenticacaoSameOrigin?: boolean | null;
   etapaRenderizacao?: EtapaRenderizacaoDocumento | null;
   evidenciaPdf?: EvidenciaPdfAoExpirar | null;
+  evidenciaEgress?: EvidenciaEgressBrowserDocumento | null;
 }): Promise<void> {
   if (!ferramentaErpExigeAutoridadeAdminWhatsapp(input.toolName)) return;
   const etapaAuditavel = input.etapaRenderizacao
@@ -320,6 +329,9 @@ export async function auditarConsultaAdminWhatsapp(input: {
     : false;
   const evidenciaAuditavel = input.evidenciaPdf
     ? EVIDENCIAS_PDF_AUDITAVEIS.has(input.evidenciaPdf)
+    : false;
+  const egressAuditavel = input.evidenciaEgress
+    ? EVIDENCIAS_EGRESS_AUDITAVEIS.has(input.evidenciaEgress)
     : false;
   await audit({
     action: "integracao_erp.admin_consulta",
@@ -337,6 +349,7 @@ export async function auditarConsultaAdminWhatsapp(input: {
       ...(input.codigoTecnico ? { codigo_tecnico: input.codigoTecnico } : {}),
       ...(etapaAuditavel ? { etapa_renderizacao: input.etapaRenderizacao } : {}),
       ...(evidenciaAuditavel ? { evidencia_pdf_timeout: input.evidenciaPdf } : {}),
+      ...(egressAuditavel ? { evidencia_egress_browser: input.evidenciaEgress } : {}),
       ...(typeof input.statusHttp === "number" ? { status_http: input.statusHttp } : {}),
       ...(typeof input.autenticacaoSameOrigin === "boolean"
         ? { autenticacao_same_origin: input.autenticacaoSameOrigin }
@@ -391,6 +404,7 @@ export async function prepararDanfeAdminWhatsapp(
       autenticacaoSameOrigin?: boolean | null;
       etapaRenderizacao?: EtapaRenderizacaoDocumento | null;
       evidenciaPdf?: EvidenciaPdfAoExpirar | null;
+      evidenciaEgress?: EvidenciaEgressBrowserDocumento | null;
     },
   ): Promise<PrepararDanfeAdminWhatsappResultado> => {
     await auditarConsultaAdminWhatsapp({
@@ -404,6 +418,7 @@ export async function prepararDanfeAdminWhatsapp(
         ? { etapaRenderizacao: diagnostico.etapaRenderizacao }
         : {}),
       ...(diagnostico?.evidenciaPdf ? { evidenciaPdf: diagnostico.evidenciaPdf } : {}),
+      ...(diagnostico?.evidenciaEgress ? { evidenciaEgress: diagnostico.evidenciaEgress } : {}),
       ...(typeof diagnostico?.statusHttp === "number"
         ? { statusHttp: diagnostico.statusHttp }
         : {}),
@@ -441,6 +456,7 @@ export async function prepararDanfeAdminWhatsapp(
           codigoTecnico: erro.codigo,
           ...(erro.etapa ? { etapaRenderizacao: erro.etapa } : {}),
           ...(erro.evidenciaPdf ? { evidenciaPdf: erro.evidenciaPdf } : {}),
+          ...(erro.evidenciaEgress ? { evidenciaEgress: erro.evidenciaEgress } : {}),
           ...(typeof erro.status === "number" ? { statusHttp: erro.status } : {}),
           autenticacaoSameOrigin: Boolean(headers),
         },

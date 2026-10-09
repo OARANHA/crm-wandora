@@ -6,6 +6,7 @@ import {
   abrirRedirectLocalParaDocumento,
   ErroRenderizacaoDocumento,
   type EtapaRenderizacaoDocumento,
+  type EvidenciaEgressBrowserDocumento,
   type PoliticaRenderizacaoUrlPdf,
   type RenderizadorUrlPdf,
 } from "./renderizar-url-pdf";
@@ -106,6 +107,15 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   let browser: Browser | null = null;
   let redirect: Awaited<ReturnType<typeof abrirRedirectLocalParaDocumento>> | null = null;
   let etapa: EtapaRenderizacaoDocumento = "loopback_inicializacao";
+  let metodoBloqueado = false;
+  let destinoBloqueado = false;
+  // Resumo finito de eventos interceptados; nao registra metodos, destinos ou URLs.
+  const evidenciaEgress = (): EvidenciaEgressBrowserDocumento => {
+    if (metodoBloqueado && destinoBloqueado) return "ambas_classes_bloqueadas";
+    if (metodoBloqueado) return "metodo_nao_permitido";
+    if (destinoBloqueado) return "destino_fora_origem";
+    return "nenhum_bloqueio_interceptado";
+  };
   try {
     redirect = await abrirRedirectLocalParaDocumento(url);
     etapa = "chromium_lancamento";
@@ -168,13 +178,19 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     await executarDentroDoPrazo(
       () =>
         context.route("**/*", async (route) => {
+          const requisicao = route.request();
+          const metodo = requisicao.method();
           const permitido = recursoPermitidoNoBrowserDeDocumento(
-            route.request().url(),
+            requisicao.url(),
             origem.origin,
             redirect!.url,
-            route.request().method(),
+            metodo,
           );
-          if (!permitido) return route.abort("blockedbyclient");
+          if (!permitido) {
+            if (metodo !== "GET" && metodo !== "HEAD") metodoBloqueado = true;
+            else destinoBloqueado = true;
+            return route.abort("blockedbyclient");
+          }
           return route.continue();
         }),
       restante(),
@@ -244,13 +260,26 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     return pdf;
   } catch (erro) {
     if (erro instanceof ErroRenderizacaoDocumento) {
-      throw new ErroRenderizacaoDocumento(erro.codigo, erro.etapa ?? etapa);
+      const fase = erro.etapa ?? etapa;
+      throw new ErroRenderizacaoDocumento(
+        erro.codigo,
+        fase,
+        erro.evidenciaPdf,
+        erro.codigo === "timeout" && fase === "chromium_validacao_conteudo"
+          ? evidenciaEgress()
+          : undefined,
+      );
     }
     const timeout =
       erro instanceof Error && (erro.name === "TimeoutError" || Date.now() >= deadline);
     // Nunca repassar a mensagem original: Playwright inclui endereço visitado,
     // detalhes da navegação e argv (possível token na query).
-    throw new ErroRenderizacaoDocumento(timeout ? "timeout" : "render_falhou", etapa);
+    throw new ErroRenderizacaoDocumento(
+      timeout ? "timeout" : "render_falhou",
+      etapa,
+      undefined,
+      timeout && etapa === "chromium_validacao_conteudo" ? evidenciaEgress() : undefined,
+    );
   } finally {
     if (browser) {
       try {

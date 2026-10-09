@@ -35,11 +35,19 @@ export type EvidenciaPdfAoExpirar =
   | "marcadores_pdf_presentes"
   | "inspecao_indisponivel";
 
+/** Apenas eventos de bloqueio vistos pelo interceptor HTTP, nunca URLs nem causa provada. */
+export type EvidenciaEgressBrowserDocumento =
+  | "nenhum_bloqueio_interceptado"
+  | "metodo_nao_permitido"
+  | "destino_fora_origem"
+  | "ambas_classes_bloqueadas";
+
 export class ErroRenderizacaoDocumento extends Error {
   constructor(
     public readonly codigo: CodigoErroRenderizacaoDocumento,
     public readonly etapa?: EtapaRenderizacaoDocumento,
     public readonly evidenciaPdf?: EvidenciaPdfAoExpirar,
+    public readonly evidenciaEgress?: EvidenciaEgressBrowserDocumento,
   ) {
     super(codigo);
     this.name = "ErroRenderizacaoDocumento";
