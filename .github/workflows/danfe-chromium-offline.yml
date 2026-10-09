@@ -5,6 +5,11 @@ on:
     paths:
       - ".github/workflows/danfe-chromium-offline.yml"
       - "lib/documentos/renderizar-url-pdf.ts"
+      - "lib/documentos/renderizar-url-pdf-controlado.ts"
+      - "lib/integracoes-erp/autoridade-admin-whatsapp.ts"
+      - "Dockerfile.worker"
+      - "tests/unit/danfe-renderer-controlado.test.ts"
+      - "tests/integration/danfe-playwright-worker-offline.test.ts"
       - "tests/integration/danfe-chromium-offline.test.ts"
       - "tests/unit/documentos-renderizar-url-pdf.test.ts"
   workflow_dispatch:
@@ -41,6 +46,9 @@ jobs:
           pnpm typecheck
           pnpm exec eslint \
             lib/documentos/renderizar-url-pdf.ts \
+            lib/documentos/renderizar-url-pdf-controlado.ts \
+            tests/unit/danfe-renderer-controlado.test.ts \
+            tests/integration/danfe-playwright-worker-offline.test.ts \
             lib/integracoes-erp/danfe.ts \
             lib/integracoes-erp/autoridade-admin-whatsapp.ts \
             tests/integration/danfe-chromium-offline.test.ts \
@@ -49,6 +57,9 @@ jobs:
             tests/unit/integracoes-erp-danfe.test.ts
           pnpm exec prettier --check \
             lib/documentos/renderizar-url-pdf.ts \
+            lib/documentos/renderizar-url-pdf-controlado.ts \
+            tests/unit/danfe-renderer-controlado.test.ts \
+            tests/integration/danfe-playwright-worker-offline.test.ts \
             lib/integracoes-erp/danfe.ts \
             lib/integracoes-erp/autoridade-admin-whatsapp.ts \
             tests/integration/danfe-chromium-offline.test.ts \
@@ -73,4 +84,31 @@ jobs:
           pnpm exec vitest run
           tests/integration/danfe-chromium-offline.test.ts
           tests/unit/documentos-renderizar-url-pdf.test.ts
+          tests/unit/danfe-renderer-controlado.test.ts
+          --maxWorkers=1
+
+  renderer-worker-real:
+    name: Chromium e Playwright reais no Alpine do worker (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Construir worker somente no CI
+        run: docker build -f Dockerfile.worker -t elus-worker-danfe-offline .
+
+      - name: Testar Chromium na memória e no isolamento reais do worker
+        run: >-
+          docker run --rm
+          --network none
+          --memory 512m
+          --pids-limit 256
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          -e ELUS_DANFE_WORKER_OFFLINE=1
+          --mount "type=bind,source=${GITHUB_WORKSPACE}/tests,target=/app/tests,readonly"
+          elus-worker-danfe-offline
+          pnpm exec vitest run
+          tests/integration/danfe-playwright-worker-offline.test.ts
           --maxWorkers=1
