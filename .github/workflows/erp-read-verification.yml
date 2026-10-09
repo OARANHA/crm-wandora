@@ -171,6 +171,15 @@ jobs:
       - name: Configure Docker Hub cache on CI runner
         run: bash scripts/ci-configure-dockerhub-mirror.sh
 
+      # O daemon do GitHub pode ignorar o mirror ao resolver pgvector
+      # via Docker Hub (429). Baixar explicitamente o mesmo repositorio
+      # pelo cache publico e atribuir a tag esperada pelo test:db.
+      - name: Preload official pgvector image from public Docker Hub cache
+        run: |
+          docker pull "mirror.gcr.io/${{ matrix.image }}"
+          docker tag "mirror.gcr.io/${{ matrix.image }}" "${{ matrix.image }}"
+          docker image inspect "${{ matrix.image }}" --format '{{.Id}}'
+
       - name: Baseline install, reapply and invariants
         run: pnpm test:db
         env:
