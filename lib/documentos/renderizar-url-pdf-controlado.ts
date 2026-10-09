@@ -205,6 +205,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
 
     // Não imprimir uma SPA vazia, "Carregando..." ou tela de autenticação.
     // A prontidão é medida no browser; nunca exportar texto fiscal para logs.
+    etapa = "chromium_validacao_conteudo";
     await page.waitForFunction(
       (chaveEsperada) => {
         const texto = document.body?.innerText ?? "";
@@ -220,6 +221,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       { timeout: restante() },
     );
 
+    etapa = "chromium_impressao_pdf";
     const pdf = await imprimirPdfComPrazo(
       () =>
         page.pdf({
