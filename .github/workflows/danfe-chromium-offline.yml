@@ -95,6 +95,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure Docker Hub cache on CI runner
+        run: bash scripts/ci-configure-dockerhub-mirror.sh
+
       - name: Construir worker somente no CI
         run: docker build -f Dockerfile.worker -t elus-worker-danfe-offline .
 
