@@ -74,7 +74,7 @@ services:
     image: ${WORKER_IMAGE:-ghcr.io/melgarafael/deskcomm-worker:1.69.0}
     pull_policy: ${WORKER_PULL_POLICY:-missing}
     restart: unless-stopped
-    mem_limit: 512m
+    mem_limit: 768m
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
