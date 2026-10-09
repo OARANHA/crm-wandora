@@ -412,6 +412,7 @@ Playwright com egress restrito ao mesmo origin, DNS público fixado, bloqueio
 de WebSocket/WebRTC, processo sem credenciais ERP e cleanup do loopback.
 
 **Depois da impressão** o PDF é validado em duas camadas:
+
 1. assinatura do arquivo, marcador final e limite de tamanho já existentes;
 2. texto extraído pelo `extractPdfText` canônico, na estratégia
    `processo-a-parte`, com limite de heap e deadline, deve conter
