@@ -4,7 +4,7 @@
 # Google Artifact Registry: https://docs.cloud.google.com/artifact-registry/docs/pull-cached-dockerhub-images
 set -euo pipefail
 
-if [[ "${GITHUB_ACTIONS:-}" != "true" || "${RUNNER_OS:-}" != "Linux" ]]; then
+if [[ "${GITHUB_ACTIONS:-}" != "true" || "${RUNNER_OS:-}" != "Linux" || "${RUNNER_ENVIRONMENT:-}" != "github-hosted" ]]; then
   echo "Este helper só pode alterar o Docker no runner Linux de GitHub Actions." >&2
   exit 2
 fi
