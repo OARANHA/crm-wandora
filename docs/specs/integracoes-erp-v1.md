@@ -341,6 +341,21 @@ A tabela `erp_admin_whatsapp_bindings` é parte do próprio módulo
 `integracoes_erp` e segue a ADR-0002: server-only, RLS ligada, sem grants para
 `anon/authenticated`, provisionada somente onde o módulo foi instalado.
 
+### Auditoria de retorno fiscal estruturado (issue #55)
+
+crm_erp_search_recent_invoices pode encerrar seu handler com { erro: codigo, mensagem: ... }
+sem lançar exceção. Essa resposta não é sucesso da capability, mesmo quando a Promise
+conclui normalmente. Agente interno e MCP externo classificam pela declaração opt-in
+da tool: success=false, desfecho=erro_resultado e motivo restrito à allowlist de
+códigos estáticos; qualquer erro desconhecido vira erro_fiscal_nao_classificado.
+Um retorno comprovadamente vazio de notas no período é sem_resultado/sem_nfes_no_periodo,
+não erro de transporte. O corpo retornado ao agente ou ao MCP não muda.
+
+Nunca auditar mensagem do provider, cliente, CPF/CNPJ, número ou chave de NFe,
+XML, URLs ou dados crus. Esse indicador mede o desfecho da ferramenta;
+não prova por si só recência fiscal nem entrega de DANFE. O gate de
+inbound-turn.ts continua sendo a autoridade para últimas notas e anexos.
+
 ## ISIS — busca fiscal regressiva de NFes (2026-10-08)
 
 Complemento READ-ONLY ao provider existente. O Swagger entregue nesta data documenta

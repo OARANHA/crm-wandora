@@ -16,6 +16,7 @@ import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { auditMcpToolCall } from "./audit";
+import { classificarResultadoParaAuditoria } from "./classificar-resultado-auditoria";
 import { McpAuthError, ensureRole, ensureScope, type McpAuthResult } from "./auth";
 import { verificarTetoMcp } from "./rate-limit";
 import { allTools } from "./tools";
@@ -113,18 +114,18 @@ export function createMcpServer(
           // Mesma regra do ingresso do agente (`lib/ai/runtime/tools.ts`, #484):
           // o vazio que a tool declara não é sucesso. Sem isto, a mesma busca
           // sem achado era `success: true` por aqui e `false` por lá.
-          const motivoDoVazio = tool.motivoDoVazio?.(result) ?? null;
+          const classificacao = classificarResultadoParaAuditoria(tool, result);
 
           await auditMcpToolCall({
             ctx,
             toolName: tool.name,
             args: argsAudit,
             durationMs,
-            success: motivoDoVazio === null,
+            success: classificacao.success,
             resultSummary: summarizeResult(result),
-            ...(motivoDoVazio === null
-              ? {}
-              : { desfecho: "sem_resultado" as const, motivo: motivoDoVazio }),
+            ...(classificacao.desfecho
+              ? { desfecho: classificacao.desfecho, motivo: classificacao.motivo ?? undefined }
+              : {}),
           });
 
           return {

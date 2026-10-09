@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { auditMcpToolCall } from "@/lib/mcp/audit";
+import { classificarResultadoParaAuditoria } from "@/lib/mcp/classificar-resultado-auditoria";
 import { McpAuthError, ensureRole, ensureScope } from "@/lib/mcp/auth";
 import type { McpAuthResult } from "@/lib/mcp/auth";
 import { logger } from "@/lib/logger";
@@ -188,10 +189,7 @@ function shapeToZodObject(shape: Record<string, z.ZodTypeAny>): z.ZodTypeAny {
   return z.object(shape);
 }
 
-function wrapMcpTool(
-  def: McpToolDefinition,
-  input: PickToolsInput,
-): Tool {
+function wrapMcpTool(def: McpToolDefinition, input: PickToolsInput): Tool {
   const inputSchema = shapeToZodObject(def.inputSchema as Record<string, z.ZodTypeAny>);
 
   return tool({
@@ -232,7 +230,9 @@ function wrapMcpTool(
       }
       // O que vai ao audit não é necessariamente o que vai ao handler: a tool
       // pode declarar como tirar PII dos args (ex.: valores de filtro).
-      const argsAudit = def.redigirParaAuditoria ? def.redigirParaAuditoria(argsRecord) : argsRecord;
+      const argsAudit = def.redigirParaAuditoria
+        ? def.redigirParaAuditoria(argsRecord)
+        : argsRecord;
       if (higiene.descartados.length > 0) {
         // Não é cosmético: sem esta linha o defeito passa a se curar em
         // silêncio e ninguém descobre que um modelo faz isso o tempo todo.
@@ -244,10 +244,7 @@ function wrapMcpTool(
       try {
         ensureScope(input.auth.scopes, def.requiresScope);
         ensureRole(input.auth.role, def.requiresRole);
-        if (
-          ferramentaErpExigeAutoridadeAdminWhatsapp(def.name) &&
-          !input.autoridadeAdminWhatsapp
-        ) {
+        if (ferramentaErpExigeAutoridadeAdminWhatsapp(def.name) && !input.autoridadeAdminWhatsapp) {
           return {
             permitido: false,
             motivo: "autoridade_admin_whatsapp_ausente",
@@ -388,37 +385,31 @@ function wrapMcpTool(
         // que é o que separa "não achei" de "quebrou" no dado gravado.
         //
         // Só quem declara é afetado: sem `motivoDoVazio` nada muda.
-        const motivoDoVazio = def.motivoDoVazio?.(result) ?? null;
+        const classificacao = classificarResultadoParaAuditoria(def, result);
 
         void auditMcpToolCall({
           ctx: input.ctx,
           toolName: def.name,
           args: argsAudit,
           durationMs: Date.now() - startedAt,
-          success: motivoDoVazio === null,
-          ...(motivoDoVazio === null
-            ? {}
-            : { desfecho: "sem_resultado" as const, motivo: motivoDoVazio }),
+          success: classificacao.success,
+          ...(classificacao.desfecho
+            ? { desfecho: classificacao.desfecho, motivo: classificacao.motivo ?? undefined }
+            : {}),
         });
-        if (
-          input.autoridadeAdminWhatsapp &&
-          ferramentaErpExigeAutoridadeAdminWhatsapp(def.name)
-        ) {
+        if (input.autoridadeAdminWhatsapp && ferramentaErpExigeAutoridadeAdminWhatsapp(def.name)) {
           await auditarConsultaAdminWhatsapp({
             autoridade: input.autoridadeAdminWhatsapp,
             toolName: def.name,
             requestId: input.ctx.requestId,
-            success: motivoDoVazio === null,
-            motivo: motivoDoVazio,
+            success: classificacao.success,
+            motivo: classificacao.motivo,
           });
         }
         return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : "unknown_error";
-        if (
-          input.autoridadeAdminWhatsapp &&
-          ferramentaErpExigeAutoridadeAdminWhatsapp(def.name)
-        ) {
+        if (input.autoridadeAdminWhatsapp && ferramentaErpExigeAutoridadeAdminWhatsapp(def.name)) {
           await auditarConsultaAdminWhatsapp({
             autoridade: input.autoridadeAdminWhatsapp,
             toolName: def.name,
@@ -490,10 +481,7 @@ export function pickToolsFromMcp(input: PickToolsInput): Record<string, Tool> {
     // Cliente/pedido/NFe são consultas administrativas no WhatsApp deste V1.
     // Sem autoridade explícita elas nem entram no toolset; o check no execute
     // acima é defesa em profundidade.
-    if (
-      ferramentaErpExigeAutoridadeAdminWhatsapp(def.name) &&
-      !input.autoridadeAdminWhatsapp
-    )
+    if (ferramentaErpExigeAutoridadeAdminWhatsapp(def.name) && !input.autoridadeAdminWhatsapp)
       continue;
 
     // Módulo opcional desligado nesta instalação (doc 37): a capacidade não
