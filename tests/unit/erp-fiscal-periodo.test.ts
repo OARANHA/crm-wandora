@@ -24,8 +24,8 @@ const { crmErpSearchRecentInvoices } =
 
 const db = {} as SupabaseClient;
 const org = "org-test";
-const target = "12345678000199";
-const other = "11222333000144";
+const target = "12345678000195";
+const other = "11222333000181";
 function entrada(numero: number, data: string, doc = target) {
   return {
     Tipo: "NFe", Numero: numero, Serie: "02",
@@ -144,6 +144,6 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
       resolucao_cliente: { status: "resolved" },
       notas: [expect.objectContaining({ numeroNFe: "21", dataEmissao: "04/08/2026 - 13:45" })],
     });
-    expect(JSON.stringify(resposta)).not.toMatch(/12345678000199|XML|UrlImpressaoUrl/);
+    expect(JSON.stringify(resposta)).not.toMatch(/12345678000195|XML|UrlImpressaoUrl/);
   });
 });
