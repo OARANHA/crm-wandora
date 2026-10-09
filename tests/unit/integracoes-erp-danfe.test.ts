@@ -127,6 +127,27 @@ describe("materialização segura do DANFE", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it("propaga evidência sanitizada de bloqueio sem expor o destino", async () => {
+    const url =
+      "https://app.vendaerp.com.br/v3/public/NFe/Danfe?Cod=6abe71151d133d5c8962c4e9&g=34b6208d-4d02-49bc-8a59-8823d1b10765";
+    const renderizadorVendaErp = vi.fn(async () => {
+      throw new ErroRenderizacaoDocumento(
+        "timeout",
+        "chromium_validacao_conteudo",
+        undefined,
+        "destino_fora_origem",
+      );
+    });
+    await expect(
+      materializarDanfeExterno(url, undefined, { renderizadorVendaErp }),
+    ).rejects.toMatchObject({
+      codigo: "timeout",
+      etapa: "chromium_validacao_conteudo",
+      evidenciaEgress: "destino_fora_origem",
+    });
+    expect(renderizadorVendaErp).toHaveBeenCalledOnce();
+  });
+
   it("continua recusando HTML para qualquer outra URL", async () => {
     const fetcher = vi.fn(
       async () =>
