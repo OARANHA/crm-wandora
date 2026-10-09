@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 import { buscarUltimasNfesFiscais } from "@/lib/integracoes-erp/busca-notas-recentes-fiscais";
-import { buscarClientesErp } from "@/lib/integracoes-erp/service";
+import { comprovarDocumentoFiscalDoVinculo } from "@/lib/integracoes-erp/identidade-fiscal-vinculo";
 import { carregarVinculoClienteExterno } from "@/lib/integracoes-erp/identidade-externa-cliente";
 import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
 import { resolverClienteVendaErp } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
@@ -93,23 +93,23 @@ export const crmErpSearchRecentInvoices: McpToolDefinition<typeof inputShape> = 
         });
         if (!vinculo.ok || !vinculo.vinculo)
           return { erro: "cliente_nao_resolvido", mensagem: "Vínculo ERP indisponível." };
-        const pessoas = await buscarClientesErp(ctx.supabase, ctx.organizationId, {
-          nomefantasia: vinculo.vinculo.providerLookupLabel,
-          pageSize: 100,
-          skip: 0,
-        });
-        if (!pessoas.ok)
+        const prova = await comprovarDocumentoFiscalDoVinculo(
+          ctx.supabase,
+          ctx.organizationId,
+          vinculo.vinculo,
+        );
+        if (!prova.ok) {
           return {
-            erro: pessoas.motivo,
-            mensagem: "Não foi possível verificar a identidade fiscal do cliente.",
+            erro: prova.motivo,
+            mensagem:
+              prova.motivo === "consulta_parcial"
+                ? "A paginação dos pedidos não comprovou a identidade fiscal; confirme o CPF/CNPJ."
+                : prova.motivo === "erp_read_failed"
+                  ? "Não foi possível consultar a identidade fiscal no VendaERP."
+                  : "Não há CPF/CNPJ comprovado para este vínculo. Confirme o documento fiscal.",
           };
-        const exatas = pessoas.dados.filter((p) => p.id === vinculo.vinculo?.externalId);
-        if (exatas.length !== 1)
-          return {
-            erro: "identidade_fiscal_nao_confirmada",
-            mensagem: "Não há CPF/CNPJ comprovado para este vínculo. Confirme o documento fiscal.",
-          };
-        documento = exatas[0]?.cpfCnpj?.replace(/\D/g, "");
+        }
+        documento = prova.documento;
       }
       if (!documento || ![11, 14].includes(documento.length))
         return {
