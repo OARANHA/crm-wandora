@@ -275,7 +275,6 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     });
   });
 
-
   it("distingue timeout na validação fiscal sem imprimir PDF nem vazar URL", async () => {
     const env = ambientePdf();
     const timeout = Object.assign(new Error("falha em " + danfe), {
