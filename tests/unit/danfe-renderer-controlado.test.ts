@@ -149,7 +149,10 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
       falha = err;
     }
     expect(falha).toBeInstanceOf(ErroRenderizacaoDocumento);
-    expect(falha).toMatchObject({ codigo: "render_falhou" });
+    expect(falha).toMatchObject({
+      codigo: "render_falhou",
+      etapa: "chromium_impressao_pdf",
+    });
     expect(String(falha)).not.toContain(danfe);
     expect(env.browser.close).toHaveBeenCalledTimes(1);
     expect(env.fechar).toHaveBeenCalledTimes(1);
@@ -160,7 +163,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     env.page.pdf.mockImplementationOnce(() => new Promise<Buffer>(() => undefined));
     await expect(
       renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 40 }),
-    ).rejects.toMatchObject({ codigo: "timeout" });
+    ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_impressao_pdf" });
     expect(env.browser.close).toHaveBeenCalledTimes(1);
     expect(env.fechar).toHaveBeenCalledTimes(1);
   });
@@ -270,5 +273,46 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     await expect(renderizarUrlParaPdfControlado(danfe, policy)).rejects.toMatchObject({
       codigo: "tipo_nao_pdf",
     });
+  });
+
+
+  it("distingue timeout na validação fiscal sem imprimir PDF nem vazar URL", async () => {
+    const env = ambientePdf();
+    const timeout = Object.assign(new Error("falha em " + danfe), {
+      name: "TimeoutError",
+    });
+    env.page.waitForFunction.mockRejectedValueOnce(timeout);
+
+    let falha: unknown;
+    try {
+      await renderizarUrlParaPdfControlado(danfe, policy);
+    } catch (erro) {
+      falha = erro;
+    }
+    expect(falha).toBeInstanceOf(ErroRenderizacaoDocumento);
+    expect(falha).toMatchObject({
+      codigo: "timeout",
+      etapa: "chromium_validacao_conteudo",
+    });
+    expect(String(falha)).not.toContain(danfe);
+    expect(env.page.pdf).not.toHaveBeenCalled();
+    expect(env.browser.close).toHaveBeenCalledTimes(1);
+    expect(env.fechar).toHaveBeenCalledTimes(1);
+  });
+
+  it("distingue timeout nativo na impressão depois de validar o conteúdo", async () => {
+    const env = ambientePdf();
+    const timeout = Object.assign(new Error("falha em " + danfe), {
+      name: "TimeoutError",
+    });
+    env.page.pdf.mockRejectedValueOnce(timeout);
+
+    await expect(renderizarUrlParaPdfControlado(danfe, policy)).rejects.toMatchObject({
+      codigo: "timeout",
+      etapa: "chromium_impressao_pdf",
+    });
+    expect(env.page.waitForFunction).toHaveBeenCalledOnce();
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
   });
 });
