@@ -19,8 +19,7 @@ const { normalizarNfesPeriodoVendaErp, selecionarNotasRecentes } =
   await import("@/lib/integracoes-erp/notas-fiscais-periodo");
 const { buscarUltimasNfesFiscais } =
   await import("@/lib/integracoes-erp/busca-notas-recentes-fiscais");
-const { crmErpSearchRecentInvoices } =
-  await import("@/lib/mcp/tools/notas-recentes-fiscais");
+const { crmErpSearchRecentInvoices } = await import("@/lib/mcp/tools/notas-recentes-fiscais");
 
 const db = {} as SupabaseClient;
 const org = "org-test";
@@ -28,10 +27,15 @@ const target = "12345678000195";
 const other = "11222333000181";
 function entrada(numero: number, data: string, doc = target) {
   return {
-    Tipo: "NFe", Numero: numero, Serie: "02",
+    Tipo: "NFe",
+    Numero: numero,
+    Serie: "02",
     ChaveAcesso: String(numero).padStart(44, "0"),
-    DataEmissao: data, UrlImpressaoUrl: "https://app.example.test/documento",
-    XML: "<nfeProc><NFe><infNFe><dest><CNPJ>" + doc +
+    DataEmissao: data,
+    UrlImpressaoUrl: "https://app.example.test/documento",
+    XML:
+      "<nfeProc><NFe><infNFe><dest><CNPJ>" +
+      doc +
       "</CNPJ><xNome>Empresa de teste</xNome></dest></infNFe></NFe>" +
       "<protNFe><infProt><cStat>100</cStat></infProt></protNFe></nfeProc>",
   };
@@ -62,10 +66,12 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
   });
 
   it("falha fechado quando a resposta omite documento ou data fiscal válida", () => {
-    expect(() => normalizarNfesPeriodoVendaErp([{ ...entrada(1, "31/02/2026 - 12:00") }]))
-      .toThrow("invalid_response");
-    expect(() => normalizarNfesPeriodoVendaErp([{ ...entrada(1, "03/08/2026 - 12:00"), XML: "" }]))
-      .toThrow("invalid_response");
+    expect(() => normalizarNfesPeriodoVendaErp([{ ...entrada(1, "31/02/2026 - 12:00") }])).toThrow(
+      "invalid_response",
+    );
+    expect(() =>
+      normalizarNfesPeriodoVendaErp([{ ...entrada(1, "03/08/2026 - 12:00"), XML: "" }]),
+    ).toThrow("invalid_response");
   });
 
   it("pede mês antes de consultar mais de três NFes", async () => {
@@ -92,19 +98,24 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
         },
       });
     const r = await buscarUltimasNfesFiscais(db, org, {
-      quantidade: 2, documento: target, agora: new Date("2026-10-08T14:00:00Z"),
+      quantidade: 2,
+      documento: target,
+      agora: new Date("2026-10-08T14:00:00Z"),
     });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.dados.notas.map((n) => n.numero)).toEqual([371, 369]);
       expect(r.dados.mesesConsultados).toEqual(["2026-10", "2026-09", "2026-08"]);
     }
-    expect(vi.mocked(service.buscarNfesPeriodoErp).mock.calls.map(([, , f]) =>
-      [f.dataInicial, f.dataFinal])).toEqual([
-        ["10-01-2026", "10-08-2026"],
-        ["09-01-2026", "09-30-2026"],
-        ["08-01-2026", "08-31-2026"],
-      ]);
+    expect(
+      vi
+        .mocked(service.buscarNfesPeriodoErp)
+        .mock.calls.map(([, , f]) => [f.dataInicial, f.dataFinal]),
+    ).toEqual([
+      ["10-01-2026", "10-08-2026"],
+      ["09-01-2026", "09-30-2026"],
+      ["08-01-2026", "08-31-2026"],
+    ]);
   });
 
   it("página cheia não prova fim: percorre o restante do mês antes de selecionar", async () => {
@@ -113,33 +124,53 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
       .mockResolvedValueOnce({ ok: true, dados: { notas: lote, retornados: 50 } })
       .mockResolvedValueOnce({ ok: true, dados: { notas: [], retornados: 0 } });
     const r = await buscarUltimasNfesFiscais(db, org, {
-      quantidade: 1, mesAno: "2026-08", agora: new Date("2026-10-08T14:00:00Z"),
+      quantidade: 1,
+      mesAno: "2026-08",
+      agora: new Date("2026-10-08T14:00:00Z"),
     });
     expect(r.ok).toBe(true);
-    expect(vi.mocked(service.buscarNfesPeriodoErp).mock.calls.map(([, , f]) => f.skip))
-      .toEqual([0, 50]);
+    expect(vi.mocked(service.buscarNfesPeriodoErp).mock.calls.map(([, , f]) => f.skip)).toEqual([
+      0, 50,
+    ]);
   });
 
   it("ISIS resolve pelo cadastro ERP e envia somente metadados fiscais", async () => {
     vi.mocked(resolver.resolverClienteVendaErp).mockResolvedValue({
-      status: "resolved", contactId: "11111111-1111-4111-8111-111111111111",
-      origem: "provider", materialized: false, externalLabel: "Empresa de teste",
+      status: "resolved",
+      contactId: "11111111-1111-4111-8111-111111111111",
+      origem: "provider",
+      materialized: false,
+      externalLabel: "Empresa de teste",
       cliente: {
-        id: "erp-01", nome: "Empresa de teste", nomeFantasia: "Empresa de teste",
-        razaoSocial: "Empresa de teste", cpfCnpj: target, email: null,
-        telefone: null, celular: null, cidade: null, uf: null,
+        id: "erp-01",
+        nome: "Empresa de teste",
+        nomeFantasia: "Empresa de teste",
+        razaoSocial: "Empresa de teste",
+        cpfCnpj: target,
+        email: null,
+        telefone: null,
+        celular: null,
+        cidade: null,
+        uf: null,
       },
     });
     vi.mocked(service.buscarNfesPeriodoErp).mockResolvedValue({
-      ok: true, dados: {
+      ok: true,
+      dados: {
         notas: normalizarNfesPeriodoVendaErp([entrada(21, "04/08/2026 - 13:45")]),
         retornados: 1,
       },
     });
-    const resposta = await crmErpSearchRecentInvoices.handler({
-      quantidade: 1, cliente: "Empresa de teste", cpf_cnpj: undefined,
-      cliente_contact_id: undefined, mes_ano: "2026-08",
-    }, ctx);
+    const resposta = await crmErpSearchRecentInvoices.handler(
+      {
+        quantidade: 1,
+        cliente: "Empresa de teste",
+        cpf_cnpj: undefined,
+        cliente_contact_id: undefined,
+        mes_ano: "2026-08",
+      },
+      ctx,
+    );
     expect(resposta).toMatchObject({
       resolucao_cliente: { status: "resolved" },
       notas: [expect.objectContaining({ numeroNFe: "21", dataEmissao: "04/08/2026 - 13:45" })],
