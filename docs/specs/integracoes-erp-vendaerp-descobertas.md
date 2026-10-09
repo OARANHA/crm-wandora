@@ -369,3 +369,24 @@ Bloqueio observado não estabelece causalidade com o timeout,
 especialmente para scripts de rastreamento opcionais.
 Testes sintéticos cobrem os quatro estados e propagation/censura.
 A causa e a entrega de duas DANFEs reais ainda não foram provadas.
+
+## Gate de prontidão da DANFE — reprodução offline de tela de erro
+
+Em 09/10/2026, teste unitário sintético acrescentou uma página que responde
+"Nota Fiscal indisponível para consulta" e ecoa a chave fiscal correta de
+44 dígitos. A função original de prontidão aceitou a página como DANFE
+(true em vez de false), reproduzindo um falso positivo determinístico.
+Essa prova **não é evidência do HTML real do VendaERP** nem explica os
+timeouts observados.
+
+O gate no renderer controlado passa a exigir os rótulos de documento
+DANFE e CHAVE DE ACESSO, rejeita mensagens explícitas de nota indisponível,
+não encontrada ou erro ao carregar/consultar, e mantém obrigatória a
+chave exata comprovada pelo ERP antes da impressão. Nenhum texto do DOM,
+URL fiscal, chave, HTML ou erro do Chromium é enviado para logs/auditoria.
+Os limites de tempo, a allowlist, o DNS pinado, o bloqueio de egress,
+a persistência privada e o sender não são alterados.
+
+**Limite:** rótulos e chave exata não constituem prova criptográfica de
+autenticidade nem substituem a conferência do PDF na conversa administrativa.
+A issue #55 permanece aberta para recência fiscal e duas DANFEs corretas.
