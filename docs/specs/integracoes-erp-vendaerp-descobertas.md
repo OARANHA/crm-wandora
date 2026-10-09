@@ -323,3 +323,26 @@ pelo `.dockerignore` e é montado somente em leitura no container
 efêmero do CI, sem ampliar o conteúdo da imagem de produção. O teste não substitui o gate SSRF e não comprova
 a entrega das duas DANFEs reais. A causa original do timeout segue
 não comprovada até os resultados da investigação.
+
+## Canário administrativo de 13h35 — 09/10/2026
+
+No turno real da ISIS, a mensagem de entrada ocorreu às 13h35min10s BRT.
+A busca fiscal crm_erp_search_recent_invoices foi auditada com success=true
+às 13h35min44s. As duas chamadas de crm_erp_prepare_admin_danfe
+falharam com danfe_download_failed, código timeout e etapa agregada
+chromium_apos_redirect às 13h36min08s e 13h36min25s. A resposta outbound
+foi somente texto, às 13h36min34s; não há PDF/documento no turno.
+O job inbound_turn terminou done, sem nova tentativa, e o worker permaneceu
+healthy, com memória cgroup de 768 MiB e sem OOM.
+
+**Limite da prova:** chromium_apos_redirect cobria tanto espera pelo DOM fiscal
+quanto impressão por Playwright. Não é possível atribuir a falha a cross-origin,
+à chave de 44 dígitos, à página ou à impressão sem uma evidência mais fina.
+O renderer controlado já recusa métodos diferentes de GET/HEAD, origens extras
+e DNS privado: não relaxar a política de egress para tentar resolver timeout.
+
+**Slice de diagnóstico:** adicionar apenas os estágios sanitizados
+chromium_validacao_conteudo e chromium_impressao_pdf ao contrato de erro
+e à allowlist da auditoria. Testes sintéticos offline cobrem falha em cada fase
+e fechamento do browser; nenhuma URL fiscal ou conteúdo do documento é logado.
+Não há novo canário real nem alteração no VendaERP ou no sender WhatsApp.
