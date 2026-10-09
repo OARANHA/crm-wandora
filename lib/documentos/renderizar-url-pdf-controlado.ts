@@ -1,5 +1,6 @@
 import { chromium, type Browser } from "playwright-core";
 
+import { extractPdfText } from "@/lib/ai/rag/extractors/pdf";
 import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
 
 import {
@@ -17,6 +18,26 @@ import {
 
 const LIMITE_TOTAL_MS = 28_000;
 const LIMITE_ETAPA_MS = 8_000;
+
+/**
+ * A DANFE só pode ser entregue após conferência dos bytes impressos, e não
+ * apenas porque uma SPA colocou a chave de acesso no DOM. Esta função
+ * nunca devolve o texto extraído para auditoria, logs ou modelo.
+ */
+export function pdfImpressoComprovaDanfe(texto: string, chaveEsperada: string): boolean {
+  if (!/^\d{44}$/.test(chaveEsperada)) return false;
+  const normalizado = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  if (
+    normalizado.length < 80 ||
+    !/\bDANFE\b/.test(normalizado) ||
+    !/\bCHAVE\s+DE\s+ACESSO\b/.test(normalizado) ||
+    /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(normalizado) ||
+    /\bERRO\s+AO\s+(?:CARREGAR|CONSULTAR)\b/.test(normalizado)
+  ) {
+    return false;
+  }
+  return normalizado.replace(/\D/g, "").includes(chaveEsperada);
+}
 
 /**
  * Limite por operação, inclusive nas chamadas Playwright que não oferecem
@@ -222,7 +243,8 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     // Não imprimir uma SPA vazia, "Carregando..." ou tela de autenticação.
     // A prontidão é medida no browser; nunca exportar texto fiscal para logs.
     etapa = "chromium_validacao_conteudo";
-    await page.waitForFunction(
+    try {
+      await page.waitForFunction(
       (chaveEsperada) => {
         const texto = document.body?.innerText ?? "";
         const normalizado = texto
@@ -247,7 +269,17 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       },
       politica.chaveFiscalEsperada ?? null,
       { timeout: restante() },
-    );
+      );
+    } catch (erro) {
+      // O HTML da SPA pode não expor texto selecionável, mesmo que a impressão
+      // contenha a DANFE. Só continuamos para imprimir se existir chave fiscal
+      // comprovada e a espera do DOM simplesmente tiver expirado.
+      const expirou =
+        erro instanceof Error &&
+        (erro.name === "TimeoutError" ||
+          (erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout"));
+      if (!expirou || !politica.chaveFiscalEsperada || Date.now() >= deadline) throw erro;
+    }
 
     etapa = "chromium_impressao_pdf";
     const pdf = await imprimirPdfComPrazo(
@@ -268,6 +300,30 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       !pdf.subarray(-2048).includes(Buffer.from("%%EOF"))
     ) {
       throw new ErroRenderizacaoDocumento("tipo_nao_pdf");
+    }
+
+    // A chave tem origem em Fiscal/ConsultarNFE; não é aceita do modelo.
+    // Conferir o PDF impresso impede que uma tela de erro ou documento de
+    // outra nota seja enviado, inclusive quando a verificação DOM passou.
+    if (politica.chaveFiscalEsperada) {
+      const prazo = restante();
+      let texto: string;
+      try {
+        texto = await executarDentroDoPrazo(
+          () =>
+            extractPdfText(pdf, {
+              estrategia: "processo-a-parte",
+              heapMb: 96,
+              timeoutMs: prazo,
+            }),
+          prazo,
+        );
+      } catch {
+        throw new ErroRenderizacaoDocumento("render_falhou", "pdf_validacao");
+      }
+      if (!pdfImpressoComprovaDanfe(texto, politica.chaveFiscalEsperada)) {
+        throw new ErroRenderizacaoDocumento("render_falhou", "pdf_validacao");
+      }
     }
     return pdf;
   } catch (erro) {
