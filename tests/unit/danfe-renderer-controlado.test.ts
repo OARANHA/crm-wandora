@@ -218,11 +218,17 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
   });
 
   it("distingue timeout de lançamento sem redirect", async () => {
-    ambientePdf();
-    mocks.launch.mockImplementationOnce(() => new Promise(() => undefined));
+    const env = ambientePdf();
+    // O Playwright aplica o timeout nativamente em chromium.launch().
+    // Uma Promise eternamente pendente no mock não reproduz esse contrato.
+    const timeout = Object.assign(new Error("Timeout sintético no lançamento"), {
+      name: "TimeoutError",
+    });
+    mocks.launch.mockRejectedValueOnce(timeout);
     await expect(
       renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 35 }),
     ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_lancamento" });
+    expect(env.fechar).toHaveBeenCalledTimes(1);
   });
 
   it("limita inicialização do contexto, fecha browser e bootstrap", async () => {
@@ -237,7 +243,11 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
 
   it("distingue timeout na navegação antes do redirect", async () => {
     const env = ambientePdf();
-    env.page.goto.mockImplementationOnce(() => new Promise(() => undefined));
+    // page.goto({ timeout }) rejeita com TimeoutError; não pendura para sempre.
+    const timeout = Object.assign(new Error("Timeout sintético na navegação"), {
+      name: "TimeoutError",
+    });
+    env.page.goto.mockRejectedValueOnce(timeout);
     await expect(
       renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 35 }),
     ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_navegacao" });

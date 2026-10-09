@@ -318,6 +318,8 @@ URLs, credenciais ou conteúdo fiscal.
 
 Um teste offline constrói a imagem `Dockerfile.worker` apenas no CI e
 executa Chromium/Playwright com 512 MiB e `--network none`, usando
-apenas fixture local. O teste não substitui o gate SSRF e não comprova
+apenas fixture local. O diretório `tests/` é intencionalmente excluído
+pelo `.dockerignore` e é montado somente em leitura no container
+efêmero do CI, sem ampliar o conteúdo da imagem de produção. O teste não substitui o gate SSRF e não comprova
 a entrega das duas DANFEs reais. A causa original do timeout segue
 não comprovada até os resultados da investigação.

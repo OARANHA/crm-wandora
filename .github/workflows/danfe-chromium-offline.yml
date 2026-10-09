@@ -107,6 +107,7 @@ jobs:
           --cap-drop ALL
           --security-opt no-new-privileges
           -e ELUS_DANFE_WORKER_OFFLINE=1
+          --mount "type=bind,source=${GITHUB_WORKSPACE}/tests,target=/app/tests,readonly"
           elus-worker-danfe-offline
           pnpm exec vitest run
           tests/integration/danfe-playwright-worker-offline.test.ts
