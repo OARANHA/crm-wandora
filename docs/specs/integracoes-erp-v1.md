@@ -412,7 +412,8 @@ o limite é atingido, responde `consulta_parcial` e não declara recência.
 
 A projeção pública não recebe o documento, os pedidos brutos, o XML nem a URL.
 As duas fontes são GET/read-only e ficam sob o mesmo `organization_id`.
-A validação CPF segue `isValidCpf`; CNPJ segue `normalizeCnpj` canônico.
+A validação CPF segue `isValidCpf`; CNPJ exige `normalizeCnpj` canônico
+e também verificação dos dois dígitos verificadores.
 Não confundir esse fallback com **persistência de cadastro mínimo**: contatos PF
 ainda precisam de CPF cifrado + hash, e empresas PJ exigem `companies` e
 identidade própria, sem criar um `contacts.kind=person` fictício.

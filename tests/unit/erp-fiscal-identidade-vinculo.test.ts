@@ -7,12 +7,12 @@ vi.mock("@/lib/integracoes-erp/service", () => ({
 }));
 
 const service = await import("@/lib/integracoes-erp/service");
-const { comprovarDocumentoFiscalDoVinculo } =
+const { comprovarDocumentoFiscalDoVinculo, documentoFiscalValido } =
   await import("@/lib/integracoes-erp/identidade-fiscal-vinculo");
 const db = {} as SupabaseClient;
 const org = "org-ficticia";
 const vinculo = { externalId: "erp-id-42", providerLookupLabel: "EMPRESA EXEMPLO LTDA" };
-const documento = "12345678000190";
+const documento = "12345678000195";
 
 function pedido(pessoaId = vinculo.externalId, cpfCnpj: string | null = documento) {
   return {
@@ -25,6 +25,22 @@ function pedido(pessoaId = vinculo.externalId, cpfCnpj: string | null = document
 }
 
 describe("identidade fiscal dos vínculos VendaERP antigos", () => {
+  it("exige dígitos verificadores válidos no CNPJ antes de aceitar filtro fiscal", () => {
+    expect(documentoFiscalValido("12.345.678/0001-95")).toBe(documento);
+    expect(documentoFiscalValido("12.345.678/0001-90")).toBeNull();
+    expect(documentoFiscalValido("00.000.000/0000-00")).toBeNull();
+  });
+
+  it("rejeita CNPJ inválido mesmo quando o ID da Pessoa coincide", async () => {
+    vi.mocked(service.buscarClientesErp).mockResolvedValue({
+      ok: true,
+      dados: [{ id: vinculo.externalId, cpfCnpj: "12345678000190", nome: null,
+        nomeFantasia: null, razaoSocial: null, email: null,
+        telefone: null, celular: null, cidade: null, uf: null }],
+    });
+    expect(await comprovarDocumentoFiscalDoVinculo(db, org, vinculo))
+      .toEqual({ ok: false, motivo: "identidade_fiscal_nao_confirmada" });
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(service.buscarClientesErp).mockResolvedValue({ ok: true, dados: [] });
@@ -62,7 +78,7 @@ describe("identidade fiscal dos vínculos VendaERP antigos", () => {
 
   it("falha fechado diante de CPF/CNPJ divergentes no mesmo ID", async () => {
     vi.mocked(service.buscarPedidosErpComIdentidadeInterna).mockResolvedValue({
-      ok: true, dados: [pedido(), pedido(vinculo.externalId, "11222333000144")],
+      ok: true, dados: [pedido(), pedido(vinculo.externalId, "11222333000181")],
     });
     expect(await comprovarDocumentoFiscalDoVinculo(db, org, vinculo))
       .toEqual({ ok: false, motivo: "identidade_fiscal_conflitante" });

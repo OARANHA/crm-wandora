@@ -26,10 +26,33 @@ export type DocumentoFiscalDoVinculo =
         | "erp_read_failed";
     };
 
+/**
+ * O normalizador B2B confere formato, mas não dígitos verificadores.
+ * A identidade fiscal requer ambas as verificações antes de filtrar NFes.
+ */
+function cnpjTemDigitosValidos(cnpj: string): boolean {
+  const confere = (pesos: readonly number[], posicao: number): boolean => {
+    const soma = pesos.reduce(
+      (acumulado, peso, indice) => acumulado + Number(cnpj[indice]) * peso,
+      0,
+    );
+    const resto = soma % 11;
+    const digito = resto < 2 ? 0 : 11 - resto;
+    return Number(cnpj[posicao]) === digito;
+  };
+  return (
+    confere([5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2], 12) &&
+    confere([6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2], 13)
+  );
+}
+
 export function documentoFiscalValido(raw: string | null | undefined): string | null {
   const digits = raw?.replace(/\D/g, "") ?? "";
   if (digits.length === 11) return isValidCpf(digits) ? digits : null;
-  if (digits.length === 14) return normalizeCnpj(digits);
+  if (digits.length === 14) {
+    const cnpj = normalizeCnpj(digits);
+    return cnpj && cnpjTemDigitosValidos(cnpj) ? cnpj : null;
+  }
   return null;
 }
 
