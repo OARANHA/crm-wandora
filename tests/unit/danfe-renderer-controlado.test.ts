@@ -68,7 +68,10 @@ const policy = {
 describe("renderer controlado DANFE — fronteiras seguras", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.extractPdfText.mockResolvedValue("DANFE CHAVE DE ACESSO 35261012345678000190550010649963971123456780 " + "PRODUTO TESTE ".repeat(12));
+    mocks.extractPdfText.mockResolvedValue(
+      "DANFE CHAVE DE ACESSO 35261012345678000190550010649963971123456780 " +
+        "PRODUTO TESTE ".repeat(12),
+    );
   });
 
   it("não abre navegador nem resolve DNS se a policy recusa o endereço", async () => {
@@ -233,7 +236,6 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(checar(chave)).toBe(false);
     Reflect.deleteProperty(document.body, "innerText");
   });
-
 
   it("imprime uma DANFE com chave comprovada quando o DOM não termina a espera", async () => {
     const env = ambientePdf();
