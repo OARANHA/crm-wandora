@@ -46,7 +46,7 @@ jobs:
 
       # Não publica imagem de PR nem executa provider ERP.
       - name: Build and import worker image into Docker containerd
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile.worker
