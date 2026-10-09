@@ -282,7 +282,6 @@ o thread por `fn_service_begin`.
 Nada muda na autoridade de identidade: o ERP continua somente leitura, nome não identifica,
 telefone digitado pelo modelo não escolhe destinatário e nenhum contato é criado automaticamente.
 
-
 ## Identidade fiscal — recuperação de vínculo legado (slice de segurança)
 
 Em um vínculo antigo `contact_id ↔ Pessoa.id`, nome/razão social **não**

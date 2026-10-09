@@ -400,7 +400,6 @@ ou criação de contato de terceiro com telefone obrigatório; exige reconcilia�
 da migration/RPC local e gate de privacidade próprios, sem qualquer escrita
 em Pessoas/Salvar do VendaERP.
 
-
 ## Identidade fiscal — recuperação de vínculo legado (slice de segurança)
 
 Em um vínculo antigo `contact_id ↔ Pessoa.id`, nome/razão social **não**
