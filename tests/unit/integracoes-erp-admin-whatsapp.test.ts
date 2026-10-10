@@ -218,6 +218,23 @@ describe("Admin WhatsApp Read-Only V1", () => {
     expect(serialized).not.toContain(telefone);
   });
 
+  it("audita apenas categoria finita da validação fiscal, nunca texto ou chave", async () => {
+    await auditarConsultaAdminWhatsapp({
+      autoridade: resolver() as AutoridadeAdminWhatsapp,
+      toolName: "crm_erp_prepare_admin_danfe",
+      requestId: "run-pdf-sintetico",
+      success: false,
+      motivo: "danfe_download_failed",
+      codigoTecnico: "download_falhou",
+      etapaRenderizacao: "pdf_validacao",
+      evidenciaValidacaoPdf: "extracao_falhou",
+    });
+    expect(vi.mocked(audit).mock.calls[0]?.[0].metadata).toHaveProperty(
+      "evidencia_validacao_pdf",
+      "extracao_falhou",
+    );
+  });
+
   it("descarta etapas de diagnóstico arbitrárias antes de gravar a auditoria", async () => {
     await auditarConsultaAdminWhatsapp({
       autoridade: resolver() as AutoridadeAdminWhatsapp,

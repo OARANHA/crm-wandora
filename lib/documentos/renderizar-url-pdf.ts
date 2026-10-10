@@ -35,6 +35,16 @@ export type EvidenciaPdfAoExpirar =
   | "marcadores_pdf_presentes"
   | "inspecao_indisponivel";
 
+/** Categoria finita de falha no PDF: nunca o texto, número, chave ou URL fiscal. */
+export type EvidenciaValidacaoPdfDocumento =
+  | "extracao_falhou"
+  | "extracao_timeout"
+  | "texto_insuficiente"
+  | "marcador_danfe_ausente"
+  | "rotulo_chave_ausente"
+  | "chave_divergente"
+  | "pagina_de_erro";
+
 /** Apenas eventos de bloqueio vistos pelo interceptor HTTP, nunca URLs nem causa provada. */
 export type EvidenciaEgressBrowserDocumento =
   | "nenhum_bloqueio_interceptado"
@@ -48,6 +58,7 @@ export class ErroRenderizacaoDocumento extends Error {
     public readonly etapa?: EtapaRenderizacaoDocumento,
     public readonly evidenciaPdf?: EvidenciaPdfAoExpirar,
     public readonly evidenciaEgress?: EvidenciaEgressBrowserDocumento,
+    public readonly evidenciaValidacaoPdf?: EvidenciaValidacaoPdfDocumento,
   ) {
     super(codigo);
     this.name = "ErroRenderizacaoDocumento";

@@ -419,6 +419,14 @@ de WebSocket/WebRTC, processo sem credenciais ERP e cleanup do loopback.
    `DANFE`, `CHAVE DE ACESSO`, a chave fiscal exata e não conter marcadores
    explícitos de nota indisponível ou não encontrada.
 
+A chave deve aparecer como sequência íntegra de 44 dígitos no campo principal
+imediatamente após o rótulo `CHAVE DE ACESSO`. Separadores tipográficos
+(espaços, pontos e hífens) são aceitos entre os dígitos; palavras não são.
+Não concatenar todos os dígitos do PDF: isso pode gerar chave artificial
+ou aceitar uma NFe diferente que apenas referencia a nota solicitada.
+Quando o campo principal não puder ser comprovado, falhar fechado.
+O controle textual não é prova criptográfica de autenticidade do documento.
+
 O texto extraído não vai para logs, modelo, auditoria ou WhatsApp. Erro na
 extração, chave distinta, ausência de texto ou retorno com aviso de erro
 **falham fechado**, sem preparar mídia. A inspeção de texto não equivale à
