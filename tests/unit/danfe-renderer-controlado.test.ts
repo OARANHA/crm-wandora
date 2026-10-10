@@ -1,4 +1,5 @@
 import type * as BrowserEgress from "@/lib/documentos/egress-browser-pdf";
+import type * as PdfExtractor from "@/lib/ai/rag/extractors/pdf";
 import type * as RenderUrlPdf from "@/lib/documentos/renderizar-url-pdf";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,12 +16,16 @@ vi.mock("@/lib/documentos/egress-browser-pdf", async (importOriginal) => {
   return { ...original, resolverIpPublicoFixadoParaBrowser: mocks.resolver };
 });
 vi.mock("playwright-core", () => ({ chromium: { launch: mocks.launch } }));
-vi.mock("@/lib/ai/rag/extractors/pdf", () => ({ extractPdfText: mocks.extractPdfText }));
+vi.mock("@/lib/ai/rag/extractors/pdf", async (importOriginal) => {
+  const original = await importOriginal<typeof PdfExtractor>();
+  return { ...original, extractPdfText: mocks.extractPdfText };
+});
 vi.mock("@/lib/documentos/renderizar-url-pdf", async (importOriginal) => {
   const original = await importOriginal<typeof RenderUrlPdf>();
   return { ...original, abrirRedirectLocalParaDocumento: mocks.redirect };
 });
 
+import { PdfExtractError } from "@/lib/ai/rag/extractors/pdf";
 import { ErroRenderizacaoDocumento } from "@/lib/documentos/renderizar-url-pdf";
 import {
   diagnosticarTextoPdfFiscal,
@@ -298,6 +303,36 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     });
     expect(env.browser.close).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    ["sem_texto", "extracao_sem_texto"],
+    ["timeout", "extracao_timeout"],
+    ["memoria", "extracao_memoria"],
+    ["processo", "extracao_processo_falhou"],
+    ["dependencia", "extracao_dependencia"],
+    ["motor", "extracao_falhou"],
+  ] as const)(
+    "audita causa finita do extrator %s sem revelar conteúdo fiscal",
+    async (causa, evidencia) => {
+      ambientePdf();
+      const chave = "35261012345678000190550010649963971123456780";
+      mocks.extractPdfText.mockRejectedValueOnce(
+        new PdfExtractError("conteúdo confidencial " + chave, undefined, "falha", causa),
+      );
+      let falha: unknown;
+      try {
+        await renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave });
+      } catch (erro) {
+        falha = erro;
+      }
+      expect(falha).toMatchObject({
+        codigo: "render_falhou",
+        etapa: "pdf_validacao",
+        evidenciaValidacaoPdf: evidencia,
+      });
+      expect(String(falha)).not.toContain(chave);
+    },
+  );
 
   it("classifica chave divergente e pagina de erro separadamente sem expor texto", () => {
     const chave = "35261012345678000190550010649963971123456780";

@@ -441,3 +441,20 @@ necessidade e revisão adversarial específica. Não aumentar timeout, não
 abrir domínio alternativo, não reutilizar URL provider em sender.
 A issue #55 só fecha com as duas notas comprovadamente mais recentes,
 distintas e os dois PDFs corretos recebidos na conversa administrativa.
+
+## DANFE — observabilidade do extrator sem repetir canário — 10/10/2026
+
+Canário administrativo pós-deploy `d664b676`, às 18h50 (Brasília): busca
+`crm_erp_search_recent_invoices` bem-sucedida; duas preparações de DANFE
+falharam na etapa `pdf_validacao` com `extracao_falhou`. Nenhum PDF foi enviado;
+apenas uma resposta textual aceita pelo sender. A auditoria anterior não permite
+distinguir timeout do subprocesso, heap esgotado, import ausente ou PDF sem texto.
+**Esta evidência não comprova qual dessas hipóteses ocorreu.**
+
+Para futuras falhas, `PdfExtractError` carrega uma categoria técnica finita,
+sem texto, URL, chave, notas, `stderr` ou identidade. O renderer mapeia para
+`extracao_sem_texto`, `extracao_timeout`, `extracao_memoria`,
+`extracao_processo_falhou`, `extracao_dependencia` ou o fallback
+`extracao_falhou`. Todos os casos continuam **fail-closed**: nenhum documento
+é preparado. O diagnóstico não autoriza aumentar heap/timeout sem evidência,
+abrir egress, nem chamar o VendaERP outra vez antes de CI/merge/deploy saudáveis.

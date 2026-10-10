@@ -72,11 +72,16 @@ import type * as PdfjsDist from "pdfjs-dist";
  */
 export type MotivoDaFalhaDePdf = "sem_texto" | "falha";
 
+/** Apenas categoria finita; erro original e PDF nunca vão para auditoria. */
+export type CausaTecnicaPdf =
+  "sem_texto" | "timeout" | "memoria" | "processo" | "dependencia" | "motor";
+
 export class PdfExtractError extends Error {
   constructor(
     message: string,
     public readonly cause?: unknown,
     public readonly motivo: MotivoDaFalhaDePdf = "falha",
+    public readonly causaTecnica: CausaTecnicaPdf = "motor",
   ) {
     super(message);
     this.name = "PdfExtractError";
@@ -127,7 +132,8 @@ export async function extractPdfText(
 
 async function extrairEmProcesso(buffer: Buffer): Promise<string> {
   try {
-    const pdfjsLib = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as typeof PdfjsDist;
+    const pdfjsLib =
+      (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as typeof PdfjsDist;
 
     // NÃO mexa em GlobalWorkerOptions.workerSrc aqui (issue #102).
     //
@@ -163,7 +169,12 @@ async function extrairEmProcesso(buffer: Buffer): Promise<string> {
 
     const combined = pageTexts.join("\n\n").trim();
     if (combined.length === 0) {
-      throw new PdfExtractError("pdfjs-dist extracted no text (possibly image-only PDF)", undefined, "sem_texto");
+      throw new PdfExtractError(
+        "pdfjs-dist extracted no text (possibly image-only PDF)",
+        undefined,
+        "sem_texto",
+        "sem_texto",
+      );
     }
     return combined;
   } catch (err) {
@@ -211,6 +222,8 @@ function traduzirErro(err: unknown): PdfExtractError {
         "imagem. Enquanto isso, o mesmo conteúdo em texto (.txt), Markdown (.md) ou " +
         "CSV (.csv) é lido normalmente.",
       err,
+      "falha",
+      "dependencia",
     );
   }
 
@@ -267,10 +280,7 @@ interface SaidaDoFilho {
   stderr: string;
 }
 
-async function extrairEmProcessoAParte(
-  buffer: Buffer,
-  opcoes: OpcoesDeExtracao,
-): Promise<string> {
+async function extrairEmProcessoAParte(buffer: Buffer, opcoes: OpcoesDeExtracao): Promise<string> {
   const heapMb = opcoes.heapMb ?? HEAP_DO_FILHO_MB;
   const timeoutMs = opcoes.timeoutMs ?? TEMPO_MAXIMO_MS;
 
@@ -307,12 +317,26 @@ async function extrairEmProcessoAParte(
     });
     filho.on("error", (err) => {
       clearTimeout(relogio);
-      reject(new PdfExtractError(`não consegui abrir o processo de extração: ${err.message}`, err));
+      reject(
+        new PdfExtractError(
+          `não consegui abrir o processo de extração: ${err.message}`,
+          err,
+          "falha",
+          "processo",
+        ),
+      );
     });
     filho.on("close", (codigo, sinal) => {
       clearTimeout(relogio);
       if (expirou) {
-        reject(new PdfExtractError(`a extração do PDF excedeu ${timeoutMs} ms e foi interrompida`));
+        reject(
+          new PdfExtractError(
+            `a extração do PDF excedeu ${timeoutMs} ms e foi interrompida`,
+            undefined,
+            "falha",
+            "timeout",
+          ),
+        );
         return;
       }
       resolve({ codigo, sinal, stdout, stderr });
@@ -342,13 +366,23 @@ async function extrairEmProcessoAParte(
     // A frase vai INTEIRA para o `last_error` do evento: "sinal SIGSEGV, teto de
     // heap 160 MB" é o que distingue PDF grande demais de PDF corrompido.
     if (/DOMMatrix|@napi-rs\/canvas/.test(causa)) throw traduzirErro(erro);
-    throw new PdfExtractError(erro.message, erro);
+    // Inferir memória apenas com assinatura explícita do V8; sinal isolado não prova OOM.
+    const memoria =
+      /(?:heap out of memory|Reached heap limit|Allocation failed - JavaScript heap)/i.test(
+        saida.stderr,
+      );
+    throw new PdfExtractError(erro.message, erro, "falha", memoria ? "memoria" : "processo");
   }
   if (!resposta.ok) throw traduzirErro(new Error(resposta.erro ?? "erro desconhecido"));
 
   const texto = resposta.texto ?? "";
   if (texto.length === 0) {
-    throw new PdfExtractError("pdfjs-dist extracted no text (possibly image-only PDF)");
+    throw new PdfExtractError(
+      "pdfjs-dist extracted no text (possibly image-only PDF)",
+      undefined,
+      "sem_texto",
+      "sem_texto",
+    );
   }
   return texto;
 }

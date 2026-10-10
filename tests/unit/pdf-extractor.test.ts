@@ -158,9 +158,10 @@ describe("extractPdfText — estratégia `processo-a-parte`", () => {
 
   it("PDF sem texto e PDF corrompido falham com PdfExtractError, como em processo", async () => {
     const { extractPdfText, PdfExtractError } = await import("@/lib/ai/rag/extractors/pdf");
-    await expect(extractPdfText(fixture("sample-sem-texto.pdf"), A_PARTE)).rejects.toThrow(
-      /image-only/,
+    const semTexto = await extractPdfText(fixture("sample-sem-texto.pdf"), A_PARTE).catch(
+      (erro: unknown) => erro,
     );
+    expect(semTexto).toMatchObject({ motivo: "sem_texto", causaTecnica: "sem_texto" });
     await expect(extractPdfText(fixture("sample-corrompido.pdf"), A_PARTE)).rejects.toBeInstanceOf(
       PdfExtractError,
     );
@@ -183,6 +184,7 @@ describe("extractPdfText — estratégia `processo-a-parte`", () => {
     // PDF grande demais de PDF corrompido.
     expect((erro as Error).message).toMatch(/sem responder/);
     expect((erro as Error).message).toMatch(/teto de heap 4 MB/);
+    expect(erro).toMatchObject({ causaTecnica: "memoria" });
     // O pai continua vivo e extraindo.
     expect(await extractPdfText(fixture("sample-text.pdf"), A_PARTE)).toBe(
       "DeskcommCRM RAG fixture",
@@ -191,9 +193,11 @@ describe("extractPdfText — estratégia `processo-a-parte`", () => {
 
   it("o filho que não responde a tempo é morto e vira PdfExtractError", async () => {
     const { extractPdfText } = await import("@/lib/ai/rag/extractors/pdf");
-    await expect(
-      extractPdfText(fixture("sample-multipagina.pdf"), { ...A_PARTE, timeoutMs: 1 }),
-    ).rejects.toThrow(/excedeu 1 ms/);
+    const erro = await extractPdfText(fixture("sample-multipagina.pdf"), {
+      ...A_PARTE,
+      timeoutMs: 1,
+    }).catch((e: unknown) => e);
+    expect(erro).toMatchObject({ causaTecnica: "timeout" });
   });
 
   it("a estratégia padrão é a do filho SÓ sob o tsx", async () => {
