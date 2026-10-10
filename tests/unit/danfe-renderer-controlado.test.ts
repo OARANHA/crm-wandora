@@ -359,7 +359,6 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(diagnosticarTextoPdfFiscal(texto + " PRODUTO TESTE ".repeat(12), chave)).toBeNull();
   });
 
-
   it("não imprime após timeout de DOM sem chave fiscal comprovada", async () => {
     const env = ambientePdf();
     env.page.waitForFunction.mockRejectedValueOnce(
