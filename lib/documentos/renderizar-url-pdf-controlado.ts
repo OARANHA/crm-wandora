@@ -45,7 +45,17 @@ export function diagnosticarTextoPdfFiscal(
   // A chave inteira continua obrigatória, impedindo aceitar um HTML vazio.
   if (!semEspacos.includes("DANFE")) return "marcador_danfe_ausente";
   if (!semEspacos.includes("CHAVEDEACESSO")) return "rotulo_chave_ausente";
-  if (!normalizado.replace(/\D/g, "").includes(chaveEsperada)) return "chave_divergente";
+  // A chave fiscal deve ser a do campo principal, imediatamente após seu
+  // rótulo. Não juntar dígitos do PDF inteiro nem aceitar NFe referenciada.
+  const rotulo = /(?<![A-Z])C\s*H\s*A\s*V\s*E\s*D\s*E\s*A\s*C\s*E\s*S\s*S\s*O(?![A-Z])/.exec(
+    normalizado,
+  );
+  if (!rotulo) return "rotulo_chave_ausente";
+  const inicio = rotulo.index + rotulo[0].length;
+  const campo = normalizado.slice(inicio, inicio + 176);
+  // Espaços/pontos/hífens são separadores gráficos; palavras não são.
+  const candidata = /^\s*[:#.\-]?\s*(\d(?:[\s.\-]*\d){43})(?!\d)/.exec(campo);
+  if (candidata?.[1].replace(/\D/g, "") !== chaveEsperada) return "chave_divergente";
   return null;
 }
 
