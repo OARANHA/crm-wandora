@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   resolver: vi.fn(),
   launch: vi.fn(),
   redirect: vi.fn(),
+  extractPdfText: vi.fn(),
 }));
 
 vi.mock("@/lib/documentos/egress-browser-pdf", async (importOriginal) => {
@@ -14,6 +15,7 @@ vi.mock("@/lib/documentos/egress-browser-pdf", async (importOriginal) => {
   return { ...original, resolverIpPublicoFixadoParaBrowser: mocks.resolver };
 });
 vi.mock("playwright-core", () => ({ chromium: { launch: mocks.launch } }));
+vi.mock("@/lib/ai/rag/extractors/pdf", () => ({ extractPdfText: mocks.extractPdfText }));
 vi.mock("@/lib/documentos/renderizar-url-pdf", async (importOriginal) => {
   const original = await importOriginal<typeof RenderUrlPdf>();
   return { ...original, abrirRedirectLocalParaDocumento: mocks.redirect };
@@ -66,6 +68,10 @@ const policy = {
 describe("renderer controlado DANFE — fronteiras seguras", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.extractPdfText.mockResolvedValue(
+      "DANFE CHAVE DE ACESSO 35261012345678000190550010649963971123456780 " +
+        "PRODUTO TESTE ".repeat(12),
+    );
   });
 
   it("não abre navegador nem resolve DNS se a policy recusa o endereço", async () => {
@@ -229,6 +235,80 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     });
     expect(checar(chave)).toBe(false);
     Reflect.deleteProperty(document.body, "innerText");
+  });
+
+  it("imprime uma DANFE com chave comprovada quando o DOM não termina a espera", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    env.page.waitForFunction.mockRejectedValueOnce(
+      Object.assign(new Error("timeout de DOM"), { name: "TimeoutError" }),
+    );
+    const resultado = await renderizarUrlParaPdfControlado(danfe, {
+      ...policy,
+      chaveFiscalEsperada: chave,
+    });
+    expect(resultado).toEqual(env.pdf);
+    expect(env.page.pdf).toHaveBeenCalledOnce();
+    expect(mocks.extractPdfText).toHaveBeenCalledOnce();
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("não envia como DANFE um PDF de erro que apenas ecoa a chave fiscal", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    env.page.waitForFunction.mockRejectedValueOnce(
+      Object.assign(new Error("timeout de DOM"), { name: "TimeoutError" }),
+    );
+    mocks.extractPdfText.mockResolvedValueOnce(
+      "DANFE não encontrada. CHAVE DE ACESSO: " + chave + " " + "Tente novamente. ".repeat(15),
+    );
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave }),
+    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "pdf_validacao" });
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("rejeita PDF com chave diferente mesmo se o DOM aprovado foi burlado", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    mocks.extractPdfText.mockResolvedValueOnce(
+      "DANFE CHAVE DE ACESSO " + "9".repeat(44) + " " + "PRODUTO TESTE ".repeat(12),
+    );
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave }),
+    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "pdf_validacao" });
+    expect(env.page.pdf).toHaveBeenCalledOnce();
+  });
+
+  it("não imprime após timeout de DOM sem chave fiscal comprovada", async () => {
+    const env = ambientePdf();
+    env.page.waitForFunction.mockRejectedValueOnce(
+      Object.assign(new Error("timeout de DOM"), { name: "TimeoutError" }),
+    );
+    await expect(renderizarUrlParaPdfControlado(danfe, policy)).rejects.toMatchObject({
+      codigo: "timeout",
+      etapa: "chromium_validacao_conteudo",
+    });
+    expect(env.page.pdf).not.toHaveBeenCalled();
+    expect(mocks.extractPdfText).not.toHaveBeenCalled();
+  });
+
+  it("fecha o browser se a extração fiscal falha, sem expor dados do PDF", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    mocks.extractPdfText.mockRejectedValueOnce(new Error("PDF confidencial " + chave));
+    let erro: unknown;
+    try {
+      await renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave });
+    } catch (e) {
+      erro = e;
+    }
+    expect(erro).toMatchObject({ codigo: "render_falhou", etapa: "pdf_validacao" });
+    expect(String(erro)).not.toContain(chave);
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
   });
 
   it("limita o DNS pendente sem iniciar navegador nem URL externa", async () => {

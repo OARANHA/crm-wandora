@@ -390,3 +390,46 @@ a persistência privada e o sender não são alterados.
 **Limite:** rótulos e chave exata não constituem prova criptográfica de
 autenticidade nem substituem a conferência do PDF na conversa administrativa.
 A issue #55 permanece aberta para recência fiscal e duas DANFEs corretas.
+
+## DANFE: validação do PDF impresso com identidade fiscal — 09/10/2026
+
+### Evidência reproduzida (RED → GREEN; sem VendaERP real)
+
+Em 05/10/2026 o renderer legado com impressão direta do Chromium entregou um PDF
+administrativo: `api_audit_log.success=true`, `messages.type=document`,
+`media_mime=application/pdf`, `send_ledger=accepted` e status final `read`.
+O renderer atual do Playwright exige uma combinação de strings no DOM da SPA
+**antes** de chamar `page.pdf()`; isso é um novo gate, não presente no fluxo
+comprovadamente funcional. Um teste sintético fez `page.waitForFunction()`
+expirar, embora a impressão e o conteúdo fiscal simulado fossem válidos. O teste
+falhou no código anterior com `ErroRenderizacaoDocumento(timeout)` sem imprimir.
+
+A correção permite seguir à impressão **somente** quando (a) a validação DOM
+expirou, (b) existe uma chave fiscal de 44 dígitos comprovada por leitura
+estruturada ERP, (c) ainda resta tempo no prazo global. Qualquer outra falha do
+browser continua encerrando o processo. A impressão continua executada pelo
+Playwright com egress restrito ao mesmo origin, DNS público fixado, bloqueio
+de WebSocket/WebRTC, processo sem credenciais ERP e cleanup do loopback.
+
+**Depois da impressão** o PDF é validado em duas camadas:
+
+1. assinatura do arquivo, marcador final e limite de tamanho já existentes;
+2. texto extraído pelo `extractPdfText` canônico, na estratégia
+   `processo-a-parte`, com limite de heap e deadline, deve conter
+   `DANFE`, `CHAVE DE ACESSO`, a chave fiscal exata e não conter marcadores
+   explícitos de nota indisponível ou não encontrada.
+
+O texto extraído não vai para logs, modelo, auditoria ou WhatsApp. Erro na
+extração, chave distinta, ausência de texto ou retorno com aviso de erro
+**falham fechado**, sem preparar mídia. A inspeção de texto não equivale à
+prova criptográfica do documento; o canário funcional exige conferir o PDF
+aberto e associado à NFe correta.
+
+**Limite do diagnóstico:** esta correção fecha uma regressão reproduzida no
+código de prontidão, mas não prova que todos os recursos da SPA real do
+VendaERP carregam sob a policy atual. Se ela depender de POST ou de terceiros,
+a policy de egress permanece bloqueando esses recursos até haver prova da
+necessidade e revisão adversarial específica. Não aumentar timeout, não
+abrir domínio alternativo, não reutilizar URL provider em sender.
+A issue #55 só fecha com as duas notas comprovadamente mais recentes,
+distintas e os dois PDFs corretos recebidos na conversa administrativa.
