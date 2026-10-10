@@ -104,7 +104,9 @@ describe("checkpoint depois de um envio aceito", () => {
   });
 
   it("se o alerta durável não gravar, propaga erro para fila, sem sucesso falso", async () => {
-    const query = vi.fn(async () => { throw new Error("db_indisponivel"); });
+    const query = vi.fn(async () => {
+      throw new Error("db_indisponivel");
+    });
     await expect(
       registrarFalhaCheckpointAposEnvio({ query } as never, {
         ...ids,
