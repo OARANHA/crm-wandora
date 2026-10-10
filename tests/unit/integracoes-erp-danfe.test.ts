@@ -148,6 +148,27 @@ describe("materialização segura do DANFE", () => {
     expect(renderizadorVendaErp).toHaveBeenCalledOnce();
   });
 
+  it("propaga somente a classe de validação, sem chave fiscal ou texto", async () => {
+    const url =
+      "https://app.vendaerp.com.br/v3/public/NFe/Danfe?Cod=6abe71151d133d5c8962c4e9&g=34b6208d-4d02-49bc-8a59-8823d1b10765";
+    const renderizadorVendaErp = vi.fn(async () => {
+      throw new ErroRenderizacaoDocumento(
+        "render_falhou",
+        "pdf_validacao",
+        undefined,
+        undefined,
+        "chave_divergente",
+      );
+    });
+    await expect(
+      materializarDanfeExterno(url, undefined, { renderizadorVendaErp }),
+    ).rejects.toMatchObject({
+      codigo: "download_falhou",
+      etapa: "pdf_validacao",
+      evidenciaValidacaoPdf: "chave_divergente",
+    });
+  });
+
   it("continua recusando HTML para qualquer outra URL", async () => {
     const fetcher = vi.fn(
       async () =>

@@ -6,6 +6,7 @@ import {
   type EtapaRenderizacaoDocumento,
   type EvidenciaPdfAoExpirar,
   type EvidenciaEgressBrowserDocumento,
+  type EvidenciaValidacaoPdfDocumento,
 } from "@/lib/documentos/renderizar-url-pdf";
 
 import { ehUrlDanfePublicoVendaErp, renderizarDanfeVendaErpParaPdf } from "./vendaerp-danfe-pdf";
@@ -29,6 +30,7 @@ export class ErroDanfeExterno extends Error {
     public readonly etapa?: EtapaRenderizacaoDocumento,
     public readonly evidenciaPdf?: EvidenciaPdfAoExpirar,
     public readonly evidenciaEgress?: EvidenciaEgressBrowserDocumento,
+    public readonly evidenciaValidacaoPdf?: EvidenciaValidacaoPdfDocumento,
   ) {
     super(codigo);
     this.name = "ErroDanfeExterno";
@@ -50,7 +52,14 @@ function mapearErroRenderizacao(erro: unknown): ErroDanfeExterno {
   }
 
   const mapear = (codigo: CodigoErroDanfeExterno) =>
-    new ErroDanfeExterno(codigo, undefined, erro.etapa, erro.evidenciaPdf, erro.evidenciaEgress);
+    new ErroDanfeExterno(
+      codigo,
+      undefined,
+      erro.etapa,
+      erro.evidenciaPdf,
+      erro.evidenciaEgress,
+      erro.evidenciaValidacaoPdf,
+    );
 
   switch (erro.codigo) {
     case "destino_inseguro":
