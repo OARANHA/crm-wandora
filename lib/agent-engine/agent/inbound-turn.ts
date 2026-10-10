@@ -96,6 +96,7 @@ import {
   insertCheckpoint,
   parseCheckpointText,
   recuperarCheckpointNoFechamento,
+  registrarFalhaCheckpointAposEnvio,
   type CheckpointContent,
   type LeadCheckpointRow,
 } from "./abertura/checkpoint";
@@ -4614,7 +4615,9 @@ async function executarTurnoDoAgente(
     // A autoria da atividade acompanha a chamada que produziu o checkpoint válido.
     // Preservamos o callId fora do callback sem repetir as ferramentas do turno.
     const checkpointCall = { id: null as string | null };
-    const content = await recuperarCheckpointNoFechamento(async (tentativa) => {
+    let content: CheckpointContent;
+    try {
+      content = await recuperarCheckpointNoFechamento(async (tentativa) => {
       const closing = await runModelCall(
         pool,
         deps.llmCfg,
@@ -4654,7 +4657,33 @@ async function executarTurnoDoAgente(
         /https:\/\/meet\.google\.com\/[a-zA-Z0-9-]+/g,
         '[link da reunião disponível na Agenda]',
       );
-    });
+      });
+    } catch (erro) {
+      // Só a falha do fechamento, depois de um envio aceito, é resolvida
+      // com alerta persistente. Erro de orçamento continua no handoff próprio.
+      if (erro instanceof LlmBudgetExceededError) throw erro;
+      const houveEnvioAceito = outcomes.some(
+        (o) => o.kind === 'sent' || o.kind === 'already_sent' || o.kind === 'queued',
+      );
+      const pendenciaPersistida =
+        !preview &&
+        (await registrarFalhaCheckpointAposEnvio(pool, {
+          tenantId,
+          conversationId: input.conversationId,
+          jobId: liveJob().id,
+          houveEnvioAceito,
+        }));
+      if (pendenciaPersistida) {
+        runLog.warn('checkpoint ausente depois de outbound aceito; alerta durável', {
+          job_id: liveJob().id,
+          codigo: 'checkpoint_pos_envio_incompleto',
+        });
+        // Não reexecutar modelo, ERP e sender só para repetir o checkpoint.
+        // A Central guarda a pendência; nenhum checkpoint falso é gravado.
+        return;
+      }
+      throw erro;
+    }
 
     if (preview) {
       preview.result.checkpoint = content;
