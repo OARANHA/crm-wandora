@@ -29,21 +29,21 @@ export function diagnosticarTextoPdfFiscal(
   texto: string,
   chaveEsperada: string,
 ): EvidenciaValidacaoPdfDocumento | null {
-  if (!/^\\d{44}$/.test(chaveEsperada)) return "chave_divergente";
-  const normalizado = texto.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toUpperCase();
-  const semEspacos = normalizado.replace(/\\s+/g, "");
+  if (!/^\d{44}$/.test(chaveEsperada)) return "chave_divergente";
+  const normalizado = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const semEspacos = normalizado.replace(/\s+/g, "");
   if (
-    /\\b(?:DANFE|NOTA\\s+FISCAL)\\s+(?:INDISPONIVEL|NAO\\s+ENCONTRAD[AO])\\b/.test(
+    /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(
       normalizado,
     ) ||
-    /\\bERRO\\s+AO\\s+(?:CARREGAR|CONSULTAR)\\b/.test(normalizado)
+    /\bERRO\s+AO\s+(?:CARREGAR|CONSULTAR)\b/.test(normalizado)
   ) return "pagina_de_erro";
   if (normalizado.trim().length < 80) return "texto_insuficiente";
   // PDFjs pode separar letras ou juntar palavras na mesma linha impressa.
   // A chave inteira continua obrigatória, impedindo aceitar um HTML vazio.
   if (!semEspacos.includes("DANFE")) return "marcador_danfe_ausente";
   if (!semEspacos.includes("CHAVEDEACESSO")) return "rotulo_chave_ausente";
-  if (!normalizado.replace(/\\D/g, "").includes(chaveEsperada)) return "chave_divergente";
+  if (!normalizado.replace(/\D/g, "").includes(chaveEsperada)) return "chave_divergente";
   return null;
 }
 
