@@ -184,7 +184,9 @@ describe("extractPdfText — estratégia `processo-a-parte`", () => {
     expect((erro as Error).message).toMatch(/sem responder/);
     expect((erro as Error).message).toMatch(/teto de heap 4 MB/);
     // O pai continua vivo e extraindo.
-    expect(await extractPdfText(fixture("sample-text.pdf"), A_PARTE)).toBe("DeskcommCRM RAG fixture");
+    expect(await extractPdfText(fixture("sample-text.pdf"), A_PARTE)).toBe(
+      "DeskcommCRM RAG fixture",
+    );
   });
 
   it("o filho que não responde a tempo é morto e vira PdfExtractError", async () => {
@@ -227,13 +229,17 @@ describe("extractPdfText — estratégia `processo-a-parte`", () => {
         }));
       }).catch((e) => { console.error(String(e && e.stack || e)); process.exit(1); });
     `;
-    const saida = execFileSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "--eval", script], {
-      cwd: raiz,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 60_000,
-      env: { ...process.env, NODE_NO_WARNINGS: "1" },
-    });
+    const saida = execFileSync(
+      process.execPath,
+      ["node_modules/tsx/dist/cli.mjs", "--eval", script],
+      {
+        cwd: raiz,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 60_000,
+        env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      },
+    );
     const r = JSON.parse(saida) as { estrategia: string; texto: string; heapMb: number };
     expect(r.estrategia).toBe("processo-a-parte");
     expect(r.texto).toBe(
