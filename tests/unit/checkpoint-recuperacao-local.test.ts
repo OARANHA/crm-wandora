@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { recuperarCheckpointNoFechamento } from "@/lib/agent-engine/agent/abertura/checkpoint";
+import {
+  recuperarCheckpointNoFechamento,
+  registrarFalhaCheckpointAposEnvio,
+} from "@/lib/agent-engine/agent/abertura/checkpoint";
 
 const checkpointValido = JSON.stringify({
   commitments: [],
@@ -62,5 +65,51 @@ describe("recuperação local do checkpoint — sem replay de ferramentas", () =
     });
     expect(n).toBe(2);
     expect(value.declaracao?.nada_a_declarar).toBe(true);
+  });
+});
+
+describe("checkpoint depois de um envio aceito", () => {
+  const ids = {
+    tenantId: "11111111-1111-4111-8111-111111111111",
+    conversationId: "22222222-2222-4222-8222-222222222222",
+    jobId: "33333333-3333-4333-8333-333333333333",
+  };
+
+  it("sem outbound, NÃO transforma falha de fechamento em turno concluído", async () => {
+    const query = vi.fn();
+    expect(
+      await registrarFalhaCheckpointAposEnvio({ query } as never, {
+        ...ids,
+        houveEnvioAceito: false,
+      }),
+    ).toBe(false);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("com outbound, registra alerta durável sem inventar checkpoint e sem texto privado", async () => {
+    const query = vi.fn(async () => ({ rows: [{ id: "aviso-sintetico" }] }));
+    expect(
+      await registrarFalhaCheckpointAposEnvio({ query } as never, {
+        ...ids,
+        houveEnvioAceito: true,
+      }),
+    ).toBe(true);
+    expect(query).toHaveBeenCalledOnce();
+    const [sql, params] = query.mock.calls[0]!;
+    expect(sql).toContain("insert into agent_inbox_items");
+    expect(sql).not.toContain("lead_checkpoints");
+    expect(params).toContain(ids.tenantId);
+    expect(params).toContain(ids.conversationId);
+    expect(params).not.toContain("senha ou nota fiscal");
+  });
+
+  it("se o alerta durável não gravar, propaga erro para fila, sem sucesso falso", async () => {
+    const query = vi.fn(async () => { throw new Error("db_indisponivel"); });
+    await expect(
+      registrarFalhaCheckpointAposEnvio({ query } as never, {
+        ...ids,
+        houveEnvioAceito: true,
+      }),
+    ).rejects.toThrow("db_indisponivel");
   });
 });
