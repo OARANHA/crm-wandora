@@ -331,25 +331,18 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
 
   it("não aceita 44 dígitos montados ao concatenar trechos separados por palavras", () => {
     const chave = "35261012345678000190550010649963971123456780";
-    const texto =
-      "DANFE CHAVE DE ACESSO " +
-      chave.slice(0, 22) +
-      " DADOS DO DESTINATARIO " +
-      chave.slice(22) +
-      " " +
-      "PRODUTO TESTE ".repeat(12);
-    expect(diagnosticarTextoPdfFiscal(texto, chave)).toBe("chave_divergente");
+    const prefixo = chave.slice(0, 22);
+    const sufixo = chave.slice(22);
+    const texto = `DANFE CHAVE DE ACESSO ${prefixo} DADOS DO DESTINATARIO ${sufixo}`;
+    const resultado = diagnosticarTextoPdfFiscal(texto + " PRODUTO TESTE ".repeat(12), chave);
+    expect(resultado).toBe("chave_divergente");
   });
 
   it("rejeita documento de outra NFe mesmo quando referencia a chave esperada", () => {
     const chave = "35261012345678000190550010649963971123456780";
-    const texto =
-      "DANFE CHAVE DE ACESSO " +
-      "9".repeat(44) +
-      " DOCUMENTOS FISCAIS REFERENCIADOS " +
-      chave +
-      " " +
-      "PRODUTO TESTE ".repeat(12);
+    const cabecalho = `DANFE CHAVE DE ACESSO ${"9".repeat(44)}`;
+    const referencias = ` DOCUMENTOS FISCAIS REFERENCIADOS ${chave}`;
+    const texto = cabecalho + referencias + " PRODUTO TESTE ".repeat(12);
     expect(diagnosticarTextoPdfFiscal(texto, chave)).toBe("chave_divergente");
   });
 
@@ -362,13 +355,10 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
   it("permite chave correta agrupada por pontos e hífens junto ao rótulo", () => {
     const chave = "35261012345678000190550010649963971123456780";
     const grupos = chave.match(/.{1,4}/g) ?? [];
-    const texto =
-      "D A N F E CHAVE DE ACESSO: " +
-      grupos.join(".") +
-      " " +
-      "PRODUTO TESTE ".repeat(12);
-    expect(diagnosticarTextoPdfFiscal(texto, chave)).toBeNull();
+    const texto = `D A N F E CHAVE DE ACESSO: ${grupos.join(".")}`;
+    expect(diagnosticarTextoPdfFiscal(texto + " PRODUTO TESTE ".repeat(12), chave)).toBeNull();
   });
+
 
   it("não imprime após timeout de DOM sem chave fiscal comprovada", async () => {
     const env = ambientePdf();
