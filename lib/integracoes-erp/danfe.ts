@@ -52,7 +52,14 @@ function mapearErroRenderizacao(erro: unknown): ErroDanfeExterno {
   }
 
   const mapear = (codigo: CodigoErroDanfeExterno) =>
-    new ErroDanfeExterno(codigo, undefined, erro.etapa, erro.evidenciaPdf, erro.evidenciaEgress, erro.evidenciaValidacaoPdf);
+    new ErroDanfeExterno(
+      codigo,
+      undefined,
+      erro.etapa,
+      erro.evidenciaPdf,
+      erro.evidenciaEgress,
+      erro.evidenciaValidacaoPdf,
+    );
 
   switch (erro.codigo) {
     case "destino_inseguro":
