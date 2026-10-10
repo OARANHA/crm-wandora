@@ -35,6 +35,17 @@ describe("DANFE por turno, sem prometer entrega futura", () => {
     g.registrarExcecao();
     expect(g.falhou).toBe(true);
   });
+  it("isenta o spinning somente para o aviso técnico após falha comprovada", () => {
+    const g = new GuardaFalhaDanfeNoTurno();
+    expect(g.permitirAvisoTecnicoSemSpinning(AVISO_FALHA_DANFE, false)).toBe(false);
+    g.registrarResultado({ ok: false, motivo: "danfe_download_failed" });
+    expect(g.permitirAvisoTecnicoSemSpinning(AVISO_FALHA_DANFE, false)).toBe(true);
+    expect(g.permitirAvisoTecnicoSemSpinning("Outra mensagem qualquer", false)).toBe(false);
+    expect(g.permitirAvisoTecnicoSemSpinning(AVISO_FALHA_DANFE, true)).toBe(false);
+    g.avisoEnviado = true;
+    expect(g.permitirAvisoTecnicoSemSpinning(AVISO_FALHA_DANFE, false)).toBe(false);
+  });
+
   it("estado não vaza entre turnos", () => {
     const a = new GuardaFalhaDanfeNoTurno();
     const b = new GuardaFalhaDanfeNoTurno();
