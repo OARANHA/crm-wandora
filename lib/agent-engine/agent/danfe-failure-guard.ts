@@ -37,4 +37,18 @@ export class GuardaFalhaDanfeNoTurno {
   deveInformarFalha(temDocumentoPreparado: boolean): boolean {
     return this.falhou && !temDocumentoPreparado;
   }
+
+  /**
+   * A notificação técnica é texto determinístico, não blast do modelo.
+   * Ela pode contornar SOMENTE o gate spinning, preservando stop, LGPD,
+   * pacing, janela, ledger e before_send. O caller ainda deve garantir
+   * que é um turno de produção autorizado, nunca preview.
+   */
+  permitirAvisoTecnicoSemSpinning(body: string, temDocumentoPreparado: boolean): boolean {
+    return (
+      this.deveInformarFalha(temDocumentoPreparado) &&
+      !this.avisoEnviado &&
+      body === AVISO_FALHA_DANFE
+    );
+  }
 }
