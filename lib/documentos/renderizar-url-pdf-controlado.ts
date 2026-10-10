@@ -8,6 +8,7 @@ import {
   ErroRenderizacaoDocumento,
   type EtapaRenderizacaoDocumento,
   type EvidenciaEgressBrowserDocumento,
+  type EvidenciaValidacaoPdfDocumento,
   type PoliticaRenderizacaoUrlPdf,
   type RenderizadorUrlPdf,
 } from "./renderizar-url-pdf";
@@ -24,22 +25,30 @@ const LIMITE_ETAPA_MS = 8_000;
  * apenas porque uma SPA colocou a chave de acesso no DOM. Esta função
  * nunca devolve o texto extraído para auditoria, logs ou modelo.
  */
-export function pdfImpressoComprovaDanfe(texto: string, chaveEsperada: string): boolean {
-  if (!/^\d{44}$/.test(chaveEsperada)) return false;
-  const normalizado = texto
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase();
+export function diagnosticarTextoPdfFiscal(
+  texto: string,
+  chaveEsperada: string,
+): EvidenciaValidacaoPdfDocumento | null {
+  if (!/^\\d{44}$/.test(chaveEsperada)) return "chave_divergente";
+  const normalizado = texto.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toUpperCase();
+  const semEspacos = normalizado.replace(/\\s+/g, "");
   if (
-    normalizado.length < 80 ||
-    !/\bDANFE\b/.test(normalizado) ||
-    !/\bCHAVE\s+DE\s+ACESSO\b/.test(normalizado) ||
-    /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(normalizado) ||
-    /\bERRO\s+AO\s+(?:CARREGAR|CONSULTAR)\b/.test(normalizado)
-  ) {
-    return false;
-  }
-  return normalizado.replace(/\D/g, "").includes(chaveEsperada);
+    /\\b(?:DANFE|NOTA\\s+FISCAL)\\s+(?:INDISPONIVEL|NAO\\s+ENCONTRAD[AO])\\b/.test(
+      normalizado,
+    ) ||
+    /\\bERRO\\s+AO\\s+(?:CARREGAR|CONSULTAR)\\b/.test(normalizado)
+  ) return "pagina_de_erro";
+  if (normalizado.trim().length < 80) return "texto_insuficiente";
+  // PDFjs pode separar letras ou juntar palavras na mesma linha impressa.
+  // A chave inteira continua obrigatória, impedindo aceitar um HTML vazio.
+  if (!semEspacos.includes("DANFE")) return "marcador_danfe_ausente";
+  if (!semEspacos.includes("CHAVEDEACESSO")) return "rotulo_chave_ausente";
+  if (!normalizado.replace(/\\D/g, "").includes(chaveEsperada)) return "chave_divergente";
+  return null;
+}
+
+export function pdfImpressoComprovaDanfe(texto: string, chaveEsperada: string): boolean {
+  return diagnosticarTextoPdfFiscal(texto, chaveEsperada) === null;
 }
 
 /**
@@ -323,11 +332,26 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
             }),
           prazo,
         );
-      } catch {
-        throw new ErroRenderizacaoDocumento("render_falhou", "pdf_validacao");
+      } catch (erro) {
+        const expirou =
+          erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout";
+        throw new ErroRenderizacaoDocumento(
+          "render_falhou",
+          "pdf_validacao",
+          undefined,
+          undefined,
+          expirou ? "extracao_timeout" : "extracao_falhou",
+        );
       }
-      if (!pdfImpressoComprovaDanfe(texto, politica.chaveFiscalEsperada)) {
-        throw new ErroRenderizacaoDocumento("render_falhou", "pdf_validacao");
+      const evidencia = diagnosticarTextoPdfFiscal(texto, politica.chaveFiscalEsperada);
+      if (evidencia) {
+        throw new ErroRenderizacaoDocumento(
+          "render_falhou",
+          "pdf_validacao",
+          undefined,
+          undefined,
+          evidencia,
+        );
       }
     }
     return pdf;
@@ -341,6 +365,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
         erro.codigo === "timeout" && fase === "chromium_validacao_conteudo"
           ? evidenciaEgress()
           : undefined,
+        erro.evidenciaValidacaoPdf,
       );
     }
     const timeout =
