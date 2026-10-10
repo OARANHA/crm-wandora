@@ -55,7 +55,7 @@ export function diagnosticarTextoPdfFiscal(
   const campo = normalizado.slice(inicio, inicio + 176);
   // Espaços/pontos/hífens são separadores gráficos; palavras não são.
   const candidata = /^\s*[:#.\-]?\s*(\d(?:[\s.\-]*\d){43})(?!\d)/.exec(campo);
-  if (candidata?.[1].replace(/\D/g, "") !== chaveEsperada) return "chave_divergente";
+  if (candidata?.[1]?.replace(/\D/g, "") !== chaveEsperada) return "chave_divergente";
   return null;
 }
 
