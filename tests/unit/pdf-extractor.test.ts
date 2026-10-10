@@ -144,6 +144,18 @@ describe("extractPdfText — estratégia `processo-a-parte`", () => {
     },
   );
 
+  it("extrai PDF textual sob limites reais do renderer DANFE: 96 MB e 8 s", async () => {
+    const { extractPdfText } = await import("@/lib/ai/rag/extractors/pdf");
+    const texto = await extractPdfText(fixture("sample-multipagina.pdf"), {
+      estrategia: "processo-a-parte",
+      heapMb: 96,
+      timeoutMs: 8_000,
+    });
+    expect(texto).toBe(
+      "Pagina um linha um\nPagina um linha dois\n\nPagina dois linha um\nPagina dois linha dois",
+    );
+  });
+
   it("PDF sem texto e PDF corrompido falham com PdfExtractError, como em processo", async () => {
     const { extractPdfText, PdfExtractError } = await import("@/lib/ai/rag/extractors/pdf");
     await expect(extractPdfText(fixture("sample-sem-texto.pdf"), A_PARTE)).rejects.toThrow(
