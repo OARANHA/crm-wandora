@@ -365,9 +365,7 @@ export async function auditarConsultaAdminWhatsapp(input: {
       ...(etapaAuditavel ? { etapa_renderizacao: input.etapaRenderizacao } : {}),
       ...(evidenciaAuditavel ? { evidencia_pdf_timeout: input.evidenciaPdf } : {}),
       ...(egressAuditavel ? { evidencia_egress_browser: input.evidenciaEgress } : {}),
-      ...(validacaoPdfAuditavel
-        ? { evidencia_validacao_pdf: input.evidenciaValidacaoPdf }
-        : {}),
+      ...(validacaoPdfAuditavel ? { evidencia_validacao_pdf: input.evidenciaValidacaoPdf } : {}),
       ...(typeof input.statusHttp === "number" ? { status_http: input.statusHttp } : {}),
       ...(typeof input.autenticacaoSameOrigin === "boolean"
         ? { autenticacao_same_origin: input.autenticacaoSameOrigin }
