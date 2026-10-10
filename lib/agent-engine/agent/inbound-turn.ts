@@ -3228,6 +3228,15 @@ async function executarTurnoDoAgente(
             // no runtime — null cai nos degraus de warm-up (conservadores). Injetar
             // aqui quando o drain expuser o limite da sessão.
             crmDailyLimit: null,
+            // O aviso de falha DANFE é mensagem técnica determinística de UM turno,
+            // não um blast de marketing. A auditoria real em 09/10/2026 mostrou
+            // mass_identical vetando o aviso e deixando o administrador sem resposta.
+            // Desarmar SOMENTE spinning, nunca stop/LGPD/pacing/janela/ledger.
+            enforceSpinning:
+              !preview &&
+              guardaDanfe.permitirAvisoTecnicoSemSpinning(body, documentoAdminPreparado !== null)
+                ? false
+                : true,
             now: clock(),
             sleep: deps.sleep,
             lgpd,
