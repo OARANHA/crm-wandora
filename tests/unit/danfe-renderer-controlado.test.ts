@@ -22,7 +22,10 @@ vi.mock("@/lib/documentos/renderizar-url-pdf", async (importOriginal) => {
 });
 
 import { ErroRenderizacaoDocumento } from "@/lib/documentos/renderizar-url-pdf";
-import { diagnosticarTextoPdfFiscal, renderizarUrlParaPdfControlado } from "@/lib/documentos/renderizar-url-pdf-controlado";
+import {
+  diagnosticarTextoPdfFiscal,
+  renderizarUrlParaPdfControlado,
+} from "@/lib/documentos/renderizar-url-pdf-controlado";
 
 const danfe =
   "https://app.vendaerp.com.br/v3/public/NFe/Danfe?Cod=abcdef123456abcdef123456&g=12345678-1234-4123-8123-123456789abc";
@@ -282,7 +285,6 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(env.page.pdf).toHaveBeenCalledOnce();
   });
 
-
   it("distingue falha de extrator da rejeição fiscal, sem copiar conteúdo sensível", async () => {
     const env = ambientePdf();
     const chave = "35261012345678000190550010649963971123456780";
@@ -318,8 +320,10 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     const chave = "35261012345678000190550010649963971123456780";
     expect(
       diagnosticarTextoPdfFiscal(
-        "D A N F E CHAVEDEACESSO " + chave.match(/.{1,4}/g)?.join(" ") +
-          " " + "PRODUTO TESTE ".repeat(12),
+        "D A N F E CHAVEDEACESSO " +
+          chave.match(/.{1,4}/g)?.join(" ") +
+          " " +
+          "PRODUTO TESTE ".repeat(12),
         chave,
       ),
     ).toBeNull();
