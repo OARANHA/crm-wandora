@@ -30,14 +30,16 @@ export function diagnosticarTextoPdfFiscal(
   chaveEsperada: string,
 ): EvidenciaValidacaoPdfDocumento | null {
   if (!/^\d{44}$/.test(chaveEsperada)) return "chave_divergente";
-  const normalizado = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const normalizado = texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
   const semEspacos = normalizado.replace(/\s+/g, "");
   if (
-    /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(
-      normalizado,
-    ) ||
+    /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(normalizado) ||
     /\bERRO\s+AO\s+(?:CARREGAR|CONSULTAR)\b/.test(normalizado)
-  ) return "pagina_de_erro";
+  )
+    return "pagina_de_erro";
   if (normalizado.trim().length < 80) return "texto_insuficiente";
   // PDFjs pode separar letras ou juntar palavras na mesma linha impressa.
   // A chave inteira continua obrigatória, impedindo aceitar um HTML vazio.
@@ -333,8 +335,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
           prazo,
         );
       } catch (erro) {
-        const expirou =
-          erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout";
+        const expirou = erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout";
         throw new ErroRenderizacaoDocumento(
           "render_falhou",
           "pdf_validacao",
