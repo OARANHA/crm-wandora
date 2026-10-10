@@ -39,6 +39,10 @@ export type EvidenciaPdfAoExpirar =
 export type EvidenciaValidacaoPdfDocumento =
   | "extracao_falhou"
   | "extracao_timeout"
+  | "extracao_sem_texto"
+  | "extracao_memoria"
+  | "extracao_processo_falhou"
+  | "extracao_dependencia"
   | "texto_insuficiente"
   | "marcador_danfe_ausente"
   | "rotulo_chave_ausente"

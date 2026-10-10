@@ -1,6 +1,6 @@
 import { chromium, type Browser } from "playwright-core";
 
-import { extractPdfText } from "@/lib/ai/rag/extractors/pdf";
+import { extractPdfText, PdfExtractError } from "@/lib/ai/rag/extractors/pdf";
 import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
 
 import {
@@ -345,13 +345,26 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
           prazo,
         );
       } catch (erro) {
-        const expirou = erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout";
+        const origem = erro instanceof PdfExtractError ? erro.causaTecnica : null;
+        const evidencia: EvidenciaValidacaoPdfDocumento =
+          (erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout") ||
+          origem === "timeout"
+            ? "extracao_timeout"
+            : origem === "sem_texto"
+              ? "extracao_sem_texto"
+              : origem === "memoria"
+                ? "extracao_memoria"
+                : origem === "processo"
+                  ? "extracao_processo_falhou"
+                  : origem === "dependencia"
+                    ? "extracao_dependencia"
+                    : "extracao_falhou";
         throw new ErroRenderizacaoDocumento(
           "render_falhou",
           "pdf_validacao",
           undefined,
           undefined,
-          expirou ? "extracao_timeout" : "extracao_falhou",
+          evidencia,
         );
       }
       const evidencia = diagnosticarTextoPdfFiscal(texto, politica.chaveFiscalEsperada);
