@@ -1,0 +1,44 @@
+name: DANFE print-media fallback offline
+
+on:
+  pull_request:
+    paths:
+      - "scripts/diagnostics/danfe-screen-media-offline.mjs"
+      - ".github/workflows/danfe-screen-media-offline.yml"
+      - "lib/documentos/renderizar-url-pdf-controlado.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screen-media:
+    name: Published worker CSS print vs screen
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check synthetic probe syntax
+        run: node --check scripts/diagnostics/danfe-screen-media-offline.mjs
+      - name: Pull immutable released Alpine worker
+        run: docker pull ghcr.io/oaranha/elus-worker@sha256:fb51f10785191847a8974778620f8c7134343768c57d0efdcf2c7709914ee81e
+      - name: Verify controlled print-screen media under no network
+        run: |
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --memory 1024m \
+            --pids-limit 256 \
+            --shm-size 256m \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            --mount type=bind,source="$GITHUB_WORKSPACE/scripts/diagnostics/danfe-screen-media-offline.mjs",target=/probe.mjs,readonly \
+            --entrypoint node \
+            ghcr.io/oaranha/elus-worker@sha256:fb51f10785191847a8974778620f8c7134343768c57d0efdcf2c7709914ee81e \
+            /probe.mjs
+      - name: Boundary
+        if: always()
+        run: |
+          echo "Synthetic document only, network none, no real VendaERP request."
+          echo "This does not prove a real fiscal document or authorize deployment."

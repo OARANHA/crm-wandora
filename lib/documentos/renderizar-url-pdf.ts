@@ -40,6 +40,7 @@ export type EvidenciaValidacaoPdfDocumento =
   | "extracao_falhou"
   | "extracao_timeout"
   | "extracao_sem_texto"
+  | "extracao_sem_texto_apos_screen"
   | "extracao_memoria"
   | "extracao_processo_falhou"
   | "extracao_dependencia"
