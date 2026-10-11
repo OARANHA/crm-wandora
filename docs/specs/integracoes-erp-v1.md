@@ -166,6 +166,25 @@ DANFEs ao administrador na conversa corrente. Para cada NFe selecionada, o agent
 DANFE e imediatamente executa o `send_message` que consome aquele documento; só então prepara a
 próxima. Assim cada PDF atravessa o sender canônico, `before_send`, ledger e guardrails existentes,
 sem URL externa nem `storage_path` no contexto do modelo.
+**Orçamento exclusivo de documentos administrativos (preparo para entrega até 5 DANFEs):**
+O limite global de mensagens do agente continua protegendo leads e templates.
+Para o pedido **explícito de últimas N notas (2 a 5)**, a exceção de envio adicional
+exige cumulativamente: `crm_erp_prepare_admin_danfe` efetivamente montada após
+a autoridade do WhatsApp administrativo, busca fiscal completa no mesmo turno,
+número da DANFE preparada pertencente ao conjunto comprovado e documento privado
+ainda pendente. Somente o `send_message` que consome esse **documento** pode ultrapassar
+o teto geral até a quinta mensagem; `send_template`, texto livre e mídias comuns
+não recebem privilégio. O orçamento de steps do modelo é ampliado com teto finito
+de `2 × N + 4`, apenas neste mesmo contexto; nenhum knob da organização é alterado.
+Configuração geral de menos de três envios permanece respeitada, sem exceção.
+Duas preparações simultâneas ou novo preparo enquanto existe um PDF pendente
+são recusados para impedir sobrescrita no slot de documento.
+
+**Esta preparação não resolve a falha do Chromium/Playwright**; cinco DANFEs
+só devem ser consideradas entregues após teste da renderização e aceite real do
+sender/ledger por NFe distintas. Quantidades acima de cinco ainda exigem
+desenho de entrega em lotes/turnos duráveis com idempotência, sem ampliar
+automaticamente os limites de segurança.
 
 A coordenação do mesmo turno é determinística: uma busca de pedidos por Nome/Razão Social registra
 seu resultado pelo `requestId`. Quando todos os pedidos encontrados carregam a mesma `pessoaID`,
