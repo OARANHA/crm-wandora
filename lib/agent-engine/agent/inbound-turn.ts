@@ -2624,6 +2624,9 @@ async function executarTurnoDoAgente(
 
   // Estado do RUN — vive só neste closure (isolamento por construção, acc 3).
   let seq = 0;
+  // Contagem de documentos fiscais efetivamente entregues ao sender no turno.
+  // Mensagens de introdução não consomem a quota das N DANFEs solicitadas.
+  let danfesAdminEnviadas = 0;
   // Documento administrativo preparado por uma capability MCP NESTE turno.
   // Fica só no closure do runtime: o modelo nunca recebe storage_path. A próxima
   // send_message o entrega pelo sender canônico, sob before_send + ledger.
@@ -3142,6 +3145,7 @@ async function executarTurnoDoAgente(
             quantidade: quantidadeDeNotasMaisRecentesPedida(mensagemDoJob),
             limiteEnviosGeral: maxSendsPerTurn,
             enviosRealizados: seq,
+            danfesEnviadas: danfesAdminEnviadas,
             documentoPreparado: documentoAdminPreparado !== null,
             numeroDaNotaPreparada: numeroNfeAdminPreparada,
             recenciaComprovada: recenciaFiscalComprovadaNesteTurno,
@@ -3389,6 +3393,7 @@ async function executarTurnoDoAgente(
                 const documento = documentoAdminPreparado;
                 documentoAdminPreparado = null;
                 numeroNfeAdminPreparada = null;
+                danfesAdminEnviadas += 1;
                 return enviar(finalBody, {
                   storagePath: documento.storagePath,
                   mime: documento.mime,
