@@ -43,7 +43,6 @@ export async function buscarUltimasNfesFiscais(
   const { quantidade, documento, mesAno } = opcoes;
   if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 20)
     return { ok: false, motivo: "quantidade_invalida" };
-  if (quantidade > 3 && !mesAno) return { ok: false, motivo: "mes_necessario" };
   const hoje = hojeBrasil(opcoes.agora ?? new Date());
   const meses: ReturnType<typeof intervaloFiscal>[] = [];
   if (mesAno) {

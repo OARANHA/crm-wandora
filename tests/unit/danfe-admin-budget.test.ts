@@ -5,6 +5,7 @@ import {
   envioExtraDeDanfeAdminPermitido,
   orcamentoDeStepsDanfeAdmin,
   ReservaEnvioDanfeAdmin,
+  envioDanfeAceitoPeloSender,
   reservaDanfeAindaValida,
 } from "@/lib/agent-engine/agent/danfe-admin-budget";
 
@@ -23,6 +24,23 @@ const base = {
 } as const;
 
 describe("orçamento estrito de envio DANFE para admin comprovado", () => {
+  it("contabiliza só aceite de DANFE pelo sender, não tentativa falha", () => {
+    expect(envioDanfeAceitoPeloSender("sent")).toBe(true);
+    expect(envioDanfeAceitoPeloSender("already_sent")).toBe(true);
+    expect(envioDanfeAceitoPeloSender("queued")).toBe(true);
+    expect(envioDanfeAceitoPeloSender("blocked")).toBe(false);
+    expect(envioDanfeAceitoPeloSender("failed")).toBe(false);
+    expect(envioDanfeAceitoPeloSender("unavailable")).toBe(false);
+  });
+  it("preparo seguinte respeita reserva de envio anterior em andamento", () => {
+    const reserva = new ReservaEnvioDanfeAdmin();
+    expect(reserva.estaOcupada()).toBe(false);
+    expect(reserva.tentarReservar()).toBe(true);
+    expect(reserva.estaOcupada()).toBe(true);
+    reserva.liberar();
+    expect(reserva.estaOcupada()).toBe(false);
+  });
+
   it("não sequestra uma DANFE preparada depois do início de send_message", () => {
     const documentoTardio = { storagePath: "privado/seguro", mime: "application/pdf" };
     const parametros = {

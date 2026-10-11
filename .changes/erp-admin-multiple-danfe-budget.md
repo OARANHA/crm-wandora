@@ -5,4 +5,5 @@
 - Impede preparar duas DANFEs simultaneamente ou sobrescrever documento pendente; mantém `prepare → send_message` sequencial, `before_send`, ledger, idempotência, egress e storage privado.
 - Ajusta apenas para essa solicitação o orçamento finito de steps do agente; não altera env, mensagens genéricas nem templates.
 - Testes unitários sintéticos de autorização, recência, documento pendente, número divergente, quantidade máxima e limites deliberadamente menores.
+- Contabiliza uma DANFE apenas após o aceite pelo sender (`sent`, `already_sent` ou `queued`), sem consumir quota quando a tentativa é bloqueada ou falha; novo preparo aguarda o término da reserva documental anterior.
 - **Não muda o renderer**. Aceite real da issue #55 permanece pendente até PDFs corretos e distintos entregues.

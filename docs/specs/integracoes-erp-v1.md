@@ -166,6 +166,7 @@ DANFEs ao administrador na conversa corrente. Para cada NFe selecionada, o agent
 DANFE e imediatamente executa o `send_message` que consome aquele documento; só então prepara a
 próxima. Assim cada PDF atravessa o sender canônico, `before_send`, ledger e guardrails existentes,
 sem URL externa nem `storage_path` no contexto do modelo.
+
 **Orçamento exclusivo de documentos administrativos (preparo para entrega até 5 DANFEs):**
 O limite global de mensagens do agente continua protegendo leads e templates.
 Para o pedido **explícito de últimas N notas (2 a 5)**, a exceção de envio adicional
@@ -404,9 +405,9 @@ para recência de NFe e não inferir emissão pela posição em pedidos.
 
 Política:
 
-- quantidade omitida: **3**; quantidade de 1 a 3: consulta automaticamente
+- quantidade omitida: **3**; qualquer quantidade de **1 a 20** sem período explícito consulta automaticamente
   mês corrente e, se faltar quantidade, retrocede até seis meses anteriores;
-- quantidade de 4 a 20: exige mes_ano=AAAA-MM antes de qualquer consulta;
+- quantidade de 4 a 20: sem mês explícito também percorre a janela regressiva limitada; `mes_ano=AAAA-MM` é filtro opcional, jamais obrigatório pela quantidade;
 - mês explícito: consulta somente aquele mês; nenhuma chamada cruza meses;
 - paginação completa do mês até retorno menor que 50; por chamada, no máximo
   12 páginas/mês e 24 páginas totais; limite atingido retorna

@@ -176,6 +176,7 @@ import {
   envioExtraDeDanfeAdminPermitido,
   orcamentoDeStepsDanfeAdmin,
   ReservaEnvioDanfeAdmin,
+  envioDanfeAceitoPeloSender,
   reservaDanfeAindaValida,
 } from './danfe-admin-budget';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
@@ -3439,11 +3440,17 @@ async function executarTurnoDoAgente(
                 const documento = documentoReservadoNoInicio;
                 documentoAdminPreparado = null;
                 numeroNfeAdminPreparada = null;
-                danfesAdminEnviadas += 1;
                 return enviar(finalBody, {
                   storagePath: documento.storagePath,
                   mime: documento.mime,
                   kind: 'document',
+                }).then((outcome) => {
+                  // Uma tentativa rejeitada pelo canal não é uma DANFE entregue.
+                  // 'queued' e 'already_sent' já têm aceite durável/idempotente.
+                  if (envioDanfeAceitoPeloSender(outcome.kind)) {
+                    danfesAdminEnviadas += 1;
+                  }
+                  return outcome;
                 });
               }
 
@@ -4164,7 +4171,11 @@ async function executarTurnoDoAgente(
                   );
                   // Registra ANTES da execução: chamadas paralelas da mesma NFe
                   // também são bloqueadas, sem segunda ida ao renderer.
-                  if (documentoAdminPreparado !== null || preparoDanfeAdminEmAndamento) {
+                  if (
+                    documentoAdminPreparado !== null ||
+                    preparoDanfeAdminEmAndamento ||
+                    reservaEnvioDanfeAdmin.estaOcupada()
+                  ) {
                     return {
                       ok: false,
                       error: {

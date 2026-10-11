@@ -6,6 +6,13 @@
  */
 export const MAX_DANFES_ADMIN_POR_TURNO = 5;
 
+/** Somente aceitação pelo sender consome quota documental. */
+export function envioDanfeAceitoPeloSender(
+  kind: "sent" | "already_sent" | "queued" | "blocked" | "failed" | "unavailable",
+): boolean {
+  return kind === "sent" || kind === "already_sent" || kind === "queued";
+}
+
 export function orcamentoDeStepsDanfeAdmin(input: {
   ferramentaAdminMontada: boolean;
   pedidoRecente: boolean;
@@ -90,6 +97,10 @@ export class ReservaEnvioDanfeAdmin {
 
   liberar(): void {
     this.ocupada = false;
+  }
+
+  estaOcupada(): boolean {
+    return this.ocupada;
   }
 }
 
