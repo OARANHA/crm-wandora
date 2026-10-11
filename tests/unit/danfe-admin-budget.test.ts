@@ -5,6 +5,7 @@ import {
   envioExtraDeDanfeAdminPermitido,
   orcamentoDeStepsDanfeAdmin,
   ReservaEnvioDanfeAdmin,
+  reservaDanfeAindaValida,
 } from "@/lib/agent-engine/agent/danfe-admin-budget";
 
 const notas = new Set(["101", "102", "103", "104", "105"]);
@@ -22,6 +23,59 @@ const base = {
 } as const;
 
 describe("orçamento estrito de envio DANFE para admin comprovado", () => {
+  it("não sequestra uma DANFE preparada depois do início de send_message", () => {
+    const documentoTardio = { storagePath: "privado/seguro", mime: "application/pdf" };
+    const parametros = {
+      documentoNoInicio: null,
+      documentoNoEnvio: documentoTardio,
+      numeroNoInicio: null,
+      numeroNoEnvio: "101",
+      pedidoRecente: true,
+      recenciaComprovada: true,
+      numerosComprovados: new Set(["101"]),
+    };
+    expect(reservaDanfeAindaValida(parametros)).toBe(false);
+  });
+
+  it("mantém a mesma referência e número durante before_send", () => {
+    const documento = { storagePath: "privado/seguro", mime: "application/pdf" };
+    const baseDocumento = {
+      documentoNoInicio: documento,
+      documentoNoEnvio: documento,
+      numeroNoInicio: "101",
+      numeroNoEnvio: "101",
+      pedidoRecente: true,
+      recenciaComprovada: true,
+      numerosComprovados: new Set(["101"]),
+    };
+    expect(reservaDanfeAindaValida(baseDocumento)).toBe(true);
+    expect(
+      reservaDanfeAindaValida({
+        ...baseDocumento,
+        documentoNoEnvio: { ...documento },
+      }),
+    ).toBe(false);
+    expect(reservaDanfeAindaValida({ ...baseDocumento, numeroNoEnvio: "102" })).toBe(false);
+    expect(reservaDanfeAindaValida({ ...baseDocumento, recenciaComprovada: false })).toBe(false);
+    expect(reservaDanfeAindaValida({ ...baseDocumento, numerosComprovados: new Set() })).toBe(false);
+  });
+
+  it("permite NFe específica mesmo sem ranking, se a reserva é a mesma", () => {
+    const documento = { storagePath: "privado/seguro", mime: "application/pdf" };
+    expect(
+      reservaDanfeAindaValida({
+        documentoNoInicio: documento,
+        documentoNoEnvio: documento,
+        numeroNoInicio: "101",
+        numeroNoEnvio: "101",
+        pedidoRecente: false,
+        recenciaComprovada: false,
+        numerosComprovados: new Set(),
+      }),
+    ).toBe(true);
+  });
+
+
   it("duas chamadas paralelas não consomem o mesmo documento", async () => {
     const reserva = new ReservaEnvioDanfeAdmin();
     let liberarPrimeiro!: () => void;
