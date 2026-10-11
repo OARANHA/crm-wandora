@@ -306,7 +306,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
   });
 
   it.each([
-    ["sem_texto", "extracao_sem_texto_apos_screen"],
+    ["sem_texto", "extracao_sem_texto_apos_screen_dom_confirmado"],
     ["timeout", "extracao_timeout"],
     ["memoria", "extracao_memoria"],
     ["processo", "extracao_processo_falhou"],
@@ -373,10 +373,55 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     ).rejects.toMatchObject({
       codigo: "render_falhou",
       etapa: "pdf_validacao",
-      evidenciaValidacaoPdf: "extracao_sem_texto_apos_screen",
+      evidenciaValidacaoPdf: "extracao_sem_texto_apos_screen_dom_confirmado",
     });
     expect(env.page.pdf).toHaveBeenCalledTimes(2);
     expect(env.browser.close).toHaveBeenCalledOnce();
+  });
+
+  it("distingue DOM não confirmado após timeout sem registrar texto ou chave", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    env.page.waitForFunction.mockRejectedValueOnce(
+      Object.assign(new Error("timeout sintético com segredo " + chave), { name: "TimeoutError" }),
+    );
+    mocks.extractPdfText.mockRejectedValue(
+      new PdfExtractError("sem texto", undefined, "sem_texto", "sem_texto"),
+    );
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave }),
+    ).rejects.toMatchObject({
+      codigo: "render_falhou",
+      etapa: "pdf_validacao",
+      evidenciaValidacaoPdf: "extracao_sem_texto_apos_screen_dom_nao_confirmado",
+      evidenciaEgress: "nenhum_bloqueio_interceptado",
+    });
+    expect(env.page.pdf).toHaveBeenCalledTimes(2);
+  });
+
+  it("audita categoria de método bloqueado após duas impressões sem texto", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    env.context.route.mockImplementationOnce(async (_pattern, handler) => {
+      const abort = vi.fn();
+      await handler({
+        request: () => ({ method: () => "POST", url: () => danfe }),
+        abort,
+        continue: vi.fn(),
+      });
+      expect(abort).toHaveBeenCalledWith("blockedbyclient");
+    });
+    mocks.extractPdfText.mockRejectedValue(
+      new PdfExtractError("sem texto", undefined, "sem_texto", "sem_texto"),
+    );
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave }),
+    ).rejects.toMatchObject({
+      evidenciaValidacaoPdf: "extracao_sem_texto_apos_screen_dom_confirmado",
+      evidenciaEgress: "metodo_nao_permitido",
+    });
+    expect(env.context.route).toHaveBeenCalledTimes(1);
+    expect(env.page.pdf).toHaveBeenCalledTimes(2);
   });
 
   it("nunca aceita outro documento no fallback mesmo com chave referenciada", async () => {
