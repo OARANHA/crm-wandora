@@ -263,7 +263,7 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
       .mockResolvedValueOnce({ ok: true, dados: { notas: [], retornados: 0 } });
     const r = await buscarUltimasNfesFiscais(db, org, {
       quantidade: 1,
-      mesAno: "2026-08",
+      dataInicio: "2026-08-04", dataFim: "2026-08-04",
       agora: new Date("2026-10-08T14:00:00Z"),
     });
     expect(r.ok).toBe(true);
