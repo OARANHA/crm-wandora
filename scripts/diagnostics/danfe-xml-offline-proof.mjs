@@ -33,10 +33,17 @@ if (mode === "generate") {
   assert(normalized.includes("DANFE"), "danfe_marker_not_in_pdf_text");
   const label = normalized.indexOf("CHAVE DE ACESSO");
   assert(label >= 0, "key_label_not_in_pdf_text");
-  const field = normalized.slice(label + "CHAVE DE ACESSO".length, label + 200);
-  const candidate = field.match(/^\s*:?\s*((?:\d[\s.\-]*){44})(?!\d)/);
-  assert(candidate, "key_field_not_in_pdf_text");
-  assert.equal(candidate[1].replace(/\D/g, ""), SYNTHETIC_KEY, "key_mismatch");
+  // pdftotext -layout intercala colunas visuais entre rótulo e campo:
+  // não podemos presumir que a chave aparece imediatamente após o rótulo.
+  // Esta prova sintética exige a sequência literal íntegra de 44 dígitos,
+  // agrupados como impressos pelo gerador, sem concatenar dígitos arbitrários.
+  // NÃO substitui a validação fiscal canônica, que exige identidade do campo.
+  const grupos = SYNTHETIC_KEY.match(/\d{4}/g);
+  assert.equal(grupos?.length, 11, "invalid_synthetic_key_fixture");
+  const padraoChaveSintetica = new RegExp(
+    `(?<!\\d)${grupos.join("[\\s.\\-]+")}(?!\\d)`,
+  );
+  assert(padraoChaveSintetica.test(normalized), "synthetic_key_not_in_pdf_text");
   console.log(JSON.stringify({
     offline: true, pdf_selectable_text: true, synthetic_key_matched: true,
     fiscal_authorization_proven: false, provider_xml_compatibility_proven: false
