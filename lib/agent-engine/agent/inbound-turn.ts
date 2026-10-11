@@ -176,6 +176,7 @@ import {
   envioExtraDeDanfeAdminPermitido,
   orcamentoDeStepsDanfeAdmin,
   ReservaEnvioDanfeAdmin,
+  reservaDanfeAindaValida,
 } from './danfe-admin-budget';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
 import { cancelPendingCronsForLead } from '../cron/scheduler';
@@ -3061,7 +3062,11 @@ async function executarTurnoDoAgente(
     send_message: tool({
       ...AGENT_TOOL_DEFS.send_message,
       execute: async ({ body, produto_codigo }) => {
-        const haviaDanfePendente = documentoAdminPreparado !== null;
+        // Snapshot ANTES de qualquer await: um documento criado mais tarde não
+        // pode ser consumido por uma mensagem textual iniciada antes do preparo.
+        const documentoReservadoNoInicio = documentoAdminPreparado;
+        const numeroNfeReservadaNoInicio = numeroNfeAdminPreparada;
+        const haviaDanfePendente = documentoReservadoNoInicio !== null;
         if (haviaDanfePendente && !reservaEnvioDanfeAdmin.tentarReservar()) {
           return {
             ok: false,
@@ -3400,11 +3405,25 @@ async function executarTurnoDoAgente(
                   ...(media ? { media } : {}),
                 });
               };
-              // DANFE administrativo preparado: a próxima send_message vira UMA
-              // mensagem documental. A referência fica interna ao turno e o arquivo sai
-              // pelo MESMO sender/ledger/guardrails do texto — nunca direto da tool ERP.
-              if (documentoAdminPreparado !== null) {
-                const documento = documentoAdminPreparado;
+              // Uma DANFE que apareceu DEPOIS do início do send_message jamais
+              // pode ser anexada a um texto mais antigo. Se uma reserva perdeu
+              // identidade ou prova fiscal durante o before_send, também não
+              // fazemos fallback silencioso para mensagem sem anexo.
+              if (haviaDanfePendente || documentoAdminPreparado !== null) {
+                if (
+                  !reservaDanfeAindaValida({
+                    documentoNoInicio: documentoReservadoNoInicio,
+                    documentoNoEnvio: documentoAdminPreparado,
+                    numeroNoInicio: numeroNfeReservadaNoInicio,
+                    numeroNoEnvio: numeroNfeAdminPreparada,
+                    pedidoRecente: pedidoDeNfeMaisRecente(mensagemDoJob),
+                    recenciaComprovada: recenciaFiscalComprovadaNesteTurno,
+                    numerosComprovados: numerosNfeFiscaisComprovados,
+                  })
+                ) {
+                  throw new Error('danfe_reserva_invalida_antes_do_sender');
+                }
+                const documento = documentoReservadoNoInicio;
                 documentoAdminPreparado = null;
                 numeroNfeAdminPreparada = null;
                 danfesAdminEnviadas += 1;
