@@ -45,7 +45,11 @@ export function examinarEnvelopeFiscalDaRespostaPrivada(
   resposta: unknown,
   codigoNfeEsperado: number,
 ): ProvaFiscalInternaPendente {
-  if (!Number.isSafeInteger(codigoNfeEsperado) || codigoNfeEsperado <= 0 || codigoNfeEsperado > 2147483647) {
+  if (
+    !Number.isSafeInteger(codigoNfeEsperado) ||
+    codigoNfeEsperado <= 0 ||
+    codigoNfeEsperado > 2147483647
+  ) {
     return pendente("entrada_invalida");
   }
   const dados = registro(resposta);
@@ -53,8 +57,12 @@ export function examinarEnvelopeFiscalDaRespostaPrivada(
 
   const numero = dados.Numero ?? dados.numero;
   const chave = dados.ChaveNFe ?? dados.chaveNFe;
-  if (typeof numero !== "number" || !Number.isSafeInteger(numero) ||
-      typeof chave !== "string" || !/^\d{44}$/.test(chave)) {
+  if (
+    typeof numero !== "number" ||
+    !Number.isSafeInteger(numero) ||
+    typeof chave !== "string" ||
+    !/^\d{44}$/.test(chave)
+  ) {
     return pendente("identidade_ausente");
   }
   if (numero !== codigoNfeEsperado || Number(chave.slice(25, 34)) !== numero) {
@@ -69,7 +77,9 @@ export function examinarEnvelopeFiscalDaRespostaPrivada(
   if (Buffer.byteLength(xml, "utf8") > 262_144 || xml.length < 80) return pendente("xml_limite");
   // Pré-filtro, NÃO parser XML. Os controles estruturais da PR #95 são
   // experimentais e não habilitam autorização fiscal em produção.
-  if (/<!DOCTYPE|<!ENTITY|<!\[CDATA\[|<\?[^x]|[\u0000-\u0008\u000b\u000c\u000e-\u001f]/i.test(xml)) {
+  if (
+    /<!DOCTYPE|<!ENTITY|<!\[CDATA\[|<\?[^x]|[\u0000-\u0008\u000b\u000c\u000e-\u001f]/i.test(xml)
+  ) {
     return pendente("xml_proibido");
   }
   // Nenhum status ou XML autoafirmado promove o documento à categoria autorizada.
