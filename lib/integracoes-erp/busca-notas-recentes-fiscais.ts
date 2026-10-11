@@ -44,6 +44,7 @@ function dataIso(ms: number): string {
 function lerDataIso(data: string): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return null;
   const [ano, mes, dia] = data.split("-").map(Number);
+  if (ano === undefined || mes === undefined || dia === undefined) return null;
   const instante = Date.UTC(ano, mes - 1, dia);
   return dataIso(instante) === data ? instante : null;
 }
