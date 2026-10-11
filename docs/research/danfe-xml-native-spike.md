@@ -12,6 +12,8 @@ Alternativa a investigar: renderização do XML **inteiramente no servidor** via
 
 O teste usa um XML de NF-e de exemplo **inteiramente fictício**, originado de `brasil-fiscal/nfe/examples/nfe-exemplo.xml` (MIT; empresa e destinatário explicitamente TESTE). Instala `@brasil-fiscal/nfe@2.0.7`, `pdfkit@0.18.0` e `qrcode@1.5.4` fora do projeto, com `--ignore-scripts`. Invoca apenas `GerarDanfeUseCase` em contêiner descartável, `--network none`, permissões reduzidas e memória limitada. Inspeciona os bytes PDF e exige **texto selecionável**, rótulo DANFE e chave sintética exata via `pdftotext`.
 
+O teste de seleção de texto confirma separadamente `DANFE`, o rótulo `CHAVE DE ACESSO` e os **11 grupos consecutivos de 4 dígitos** da chave sintética. O extrator `pdftotext -layout` intercala colunas, de modo que a posição linear logo após o rótulo **não** é uma garantia. Essa prova **não estabelece proximidade geométrica, correspondência ao campo fiscal oficial, integridade/autorização SEFAZ nem compatibilidade com XML real**. A validação canônica de identidade fiscal da aplicação NÃO foi alterada.
+
 O XML de amostra é **não autorizado** (sem prova SEFAZ); serve apenas para viabilidade técnica e jamais pode ser enviado como DANFE. Nenhum pacote entra nas dependências de produção. O código da ISIS, armazenamento, auditoria, renderer vigente e política SSRF são intocados.
 
 ## Gaps antes de qualquer uso real
