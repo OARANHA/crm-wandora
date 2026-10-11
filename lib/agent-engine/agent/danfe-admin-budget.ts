@@ -34,6 +34,7 @@ export function envioExtraDeDanfeAdminPermitido(input: {
   quantidade: number;
   limiteEnviosGeral: number;
   enviosRealizados: number;
+  danfesEnviadas: number;
   documentoPreparado: boolean;
   numeroDaNotaPreparada: string | null;
   recenciaComprovada: boolean;
@@ -45,6 +46,7 @@ export function envioExtraDeDanfeAdminPermitido(input: {
     quantidade,
     limiteEnviosGeral,
     enviosRealizados,
+    danfesEnviadas,
     documentoPreparado,
     numeroDaNotaPreparada,
     recenciaComprovada,
@@ -57,8 +59,14 @@ export function envioExtraDeDanfeAdminPermitido(input: {
     quantidade >= 2 &&
     quantidade <= MAX_DANFES_ADMIN_POR_TURNO &&
     limiteEnviosGeral >= 3 &&
+    Number.isInteger(danfesEnviadas) &&
+    danfesEnviadas >= 0 &&
+    danfesEnviadas < quantidade &&
+    enviosRealizados >= danfesEnviadas &&
     enviosRealizados >= limiteEnviosGeral &&
-    enviosRealizados < Math.max(limiteEnviosGeral, quantidade) &&
+    // Apenas o envio documental excepcional: textos não ganham orçamento extra.
+    enviosRealizados - danfesEnviadas <= limiteEnviosGeral &&
+    enviosRealizados < limiteEnviosGeral + quantidade &&
     documentoPreparado &&
     typeof numeroDaNotaPreparada === "string" &&
     numerosComprovados.has(numeroDaNotaPreparada) &&
