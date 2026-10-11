@@ -92,3 +92,36 @@ export class ReservaEnvioDanfeAdmin {
     this.ocupada = false;
   }
 }
+
+/**
+ * Amarra o documento ao início do send_message: um preparo concluído durante
+ * awaits do before_send não pode ser capturado por uma chamada de texto antiga.
+ * Com pedido de "últimas notas", uma nova busca pode revogar a prova fiscal
+ * durante a espera; nesse caso o documento também não pode sair.
+ */
+export function reservaDanfeAindaValida<T extends object>(input: {
+  documentoNoInicio: T | null;
+  documentoNoEnvio: T | null;
+  numeroNoInicio: string | null;
+  numeroNoEnvio: string | null;
+  pedidoRecente: boolean;
+  recenciaComprovada: boolean;
+  numerosComprovados: ReadonlySet<string>;
+}): boolean {
+  const {
+    documentoNoInicio,
+    documentoNoEnvio,
+    numeroNoInicio,
+    numeroNoEnvio,
+    pedidoRecente,
+    recenciaComprovada,
+    numerosComprovados,
+  } = input;
+  return (
+    documentoNoInicio !== null &&
+    documentoNoEnvio === documentoNoInicio &&
+    numeroNoInicio !== null &&
+    numeroNoInicio === numeroNoEnvio &&
+    (!pedidoRecente || (recenciaComprovada && numerosComprovados.has(numeroNoInicio)))
+  );
+}
