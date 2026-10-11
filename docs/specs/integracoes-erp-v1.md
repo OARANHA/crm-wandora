@@ -184,7 +184,12 @@ Configuração geral de menos de três envios permanece respeitada, sem exceçã
 Duas preparações simultâneas ou novo preparo enquanto existe um PDF pendente
 são recusados para impedir sobrescrita no slot de documento. Duas chamadas de
 `send_message` concorrentes também não podem consumir a mesma reserva de DANFE;
-o bloqueio é por turno e liberado ao fim da tentativa, mesmo sob exceção.
+o bloqueio é por turno e liberado ao fim da tentativa, mesmo sob exceção. A seleção do anexo
+é vinculada ao instante inicial do `send_message`: um PDF preparado durante
+esperas da cadeia não pode ser anexado por outra chamada já em andamento.
+Antes da entrega, a mesma referência, NFe e prova fiscal são revalidadas;
+revogação de recência falha fechada. Um aviso de recência substituído pelo gate
+continua podendo sair como texto, sem reanexar documento revogado.
 
 **Esta preparação não resolve a falha do Chromium/Playwright**; cinco DANFEs
 só devem ser consideradas entregues após teste da renderização e aceite real do
