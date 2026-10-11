@@ -68,8 +68,13 @@ export function planejarBuscaFiscal(opcoes: {
   mesAno?: string;
   dataInicio?: string;
   dataFim?: string;
-}): { ok: true; intervalos: IntervaloFiscal[]; periodoConsultado: { dataInicio: string; dataFim: string } } |
-  { ok: false; motivo: "periodo_invalido" | "periodo_incompleto" | "periodo_excede_limite" } {
+}):
+  | {
+      ok: true;
+      intervalos: IntervaloFiscal[];
+      periodoConsultado: { dataInicio: string; dataFim: string };
+    }
+  | { ok: false; motivo: "periodo_invalido" | "periodo_incompleto" | "periodo_excede_limite" } {
   const hoje = hojeBrasil(opcoes.agora ?? new Date());
   const hojeMs = Date.UTC(hoje.ano, hoje.mes - 1, hoje.dia);
   const temInicio = opcoes.dataInicio !== undefined;
@@ -90,8 +95,7 @@ export function planejarBuscaFiscal(opcoes: {
     const ate = lerDataIso(opcoes.dataFim!);
     if (de === null || ate === null || de > ate || ate > hojeMs)
       return { ok: false, motivo: "periodo_invalido" };
-    if (ate - de >= 30 * DIA_MS)
-      return { ok: false, motivo: "periodo_excede_limite" };
+    if (ate - de >= 30 * DIA_MS) return { ok: false, motivo: "periodo_excede_limite" };
     inicio = de;
     fim = ate;
   } else {
@@ -157,8 +161,8 @@ export async function buscarUltimasNfesFiscais(
       if (!Number.isInteger(retornados) || retornados < 0 || retornados > PAGINA)
         return { ok: false, motivo: "invalid_response" };
       if (
-        notas.some((n) =>
-          n.instanteFiscal < intervalo.inicio || n.instanteFiscal >= intervalo.fim + DIA_MS
+        notas.some(
+          (n) => n.instanteFiscal < intervalo.inicio || n.instanteFiscal >= intervalo.fim + DIA_MS,
         )
       )
         return { ok: false, motivo: "consulta_inconsistente" };
@@ -169,8 +173,7 @@ export async function buscarUltimasNfesFiscais(
         break;
       }
     }
-    if (!completa)
-      return { ok: false, motivo: "consulta_parcial", detalhes: { mesesConsultados } };
+    if (!completa) return { ok: false, motivo: "consulta_parcial", detalhes: { mesesConsultados } };
     if (!mesesConsultados.includes(intervalo.codigo)) mesesConsultados.push(intervalo.codigo);
   }
   let selecionadas: NotaFiscalPeriodoErp[];
