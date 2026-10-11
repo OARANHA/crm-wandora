@@ -57,7 +57,9 @@ describe("orçamento estrito de envio DANFE para admin comprovado", () => {
     ).toBe(false);
     expect(reservaDanfeAindaValida({ ...baseDocumento, numeroNoEnvio: "102" })).toBe(false);
     expect(reservaDanfeAindaValida({ ...baseDocumento, recenciaComprovada: false })).toBe(false);
-    expect(reservaDanfeAindaValida({ ...baseDocumento, numerosComprovados: new Set() })).toBe(false);
+    expect(reservaDanfeAindaValida({ ...baseDocumento, numerosComprovados: new Set() })).toBe(
+      false,
+    );
   });
 
   it("permite NFe específica mesmo sem ranking, se a reserva é a mesma", () => {
@@ -74,7 +76,6 @@ describe("orçamento estrito de envio DANFE para admin comprovado", () => {
       }),
     ).toBe(true);
   });
-
 
   it("duas chamadas paralelas não consomem o mesmo documento", async () => {
     const reserva = new ReservaEnvioDanfeAdmin();
