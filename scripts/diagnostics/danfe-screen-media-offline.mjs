@@ -6,6 +6,8 @@ const pdfjs = await import(require.resolve("pdfjs-dist/legacy/build/pdf.mjs"));
 const CHAVE_SINTETICA = "35261012345678000190550010649963971123456780";
 let browser;
 let stage = "start";
+let printGenerated = false;
+let printMarkers = false;
 try {
   browser = await chromium.launch({
     headless: true,
@@ -41,20 +43,27 @@ try {
     await doc.destroy();
     return chunks.join("").trim();
   };
-  stage = "print";
+  stage = "print_capture";
   const impresso = await page.pdf({
     format: "A4",
     printBackground: true,
     displayHeaderFooter: false,
   });
+  printGenerated = true;
+  printMarkers =
+    impresso.subarray(0, 1024).includes(Buffer.from("%PDF-")) &&
+    impresso.subarray(-2048).includes(Buffer.from("%%EOF"));
+  stage = "print_extract";
   const textoImpresso = await texto(impresso);
-  stage = "screen";
+  stage = "screen_media";
   await page.emulateMedia({ media: "screen" });
+  stage = "screen_capture";
   const reimpresso = await page.pdf({
     format: "A4",
     printBackground: true,
     displayHeaderFooter: false,
   });
+  stage = "screen_extract";
   const textoScreen = await texto(reimpresso);
   const passou =
     textoImpresso.length === 0 &&
@@ -72,9 +81,29 @@ try {
     }),
   );
   if (!passou) process.exitCode = 1;
-} catch {
+} catch (error) {
+  // Categoria finita: nunca exportar stack, stderr, texto extraído ou caminhos.
+  const mensagem = error instanceof Error ? error.message : "";
+  const failureClass = /DOMMatrix|@napi-rs\/canvas/.test(mensagem)
+    ? "pdfjs_native_dependency"
+    : /workerSrc|PDFWorker|worker.*failed/i.test(mensagem)
+      ? "pdfjs_worker"
+      : /Invalid PDF|Missing PDF|format error/i.test(mensagem)
+        ? "pdf_invalid"
+        : /Target page|browser.*closed|process exited/i.test(mensagem)
+          ? "browser_closed"
+          : /Timeout|timed out/i.test(mensagem)
+            ? "timeout"
+            : "unclassified";
   console.log(
-    JSON.stringify({ scenario: "print_hidden_screen_visible", passed: false, failed_stage: stage }),
+    JSON.stringify({
+      scenario: "print_hidden_screen_visible",
+      passed: false,
+      failed_stage: stage,
+      failure_class: failureClass,
+      print_generated: printGenerated,
+      print_pdf_markers: printMarkers,
+    }),
   );
   process.exitCode = 1;
 } finally {
