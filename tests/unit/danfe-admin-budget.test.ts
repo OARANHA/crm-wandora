@@ -57,7 +57,6 @@ describe("orçamento estrito de envio DANFE para admin comprovado", () => {
     expect(reserva.tentarReservar()).toBe(true);
   });
 
-
   it("permite quarto e quinto documentos sem ampliar envio de texto", () => {
     expect(envioExtraDeDanfeAdminPermitido(base)).toBe(true);
     expect(
