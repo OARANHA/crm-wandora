@@ -13,8 +13,7 @@ export function orcamentoDeStepsDanfeAdmin(input: {
   limiteEnviosGeral: number;
   maxSteps: number;
 }): number {
-  const { ferramentaAdminMontada, pedidoRecente, quantidade, limiteEnviosGeral, maxSteps } =
-    input;
+  const { ferramentaAdminMontada, pedidoRecente, quantidade, limiteEnviosGeral, maxSteps } = input;
   if (
     !ferramentaAdminMontada ||
     !pedidoRecente ||
