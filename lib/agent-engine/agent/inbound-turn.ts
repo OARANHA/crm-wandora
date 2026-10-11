@@ -3411,6 +3411,7 @@ async function executarTurnoDoAgente(
               // fazemos fallback silencioso para mensagem sem anexo.
               if (haviaDanfePendente || documentoAdminPreparado !== null) {
                 if (
+                  documentoReservadoNoInicio === null ||
                   !reservaDanfeAindaValida({
                     documentoNoInicio: documentoReservadoNoInicio,
                     documentoNoEnvio: documentoAdminPreparado,
