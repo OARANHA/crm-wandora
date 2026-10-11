@@ -504,7 +504,6 @@ payload de rede. Status de bloqueio **não comprova causalidade**. Sem
 nova consulta real ao VendaERP até a versão seguir CI → merge → publicação
 → deploy healthy. Falhas continuam fail-closed, sem entregar DANFE inválida.
 
-
 ## Gate de prova fiscal interna (preparação sem liberação de DANFE, 11/10/2026)
 
 O estudo `docs/research/danfe-prova-fiscal-privada.md` documenta o seam
