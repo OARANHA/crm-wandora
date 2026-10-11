@@ -478,3 +478,28 @@ rótulo e chave fiscal exata da NFe. Se não tiver texto, auditar
 heap, dependência, chave divergente) **não acionam** a segunda impressão.
 Esse mecanismo não representa aceite real até duas DANFEs distintas chegarem
 à conversa correta após CI, merge, imagens e deploy saudável.
+
+## Canário 11/10/2026 — repetição segura após PR #92
+
+Turno `a17dff3a-9923-4af6-82ba-f8001f91ffe5`: busca recente sucesso,
+duas preparações com `pdf_validacao / extracao_sem_texto_apos_screen`.
+Apenas uma resposta `text`, nenhum documento enviado. O renderer
+executou a segunda impressão; **isso não demonstra que o HTML fiscal estivesse
+pronto nem que a falha tenha sido causada por CSS**.
+
+O código atual tolera timeout do gate DOM quando há uma chave fiscal
+estruturada, para permitir que um PDF válido seja comprovado após impressão.
+Assim, PDFs sem texto podem vir tanto de DOM não confirmado quanto de um
+DOM confirmado com renderização textual invisível para o extrator. Não há
+sinal retrospectivo separando as duas hipóteses; logs históricos não provam
+recurso bloqueado. O próximo diagnóstico conserva a proteção fiscal e marca
+somente `extracao_sem_texto_apos_screen_dom_confirmado` ou
+`extracao_sem_texto_apos_screen_dom_nao_confirmado` e a classificação
+finita já existente de egress `nenhum_bloqueio_interceptado`,
+`metodo_nao_permitido`, `destino_fora_origem` ou
+`ambas_classes_bloqueadas` nesse ramo específico.
+
+Nunca exportar DOM, PDF, URLs, método bruto, chave, NFe, identidade ou
+payload de rede. Status de bloqueio **não comprova causalidade**. Sem
+nova consulta real ao VendaERP até a versão seguir CI → merge → publicação
+→ deploy healthy. Falhas continuam fail-closed, sem entregar DANFE inválida.

@@ -41,6 +41,8 @@ export type EvidenciaValidacaoPdfDocumento =
   | "extracao_timeout"
   | "extracao_sem_texto"
   | "extracao_sem_texto_apos_screen"
+  | "extracao_sem_texto_apos_screen_dom_confirmado"
+  | "extracao_sem_texto_apos_screen_dom_nao_confirmado"
   | "extracao_memoria"
   | "extracao_processo_falhou"
   | "extracao_dependencia"

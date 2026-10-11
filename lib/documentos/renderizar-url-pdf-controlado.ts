@@ -152,6 +152,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   let browser: Browser | null = null;
   let redirect: Awaited<ReturnType<typeof abrirRedirectLocalParaDocumento>> | null = null;
   let etapa: EtapaRenderizacaoDocumento = "loopback_inicializacao";
+  let domFiscalValidado = false;
   let metodoBloqueado = false;
   let destinoBloqueado = false;
   // Resumo finito de eventos interceptados; nao registra metodos, destinos ou URLs.
@@ -296,6 +297,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
         politica.chaveFiscalEsperada ?? null,
         { timeout: restante() },
       );
+      domFiscalValidado = true;
     } catch (erro) {
       // O HTML da SPA pode não expor texto selecionável, mesmo que a impressão
       // contenha a DANFE. Só continuamos para imprimir se existir chave fiscal
@@ -358,7 +360,9 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
               ? "extracao_timeout"
               : origem === "sem_texto"
                 ? segundaImpressao
-                  ? "extracao_sem_texto_apos_screen"
+                  ? domFiscalValidado
+                    ? "extracao_sem_texto_apos_screen_dom_confirmado"
+                    : "extracao_sem_texto_apos_screen_dom_nao_confirmado"
                   : "extracao_sem_texto"
                 : origem === "memoria"
                   ? "extracao_memoria"
@@ -417,9 +421,13 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
         erro.codigo,
         fase,
         erro.evidenciaPdf,
-        erro.codigo === "timeout" && fase === "chromium_validacao_conteudo"
-          ? evidenciaEgress()
-          : undefined,
+        erro.evidenciaEgress ??
+          ((erro.codigo === "timeout" && fase === "chromium_validacao_conteudo") ||
+          (fase === "pdf_validacao" &&
+            (erro.evidenciaValidacaoPdf === "extracao_sem_texto_apos_screen_dom_confirmado" ||
+              erro.evidenciaValidacaoPdf === "extracao_sem_texto_apos_screen_dom_nao_confirmado"))
+            ? evidenciaEgress()
+            : undefined),
         erro.evidenciaValidacaoPdf,
       );
     }
