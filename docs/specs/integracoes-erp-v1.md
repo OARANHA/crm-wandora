@@ -182,7 +182,9 @@ não recebem privilégio. O orçamento de steps do modelo é ampliado com teto f
 de `2 × N + 4`, apenas neste mesmo contexto; nenhum knob da organização é alterado.
 Configuração geral de menos de três envios permanece respeitada, sem exceção.
 Duas preparações simultâneas ou novo preparo enquanto existe um PDF pendente
-são recusados para impedir sobrescrita no slot de documento.
+são recusados para impedir sobrescrita no slot de documento. Duas chamadas de
+`send_message` concorrentes também não podem consumir a mesma reserva de DANFE;
+o bloqueio é por turno e liberado ao fim da tentativa, mesmo sob exceção.
 
 **Esta preparação não resolve a falha do Chromium/Playwright**; cinco DANFEs
 só devem ser consideradas entregues após teste da renderização e aceite real do
