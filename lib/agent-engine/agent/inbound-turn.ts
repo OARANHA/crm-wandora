@@ -175,6 +175,7 @@ import { AVISO_FALHA_DANFE, GuardaFalhaDanfeNoTurno } from './danfe-failure-guar
 import {
   envioExtraDeDanfeAdminPermitido,
   orcamentoDeStepsDanfeAdmin,
+  ReservaEnvioDanfeAdmin,
 } from './danfe-admin-budget';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
 import { cancelPendingCronsForLead } from '../cron/scheduler';
@@ -2637,6 +2638,8 @@ async function executarTurnoDoAgente(
   let numeroNfeAdminPreparada: string | null = null;
   // Evita que chamadas paralelas de preparo sobrescrevam o único slot do sender.
   let preparoDanfeAdminEmAndamento = false;
+  // Slot privado de DANFE: um único send_message pode consumi-lo por vez.
+  const reservaEnvioDanfeAdmin = new ReservaEnvioDanfeAdmin();
   // O que o modelo de fato mandou neste turno (depois da cadeia). A trava "a
   // pergunta saiu?" do roteiro de atendimento lê daqui.
   const corposEnviados: string[] = [];
@@ -3058,6 +3061,17 @@ async function executarTurnoDoAgente(
     send_message: tool({
       ...AGENT_TOOL_DEFS.send_message,
       execute: async ({ body, produto_codigo }) => {
+        const haviaDanfePendente = documentoAdminPreparado !== null;
+        if (haviaDanfePendente && !reservaEnvioDanfeAdmin.tentarReservar()) {
+          return {
+            ok: false,
+            error: {
+              code: 'danfe_envio_concorrente',
+              message: 'Uma DANFE já está em envio. Não tente consumi-la duas vezes em paralelo.',
+            },
+          };
+        }
+        try {
         // Falha fechada: enquanto o agente não publicar a capacidade fiscal
         // (ou a busca não concluir o ranking), NUNCA atribuir recência a uma
         // nota conhecida do histórico nem enviar uma DANFE preparada sem prova.
@@ -3609,6 +3623,9 @@ async function executarTurnoDoAgente(
               message: 'erro interno no envio — encerre o turno agora.',
             },
           };
+        }
+        } finally {
+          if (haviaDanfePendente) reservaEnvioDanfeAdmin.liberar();
         }
       },
     }),
