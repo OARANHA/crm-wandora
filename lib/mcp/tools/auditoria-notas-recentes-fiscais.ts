@@ -6,6 +6,9 @@
 const CODIGOS_FISCAIS_PERMITIDOS = new Set([
   "mes_necessario",
   "mes_invalido",
+  "periodo_invalido",
+  "periodo_incompleto",
+  "periodo_excede_limite",
   "quantidade_invalida",
   "filtros_cliente_conflitantes",
   "cliente_ambiguo",
