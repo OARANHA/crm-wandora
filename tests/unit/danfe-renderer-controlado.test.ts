@@ -43,6 +43,7 @@ function ambientePdf() {
     url: vi.fn().mockReturnValue(danfe),
     waitForFunction: vi.fn().mockResolvedValue(true),
     pdf: vi.fn().mockResolvedValue(pdf),
+    emulateMedia: vi.fn().mockResolvedValue(undefined),
   };
   const context = {
     addInitScript: vi.fn().mockResolvedValue(undefined),
@@ -305,7 +306,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
   });
 
   it.each([
-    ["sem_texto", "extracao_sem_texto"],
+    ["sem_texto", "extracao_sem_texto_apos_screen"],
     ["timeout", "extracao_timeout"],
     ["memoria", "extracao_memoria"],
     ["processo", "extracao_processo_falhou"],
@@ -316,9 +317,14 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     async (causa, evidencia) => {
       ambientePdf();
       const chave = "35261012345678000190550010649963971123456780";
-      mocks.extractPdfText.mockRejectedValueOnce(
-        new PdfExtractError("conteúdo confidencial " + chave, undefined, "falha", causa),
+      const erroSintetico = new PdfExtractError(
+        "conteúdo confidencial " + chave,
+        undefined,
+        "falha",
+        causa,
       );
+      mocks.extractPdfText.mockRejectedValueOnce(erroSintetico);
+      if (causa === "sem_texto") mocks.extractPdfText.mockRejectedValueOnce(erroSintetico);
       let falha: unknown;
       try {
         await renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave });
@@ -333,6 +339,81 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
       expect(String(falha)).not.toContain(chave);
     },
   );
+
+  it("recupera PDF sem texto da CSS de impressão com media=screen e chave exata", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    const erro = new PdfExtractError("somente imagem", undefined, "sem_texto", "sem_texto");
+    mocks.extractPdfText.mockRejectedValueOnce(erro);
+    mocks.extractPdfText.mockResolvedValueOnce(
+      "DANFE CHAVE DE ACESSO " + chave + " " + "PRODUTO TESTE ".repeat(12),
+    );
+
+    const saida = await renderizarUrlParaPdfControlado(danfe, {
+      ...policy,
+      chaveFiscalEsperada: chave,
+    });
+    expect(saida).toEqual(env.pdf);
+    expect(env.page.pdf).toHaveBeenCalledTimes(2);
+    expect(env.page.emulateMedia).toHaveBeenCalledOnce();
+    expect(env.page.emulateMedia).toHaveBeenCalledWith({ media: "screen" });
+    expect(mocks.extractPdfText).toHaveBeenCalledTimes(2);
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("falha fechado se screen imprime PDF sem texto pela segunda vez", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    mocks.extractPdfText.mockRejectedValue(
+      new PdfExtractError("conteudo reservado", undefined, "sem_texto", "sem_texto"),
+    );
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave }),
+    ).rejects.toMatchObject({
+      codigo: "render_falhou",
+      etapa: "pdf_validacao",
+      evidenciaValidacaoPdf: "extracao_sem_texto_apos_screen",
+    });
+    expect(env.page.pdf).toHaveBeenCalledTimes(2);
+    expect(env.browser.close).toHaveBeenCalledOnce();
+  });
+
+  it("nunca aceita outro documento no fallback mesmo com chave referenciada", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    mocks.extractPdfText.mockRejectedValueOnce(
+      new PdfExtractError("sem texto", undefined, "sem_texto", "sem_texto"),
+    );
+    mocks.extractPdfText.mockResolvedValueOnce(
+      "DANFE CHAVE DE ACESSO " +
+        "9".repeat(44) +
+        " REFERENCIADA " +
+        chave +
+        " " +
+        "PRODUTO TESTE ".repeat(12),
+    );
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave }),
+    ).rejects.toMatchObject({
+      codigo: "render_falhou",
+      evidenciaValidacaoPdf: "chave_divergente",
+    });
+    expect(env.page.pdf).toHaveBeenCalledTimes(2);
+  });
+
+  it("não reimprime em screen por timeout ou falha de memória", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    mocks.extractPdfText.mockRejectedValueOnce(
+      new PdfExtractError("heap reduzido", undefined, "falha", "memoria"),
+    );
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, chaveFiscalEsperada: chave }),
+    ).rejects.toMatchObject({ evidenciaValidacaoPdf: "extracao_memoria" });
+    expect(env.page.pdf).toHaveBeenCalledOnce();
+    expect(env.page.emulateMedia).not.toHaveBeenCalled();
+  });
 
   it("classifica chave divergente e pagina de erro separadamente sem expor texto", () => {
     const chave = "35261012345678000190550010649963971123456780";

@@ -308,65 +308,96 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     }
 
     etapa = "chromium_impressao_pdf";
-    const pdf = await imprimirPdfComPrazo(
-      () =>
-        page.pdf({
-          format: "A4",
-          printBackground: true,
-          displayHeaderFooter: false,
-        }),
-      restante(),
-    );
+    const imprimir = () =>
+      imprimirPdfComPrazo(
+        () =>
+          page.pdf({
+            format: "A4",
+            printBackground: true,
+            displayHeaderFooter: false,
+          }),
+        restante(),
+      );
+    const conferirBytes = (arquivo: Buffer) => {
+      if (!arquivo.length) throw new ErroRenderizacaoDocumento("render_falhou");
+      if (arquivo.length > maxBytes) throw new ErroRenderizacaoDocumento("arquivo_grande");
+      if (
+        !arquivo.subarray(0, Math.min(arquivo.length, 1024)).includes(Buffer.from("%PDF-")) ||
+        !arquivo.subarray(-2048).includes(Buffer.from("%%EOF"))
+      ) {
+        throw new ErroRenderizacaoDocumento("tipo_nao_pdf");
+      }
+    };
+
+    let pdf = await imprimir();
     etapa = "pdf_validacao";
+    conferirBytes(pdf);
 
-    if (!pdf.length) throw new ErroRenderizacaoDocumento("render_falhou");
-    if (pdf.length > maxBytes) throw new ErroRenderizacaoDocumento("arquivo_grande");
-    if (
-      !pdf.subarray(0, Math.min(pdf.length, 1024)).includes(Buffer.from("%PDF-")) ||
-      !pdf.subarray(-2048).includes(Buffer.from("%%EOF"))
-    ) {
-      throw new ErroRenderizacaoDocumento("tipo_nao_pdf");
-    }
-
-    // A chave tem origem em Fiscal/ConsultarNFE; não é aceita do modelo.
-    // Conferir o PDF impresso impede que uma tela de erro ou documento de
-    // outra nota seja enviado, inclusive quando a verificação DOM passou.
+    // Nunca confiar no DOM sozinho: a impressão deve provar a mesma chave
+    // fiscal estruturada. O Chromium usa media=print por padrão; se a CSS
+    // de impressão esconder o texto, permitir UMA segunda impressão da
+    // MESMA página em media=screen, dentro do prazo total original.
     if (politica.chaveFiscalEsperada) {
-      const prazo = restante();
+      const extrairValidado = async (arquivo: Buffer, segundaImpressao: boolean) => {
+        const prazo = restante();
+        try {
+          return await executarDentroDoPrazo(
+            () =>
+              extractPdfText(arquivo, {
+                estrategia: "processo-a-parte",
+                heapMb: 96,
+                timeoutMs: prazo,
+              }),
+            prazo,
+          );
+        } catch (erro) {
+          const origem = erro instanceof PdfExtractError ? erro.causaTecnica : null;
+          const evidencia: EvidenciaValidacaoPdfDocumento =
+            (erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout") ||
+            origem === "timeout"
+              ? "extracao_timeout"
+              : origem === "sem_texto"
+                ? segundaImpressao
+                  ? "extracao_sem_texto_apos_screen"
+                  : "extracao_sem_texto"
+                : origem === "memoria"
+                  ? "extracao_memoria"
+                  : origem === "processo"
+                    ? "extracao_processo_falhou"
+                    : origem === "dependencia"
+                      ? "extracao_dependencia"
+                      : "extracao_falhou";
+          throw new ErroRenderizacaoDocumento(
+            "render_falhou",
+            "pdf_validacao",
+            undefined,
+            undefined,
+            evidencia,
+          );
+        }
+      };
+
       let texto: string;
       try {
-        texto = await executarDentroDoPrazo(
-          () =>
-            extractPdfText(pdf, {
-              estrategia: "processo-a-parte",
-              heapMb: 96,
-              timeoutMs: prazo,
-            }),
-          prazo,
-        );
+        texto = await extrairValidado(pdf, false);
       } catch (erro) {
-        const origem = erro instanceof PdfExtractError ? erro.causaTecnica : null;
-        const evidencia: EvidenciaValidacaoPdfDocumento =
-          (erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout") ||
-          origem === "timeout"
-            ? "extracao_timeout"
-            : origem === "sem_texto"
-              ? "extracao_sem_texto"
-              : origem === "memoria"
-                ? "extracao_memoria"
-                : origem === "processo"
-                  ? "extracao_processo_falhou"
-                  : origem === "dependencia"
-                    ? "extracao_dependencia"
-                    : "extracao_falhou";
-        throw new ErroRenderizacaoDocumento(
-          "render_falhou",
-          "pdf_validacao",
-          undefined,
-          undefined,
-          evidencia,
-        );
+        if (
+          !(erro instanceof ErroRenderizacaoDocumento) ||
+          erro.evidenciaValidacaoPdf !== "extracao_sem_texto"
+        ) {
+          throw erro;
+        }
+
+        // Não navegar de novo nem repetir chamada ERP: somente alterar
+        // a media CSS do contexto atual. A política de egress continua ativa.
+        etapa = "chromium_impressao_pdf";
+        await executarDentroDoPrazo(() => page.emulateMedia({ media: "screen" }), restante());
+        pdf = await imprimir();
+        etapa = "pdf_validacao";
+        conferirBytes(pdf);
+        texto = await extrairValidado(pdf, true);
       }
+
       const evidencia = diagnosticarTextoPdfFiscal(texto, politica.chaveFiscalEsperada);
       if (evidencia) {
         throw new ErroRenderizacaoDocumento(

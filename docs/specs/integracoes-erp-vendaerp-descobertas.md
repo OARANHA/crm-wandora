@@ -458,3 +458,23 @@ sem texto, URL, chave, notas, `stderr` ou identidade. O renderer mapeia para
 `extracao_falhou`. Todos os casos continuam **fail-closed**: nenhum documento
 é preparado. O diagnóstico não autoriza aumentar heap/timeout sem evidência,
 abrir egress, nem chamar o VendaERP outra vez antes de CI/merge/deploy saudáveis.
+
+## CANÁRIO 11/10/2026 — PDF sem texto / hipótese CSS de impressão
+
+No canário único após o deploy `4cb7f53e`, o job
+`c6b3798d-3dfd-4111-83e2-b5fb0188dae5` registrou consulta recente
+bem-sucedida e duas tentativas de `crm_erp_prepare_admin_danfe` com
+`pdf_validacao / extracao_sem_texto`. Ledger aceitou só texto e nenhum PDF
+foi armazenado na conversa. Isso prova ausência de texto selecionável no
+PDF impresso, **não prova qual regra CSS ou conteúdo causou isso**.
+
+Hipótese defensiva: o Chromium usa `media=print`; uma página com conteúdo
+no DOM pode ficar vazia sob o CSS de impressão. Em `extracao_sem_texto`
+apenas, permitir UMA reimpressão da mesma página em `media=screen`, sem nova
+consulta VendaERP, sem navegação adicional e sem estender o prazo total.
+A segunda impressão volta a exigir PDF estruturalmente válido, título DANFE,
+rótulo e chave fiscal exata da NFe. Se não tiver texto, auditar
+`extracao_sem_texto_apos_screen` e falhar fechado. Outros erros (timeout,
+heap, dependência, chave divergente) **não acionam** a segunda impressão.
+Esse mecanismo não representa aceite real até duas DANFEs distintas chegarem
+à conversa correta após CI, merge, imagens e deploy saudável.
