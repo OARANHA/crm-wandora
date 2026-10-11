@@ -108,7 +108,9 @@ export function mencionaNfeNaoComprovada(
 }
 
 /** Só uma consulta fiscal completa e vazia prova ausência no período pesquisado. */
-export function periodoDeBuscaFiscalVazia(resultado: unknown): { dataInicio: string; dataFim: string } | null {
+export function periodoDeBuscaFiscalVazia(
+  resultado: unknown,
+): { dataInicio: string; dataFim: string } | null {
   if (!resultado || typeof resultado !== "object" || Array.isArray(resultado)) return null;
   const r = resultado as Record<string, unknown>;
   if (!Array.isArray(r.notas) || r.notas.length !== 0 || r.erro !== undefined) return null;
@@ -119,21 +121,26 @@ export function periodoDeBuscaFiscalVazia(resultado: unknown): { dataInicio: str
   const periodo = s.periodoConsultado;
   if (!periodo || typeof periodo !== "object" || Array.isArray(periodo)) return null;
   const p = periodo as Record<string, unknown>;
-  if (typeof p.dataInicio !== "string" || typeof p.dataFim !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(p.dataInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(p.dataFim)) return null;
+  if (
+    typeof p.dataInicio !== "string" ||
+    typeof p.dataFim !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(p.dataInicio) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(p.dataFim)
+  )
+    return null;
   return { dataInicio: p.dataInicio, dataFim: p.dataFim };
 }
 
 /** Pedido singular vago exige desambiguação, nunca a primeira NFe da lista. */
 export function pedidoDeNotaFiscalVaga(texto: string): boolean {
-  const s = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const s = texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
   if (!/\b(?:nota(?:\s+fiscal)?|nf[\s-]?e)\b/.test(s) || pedidoDeNfeMaisRecente(texto))
     return false;
-  if (/\b(?:notas|nfes)\b/.test(s) || /\b(?:emitid[ao]\s+em|do\s+dia)\b/.test(s))
-    return false;
-  if (/\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}\b|\b\d{4}-\d{2}-\d{2}\b/.test(s))
-    return false;
-  if (/\b(?:nota|nf[\s-]?e)\s*(?:n[ºo°.]*)?\s*\d{3,12}\b/.test(s))
-    return false;
+  if (/\b(?:notas|nfes)\b/.test(s) || /\b(?:emitid[ao]\s+em|do\s+dia)\b/.test(s)) return false;
+  if (/\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}\b|\b\d{4}-\d{2}-\d{2}\b/.test(s)) return false;
+  if (/\b(?:nota|nf[\s-]?e)\s*(?:n[ºo°.]*)?\s*\d{3,12}\b/.test(s)) return false;
   return /\b(?:me\s+(?:traga|mostre|manda|envie)|quero|preciso|traga|nota|nf[\s-]?e)\b/.test(s);
 }
