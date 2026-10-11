@@ -523,3 +523,27 @@ por chave e projeção sem XML ou URL para o agente.
 3 envios por turno nem o orçamento de steps, não repara a renderização de DANFE
 e não comprova a entrega de N PDFs. Não promover a produção como correção
 funcional completa sem gates adicionais.
+
+## ISIS — janela inicial de 30 dias e período solicitado — 11/10/2026
+
+A consulta inicial de NFe de um cliente sem data agora pesquisa **30 dias
+civis incluindo hoje**, com base em `America/Sao_Paulo`, sem retroceder
+automaticamente até sete meses. O VendaERP mantém o limite por GET de no
+máximo um mês e 30 dias inclusivos; datas separadas por fronteira mensal
+são pesquisadas em GETs independentes.
+
+A ISIS recebe `periodoConsultado` e `consultaCompleta` para distinguir
+ausência comprovada na janela de erro técnico ou consulta parcial. Quando
+`notas=[]` com sucesso completo, deve perguntar o período desejado,
+sem afirmar ausência histórica nem ampliar a busca silenciosamente.
+O cliente já resolvido é preservado como contexto conversacional.
+
+Consultas dirigidas usam `data_inicio` e `data_fim` (até 30 dias),
+o mesmo dia nos dois campos para data exata, ou `mes_ano` para um mês
+explícito (particionado quando tiver 31 dias). Pedido singular genérico
+com várias NFes exige número/data antes de preparar qualquer DANFE.
+
+A seleção mantém identidade fiscal comprovada, filtro local, data de
+emissão real, deduplicação por chave, GET READ-ONLY e saída sanitizada.
+Esse contrato **não demonstra PDF ou entrega real**, que seguem pendentes
+de CI/merge/publicação/deploy/canário humano.

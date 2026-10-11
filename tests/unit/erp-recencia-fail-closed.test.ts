@@ -6,9 +6,36 @@ import {
   numerosDaBuscaFiscalComprovada,
   quantidadeDeNotasMaisRecentesPedida,
   mencionaNfeNaoComprovada,
+  pedidoDeNotaFiscalVaga,
+  periodoDeBuscaFiscalVazia,
 } from "@/lib/agent-engine/agent/recencia-fiscal-gate";
 
 describe("ISIS — gate de recência fiscal comprovada", () => {
+  it("distingue nota singular vaga de última, de nota numerada e de dia específico", () => {
+    expect(pedidoDeNotaFiscalVaga("ISIS, me traga a nota do cliente Eco Projetos")).toBe(true);
+    expect(pedidoDeNotaFiscalVaga("ISIS, me traga a última nota da Eco Projetos")).toBe(false);
+    expect(pedidoDeNotaFiscalVaga("Traga a nota de 08/10/2026")).toBe(false);
+    expect(pedidoDeNotaFiscalVaga("Traga a nota nº 1234567")).toBe(false);
+  });
+
+  it("só comprova ausência com consulta fiscal completa e período explícito", () => {
+    const base = {
+      notas: [],
+      resumo: {
+        consultaCompleta: true,
+        quantidadeRetornada: 0,
+        periodoConsultado: { dataInicio: "2026-09-09", dataFim: "2026-10-08" },
+      },
+    };
+    expect(periodoDeBuscaFiscalVazia(base)).toEqual(base.resumo.periodoConsultado);
+    expect(periodoDeBuscaFiscalVazia({ ...base, erro: "consulta_parcial" })).toBeNull();
+    expect(
+      periodoDeBuscaFiscalVazia({ ...base, resumo: { ...base.resumo, consultaCompleta: false } }),
+    ).toBeNull();
+    expect(periodoDeBuscaFiscalVazia({ ...base, notas: [{ numeroNFe: "1" }] })).toBeNull();
+    expect(periodoDeBuscaFiscalVazia({ notas: [], resumo: { consultaCompleta: true } })).toBeNull();
+  });
+
   it.each([
     "ISIS, traga a última nota emitida para a Eco Projetos",
     "Me traga as últimas duas notas da Eco Projetos",

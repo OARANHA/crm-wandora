@@ -57,7 +57,7 @@ export const TOOLS_INTEGRACOES_ERP = declararTools([
     category: "read",
     rotulo: "Encontrar as notas fiscais mais recentes",
     explicacao:
-      "Encontra de 1 a 20 notas fiscais recentes por data de emissão comprovada, com opção de filtrar por cliente. Sem mês explícito, pesquisa meses anteriores com paginação limitada; mês é filtro opcional, não pré-requisito.",
+      "Encontra de 1 a 20 notas fiscais recentes por data de emissão comprovada, com opção de filtrar por cliente. Sem período explícito, pesquisa só 30 dias e pergunta o período quando não há NFes; mês é filtro opcional.",
     oQueToca: "Notas fiscais emitidas no sistema de gestão",
     risco: "seguro",
     pacotes: ["organizar"],

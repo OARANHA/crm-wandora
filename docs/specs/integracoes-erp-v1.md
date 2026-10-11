@@ -356,49 +356,60 @@ XML, URLs ou dados crus. Esse indicador mede o desfecho da ferramenta;
 não prova por si só recência fiscal nem entrega de DANFE. O gate de
 inbound-turn.ts continua sendo a autoridade para últimas notas e anexos.
 
-## ISIS — busca fiscal regressiva de NFes (2026-10-08)
+## ISIS — consulta de NFes em período controlado (revisão 2026-10-11)
 
-Complemento READ-ONLY ao provider existente. O Swagger entregue nesta data documenta
-GET /api/request/Fiscal/ConsultarNfePeriodo, com DataInicial e DataFinal
-em mm-dd-aaaa, máximo de **um mês por chamada**, pageSize até 50 e skip.
-A chave do VendaERP aceita até 1.000 requisições/hora. O Swagger **não fornece**
-filtro por destinatário nem ordenação garantida no endpoint fiscal. O corpo HTTP
-200 não tem schema, mas o exemplo real fornecido pelo proprietário contém Tipo,
-Numero, Serie, ChaveAcesso, DataEmissao, XML e UrlImpressaoUrl.
+Complemento READ-ONLY ao provider existente. O Swagger documenta
+`GET /api/request/Fiscal/ConsultarNfePeriodo`, com `DataInicial` e
+`DataFinal` em mm-dd-aaaa, máximo de **um mês por chamada**, `pageSize`
+até 50 e `skip`. O corpo HTTP 200 não é tipado no Swagger;
+a projeção normaliza apenas NFe autorizada, número, série, chave,
+`DataEmissao` fiscal, documento do destinatário e disponibilidade da DANFE.
 
-Para o administrador WhatsApp com erp.admin.read, a nova ferramenta
-crm_erp_search_recent_invoices é a autoridade para **últimas notas emitidas**.
-crm_erp_search_orders permanece a capability de busca de pedidos, inclusive
-seu parâmetro legado ultimas_notas=N; o agente deve preferir a busca fiscal
-para recência de NFe e não inferir emissão pela posição em pedidos.
+### Política da janela de busca
 
-Política:
+- Na ausência de data/período solicitado, pesquisar apenas os **últimos
+  30 dias civis, incluindo hoje, no fuso America/Sao_Paulo**. Não buscar
+  os seis meses anteriores nem expandir silenciosamente o período.
+- A janela inicial que cruza meses é repartida em chamadas do próprio
+  mês com até 30 dias; cada intervalo requer paginação comprovadamente
+  completa (no máximo 12 páginas/intervalo e 24 no total).
+- A consulta dirigida aceita `data_inicio` e `data_fim` em AAAA-MM-DD;
+  os dois parâmetros são obrigatórios em conjunto e limitados a
+  30 dias inclusivos. Uma data exata usa início=fim.
+- `mes_ano=AAAA-MM` continua um filtro dirigido opcional: abrange
+  apenas o mês solicitado, com divisão em duas chamadas quando o mês
+  possui 31 dias. Não é necessário informar mês apenas porque N é
+  maior que 3.
+- A seleção só considera NFes autorizadas, distintas por chave fiscal
+  e ordenadas por data fiscal validada; não usa número, posição ou ordem
+  de pedido como recência. Filtra o destinatário comprovado localmente.
+- Uma consulta **completa e sem notas** retorna `notas=[]` e
+  `periodoConsultado` (datas inicial/final). A ISIS informa a ausência
+  **somente no período consultado** e pergunta qual período o
+  administrador deseja, preservando a identidade comprovada do cliente
+  na continuação da conversa. Nunca conclui ausência histórica.
+- Consulta parcial, inconsistência fiscal, falha do ERP ou identidade
+  ambígua são erros, não resultado vazio.
+- Pedido genérico singular ("me traga a nota do cliente X") deve
+  desambiguar se houver mais de uma NFe: pedir número ou data e
+  **não** preparar/enviar uma DANFE arbitrária. Pedido de **última
+  nota** seleciona uma única NFe fiscalmente mais recente dentro da
+  janela. Para pedido de dia específico com várias NFes, perguntar
+  qual delas o usuário deseja.
+- Quantidade opcional: 3 (permite observar múltiplas candidatas);
+  de 1 a 20 aceita sem mês quando o intervalo de 30 dias basta.
+  Caso retorne menos notas que a quantidade solicitada, declarar apenas
+  quantas foram encontradas naquele período, não inferir histórico.
+- XML, documento fiscal do destinatário, URL externa da DANFE e credenciais
+  ficam fora do contexto do modelo. Preparação e envio de DANFE continuam
+  no mecanismo `crm_erp_prepare_admin_danfe` seguido do `send_message`
+  canônico, respeitando autoridade/admin, Storage, LGPD, auditoria, ledger,
+  validação de mídia e isolamento por organização.
 
-- quantidade omitida: **3**; qualquer quantidade de **1 a 20** sem período explícito consulta automaticamente
-  mês corrente e, se faltar quantidade, retrocede até seis meses anteriores;
-- quantidade de 4 a 20: sem mês explícito também percorre a janela regressiva limitada; `mes_ano=AAAA-MM` é filtro opcional, jamais obrigatório pela quantidade;
-- mês explícito: consulta somente aquele mês; nenhuma chamada cruza meses;
-- paginação completa do mês até retorno menor que 50; por chamada, no máximo
-  12 páginas/mês e 24 páginas totais; limite atingido retorna
-  consulta_parcial, **nunca** conclusão silenciosa;
-- a seleção filtra NFes autorizadas e distintas por chave de acesso, ordena
-  pelo DataEmissao fiscal validado; não ordena por número, pedido ou ordem
-  fornecida pelo ERP;
-- nome/CPF/CNPJ/contato vinculado passam pela resolução existente. Quando há
-  destinatário indicado, a tool exige CPF/CNPJ confirmado pelo cadastro Pessoa
-  e compara localmente com o documento do XML da NFe. Ambiguidade falha fechado;
-- o XML, documento destinatário e URL externa do DANFE **não chegam ao LLM**.
-  O adapter projeta somente metadados necessários e descarta os demais campos;
-- entrega DANFE continua por crm_erp_prepare_admin_danfe e send_message
-  sequencial, com controles atuais de sender, Storage privado, auditoria e egress;
-- a busca pode falhar fechada quando excede sete meses, o mês retorna volume
-  excessivo, o schema está incompleto ou o fornecedor não comprova a emissão.
-  Nesse caso ISIS pede mês/ano; não declara ausência de NFes.
-
-**Não incluído neste slice:** atualização de telefone em contatos já existentes
-ou criação de contato de terceiro com telefone obrigatório; exige reconciliação
-da migration/RPC local e gate de privacidade próprios, sem qualquer escrita
-em Pessoas/Salvar do VendaERP.
+**Histórico:** entre 08 e 11/10/2026 a busca regressiva anterior
+percorria mês atual + até seis anteriores para atender pedidos sem período.
+Essa política foi substituída pela regra inicial de 30 dias. A mudança
+de consulta não é prova de DANFE correta entregue em produção.
 
 ## Identidade fiscal — recuperação de vínculo legado (slice de segurança)
 

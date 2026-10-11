@@ -87,7 +87,7 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
         ]),
         retornados: 5,
       },
-    });
+    }).mockResolvedValueOnce({ ok: true, dados: { notas: [], retornados: 0 } });
     const r = await buscarUltimasNfesFiscais(db, org, {
       quantidade: 5,
       documento: target,
@@ -97,15 +97,19 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
     if (r.ok) {
       expect(r.dados.notas.map((n) => n.numero)).toEqual([14, 12, 13, 11, 10]);
       expect(r.dados.quantidadeSolicitada).toBe(5);
-      expect(r.dados.mesesConsultados).toEqual(["2026-10"]);
+      expect(r.dados.mesesConsultados).toEqual(["2026-10", "2026-09"]);
+      expect(r.dados.periodoConsultado).toEqual({ dataInicio: "2026-09-09", dataFim: "2026-10-08" });
       expect(r.dados.consultaCompleta).toBe(true);
     }
-    expect(service.buscarNfesPeriodoErp).toHaveBeenCalledOnce();
+    expect(service.buscarNfesPeriodoErp).toHaveBeenCalledTimes(2);
     expect(vi.mocked(service.buscarNfesPeriodoErp).mock.calls[0]?.[2]).toMatchObject({
       dataInicial: "10-01-2026",
       dataFinal: "10-08-2026",
       pageSize: 50,
       skip: 0,
+    });
+    expect(vi.mocked(service.buscarNfesPeriodoErp).mock.calls[1]?.[2]).toMatchObject({
+      dataInicial: "09-09-2026", dataFinal: "09-30-2026", pageSize: 50, skip: 0,
     });
   });
 
@@ -125,7 +129,7 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
           ]),
           retornados: 5,
         },
-      });
+      }).mockResolvedValueOnce({ ok: true, dados: { notas: [], retornados: 0 } });
       const r = await crmErpSearchRecentInvoices.handler(
         {
           quantidade: 5,
@@ -147,7 +151,7 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
         "1",
       ]);
       expect(JSON.stringify(r)).not.toMatch(/<nfeProc|UrlImpressaoUrl|app\.example\.test/);
-      expect(service.buscarNfesPeriodoErp).toHaveBeenCalledOnce();
+      expect(service.buscarNfesPeriodoErp).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }
@@ -166,42 +170,90 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
     expect(service.buscarNfesPeriodoErp).toHaveBeenCalledTimes(12);
   });
 
-  it("consulta outubro, setembro e agosto; encontra duas mais recentes só da empresa", async () => {
-    vi.mocked(service.buscarNfesPeriodoErp)
-      .mockResolvedValueOnce({ ok: true, dados: { notas: [], retornados: 0 } })
-      .mockResolvedValueOnce({ ok: true, dados: { notas: [], retornados: 0 } })
-      .mockResolvedValueOnce({
-        ok: true,
-        dados: {
-          notas: normalizarNfesPeriodoVendaErp([
-            entrada(367, "03/08/2026 - 17:40"),
-            entrada(368, "04/08/2026 - 13:31"),
-            entrada(369, "04/08/2026 - 13:35"),
-            entrada(370, "04/08/2026 - 13:40", other),
-            entrada(371, "04/08/2026 - 13:45"),
-          ]),
-          retornados: 5,
-        },
-      });
+  it("30 dias vazios não retrocedem para agosto: consulta vazia comprovada", async () => {
+    vi.mocked(service.buscarNfesPeriodoErp).mockResolvedValue({
+      ok: true, dados: { notas: [], retornados: 0 },
+    });
     const r = await buscarUltimasNfesFiscais(db, org, {
-      quantidade: 2,
-      documento: target,
+      quantidade: 2, documento: target, agora: new Date("2026-10-08T14:00:00Z"),
+    });
+    expect(r).toMatchObject({
+      ok: true,
+      dados: {
+        notas: [], consultaCompleta: true,
+        mesesConsultados: ["2026-10", "2026-09"],
+        periodoConsultado: { dataInicio: "2026-09-09", dataFim: "2026-10-08" },
+      },
+    });
+    expect(vi.mocked(service.buscarNfesPeriodoErp).mock.calls.map(([, , filtros]) => [
+      filtros.dataInicial, filtros.dataFinal,
+    ])).toEqual([
+      ["10-01-2026", "10-08-2026"],
+      ["09-09-2026", "09-30-2026"],
+    ]);
+  });
+
+  it("recusa período explícito de 31 dias sem chamar ERP; mês com 31 dias é repartido", async () => {
+    const recusado = await buscarUltimasNfesFiscais(db, org, {
+      quantidade: 1, dataInicio: "2026-09-01", dataFim: "2026-10-01",
       agora: new Date("2026-10-08T14:00:00Z"),
     });
-    expect(r.ok).toBe(true);
-    if (r.ok) {
-      expect(r.dados.notas.map((n) => n.numero)).toEqual([371, 369]);
-      expect(r.dados.mesesConsultados).toEqual(["2026-10", "2026-09", "2026-08"]);
-    }
-    expect(
-      vi
-        .mocked(service.buscarNfesPeriodoErp)
-        .mock.calls.map(([, , f]) => [f.dataInicial, f.dataFinal]),
-    ).toEqual([
-      ["10-01-2026", "10-08-2026"],
-      ["09-01-2026", "09-30-2026"],
-      ["08-01-2026", "08-31-2026"],
+    expect(recusado).toMatchObject({ ok: false, motivo: "periodo_excede_limite" });
+    expect(service.buscarNfesPeriodoErp).not.toHaveBeenCalled();
+    vi.mocked(service.buscarNfesPeriodoErp).mockResolvedValue({
+      ok: true, dados: { notas: [], retornados: 0 },
+    });
+    const mes = await buscarUltimasNfesFiscais(db, org, {
+      quantidade: 1, mesAno: "2026-08", agora: new Date("2026-10-08T14:00:00Z"),
+    });
+    expect(mes.ok).toBe(true);
+    expect(vi.mocked(service.buscarNfesPeriodoErp).mock.calls.map(([, , filtros]) => [
+      filtros.dataInicial, filtros.dataFinal,
+    ])).toEqual([
+      ["08-02-2026", "08-31-2026"],
+      ["08-01-2026", "08-01-2026"],
     ]);
+  });
+
+  it("consulta NFe de dia exato sem ampliar, mantendo seleção fiscal", async () => {
+    vi.mocked(service.buscarNfesPeriodoErp).mockResolvedValueOnce({
+      ok: true, dados: {
+        notas: normalizarNfesPeriodoVendaErp([entrada(41, "08/10/2026 - 11:00")]),
+        retornados: 1,
+      },
+    });
+    const r = await buscarUltimasNfesFiscais(db, org, {
+      quantidade: 1, dataInicio: "2026-10-08", dataFim: "2026-10-08",
+      agora: new Date("2026-10-08T15:00:00Z"),
+    });
+    expect(r).toMatchObject({
+      ok: true,
+      dados: { notas: [expect.objectContaining({ numero: 41 })] },
+    });
+    expect(vi.mocked(service.buscarNfesPeriodoErp).mock.calls.map(([, , f]) => [
+      f.dataInicial, f.dataFinal,
+    ])).toEqual([["10-08-2026", "10-08-2026"]]);
+  });
+
+  it("GET incompleto ou retorno fora da data pesquisada nunca comprova ausência", async () => {
+    vi.mocked(service.buscarNfesPeriodoErp).mockResolvedValue({ ok: true, dados: { notas: [], retornados: 50 } });
+    const incompleto = await buscarUltimasNfesFiscais(db, org, {
+      quantidade: 1, dataInicio: "2026-10-08", dataFim: "2026-10-08",
+      agora: new Date("2026-10-08T15:00:00Z"),
+    });
+    expect(incompleto).toMatchObject({ ok: false, motivo: "consulta_parcial" });
+    vi.mocked(service.buscarNfesPeriodoErp).mockReset();
+    vi.mocked(service.buscarNfesPeriodoErp).mockResolvedValue({
+      ok: true, dados: {
+        notas: normalizarNfesPeriodoVendaErp([entrada(41, "07/10/2026 - 11:00")]),
+        retornados: 1,
+      },
+    });
+    const inconsistente = await buscarUltimasNfesFiscais(db, org, {
+      quantidade: 1, dataInicio: "2026-10-08", dataFim: "2026-10-08",
+      agora: new Date("2026-10-08T15:00:00Z"),
+    });
+    expect(inconsistente).toMatchObject({ ok: false, motivo: "consulta_inconsistente" });
   });
 
   it("página cheia não prova fim: percorre o restante do mês antes de selecionar", async () => {
@@ -211,7 +263,7 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
       .mockResolvedValueOnce({ ok: true, dados: { notas: [], retornados: 0 } });
     const r = await buscarUltimasNfesFiscais(db, org, {
       quantidade: 1,
-      mesAno: "2026-08",
+      dataInicio: "2026-08-04", dataFim: "2026-08-04",
       agora: new Date("2026-10-08T14:00:00Z"),
     });
     expect(r.ok).toBe(true);
@@ -253,7 +305,9 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
         cliente: "Empresa de teste",
         cpf_cnpj: undefined,
         cliente_contact_id: undefined,
-        mes_ano: "2026-08",
+        mes_ano: undefined,
+        data_inicio: "2026-08-04",
+        data_fim: "2026-08-04",
       },
       ctx,
     );
