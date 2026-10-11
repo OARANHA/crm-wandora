@@ -175,8 +175,9 @@ número da DANFE preparada pertencente ao conjunto comprovado e documento privad
 ainda pendente. Somente o `send_message` que consome esse **documento** pode ultrapassar
 o teto geral. A quota de até **cinco PDFs** é contada separadamente do limite
 de até três mensagens comuns: uma introdução textual não retira a quinta DANFE.
-Mesmo nessa exceção o teto físico não ultrapassa a soma finita (3 mensagens
-comuns + N documentos, máximo 8). `send_template`, texto livre e mídias comuns
+Mesmo nessa exceção o teto físico não ultrapassa a soma finita entre o limite
+geral configurado no turno e N documentos (com o padrão de 3, até 8 mensagens
+físicas para 5 DANFEs). `send_template`, texto livre e mídias comuns
 não recebem privilégio. O orçamento de steps do modelo é ampliado com teto finito
 de `2 × N + 4`, apenas neste mesmo contexto; nenhum knob da organização é alterado.
 Configuração geral de menos de três envios permanece respeitada, sem exceção.
