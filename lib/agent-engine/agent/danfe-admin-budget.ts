@@ -73,3 +73,22 @@ export function envioExtraDeDanfeAdminPermitido(input: {
     recenciaComprovada
   );
 }
+
+/**
+ * Exclusão mútua por turno para consumir o único slot de documento fiscal.
+ * A aquisição é síncrona: duas chamadas da IA iniciadas em paralelo não podem
+ * atravessar a verificação de um mesmo PDF pendente.
+ */
+export class ReservaEnvioDanfeAdmin {
+  private ocupada = false;
+
+  tentarReservar(): boolean {
+    if (this.ocupada) return false;
+    this.ocupada = true;
+    return true;
+  }
+
+  liberar(): void {
+    this.ocupada = false;
+  }
+}
