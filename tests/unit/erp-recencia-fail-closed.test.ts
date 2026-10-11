@@ -19,13 +19,19 @@ describe("ISIS — gate de recência fiscal comprovada", () => {
   });
 
   it("só comprova ausência com consulta fiscal completa e período explícito", () => {
-    const base = { notas: [], resumo: {
-      consultaCompleta: true, quantidadeRetornada: 0,
-      periodoConsultado: { dataInicio: "2026-09-09", dataFim: "2026-10-08" },
-    }};
+    const base = {
+      notas: [],
+      resumo: {
+        consultaCompleta: true,
+        quantidadeRetornada: 0,
+        periodoConsultado: { dataInicio: "2026-09-09", dataFim: "2026-10-08" },
+      },
+    };
     expect(periodoDeBuscaFiscalVazia(base)).toEqual(base.resumo.periodoConsultado);
     expect(periodoDeBuscaFiscalVazia({ ...base, erro: "consulta_parcial" })).toBeNull();
-    expect(periodoDeBuscaFiscalVazia({ ...base, resumo: { ...base.resumo, consultaCompleta: false } })).toBeNull();
+    expect(
+      periodoDeBuscaFiscalVazia({ ...base, resumo: { ...base.resumo, consultaCompleta: false } }),
+    ).toBeNull();
     expect(periodoDeBuscaFiscalVazia({ ...base, notas: [{ numeroNFe: "1" }] })).toBeNull();
     expect(periodoDeBuscaFiscalVazia({ notas: [], resumo: { consultaCompleta: true } })).toBeNull();
   });
