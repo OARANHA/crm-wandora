@@ -140,7 +140,11 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
         resumo: { quantidadeSolicitada: 5, quantidadeRetornada: 5, consultaCompleta: true },
       });
       expect((r as { notas: Array<{ numeroNFe: string }> }).notas.map((n) => n.numeroNFe)).toEqual([
-        "5", "4", "3", "2", "1",
+        "5",
+        "4",
+        "3",
+        "2",
+        "1",
       ]);
       expect(JSON.stringify(r)).not.toMatch(/<nfeProc|UrlImpressaoUrl|app\.example\.test/);
       expect(service.buscarNfesPeriodoErp).toHaveBeenCalledOnce();
