@@ -4,6 +4,7 @@ import {
   MAX_DANFES_ADMIN_POR_TURNO,
   envioExtraDeDanfeAdminPermitido,
   orcamentoDeStepsDanfeAdmin,
+  ReservaEnvioDanfeAdmin,
 } from "@/lib/agent-engine/agent/danfe-admin-budget";
 
 const notas = new Set(["101", "102", "103", "104", "105"]);
@@ -21,6 +22,42 @@ const base = {
 } as const;
 
 describe("orçamento estrito de envio DANFE para admin comprovado", () => {
+  it("duas chamadas paralelas não consomem o mesmo documento", async () => {
+    const reserva = new ReservaEnvioDanfeAdmin();
+    let liberarPrimeiro!: () => void;
+    const pendente = new Promise<void>((resolve) => {
+      liberarPrimeiro = resolve;
+    });
+    const primeira = (async () => {
+      expect(reserva.tentarReservar()).toBe(true);
+      try {
+        await pendente;
+      } finally {
+        reserva.liberar();
+      }
+    })();
+    expect(reserva.tentarReservar()).toBe(false);
+    liberarPrimeiro();
+    await primeira;
+    expect(reserva.tentarReservar()).toBe(true);
+    reserva.liberar();
+  });
+
+  it("libera a reserva mesmo quando o envio termina com exceção", async () => {
+    const reserva = new ReservaEnvioDanfeAdmin();
+    async function falhaDeEnvio() {
+      expect(reserva.tentarReservar()).toBe(true);
+      try {
+        throw new Error("falha sintética");
+      } finally {
+        reserva.liberar();
+      }
+    }
+    await expect(falhaDeEnvio()).rejects.toThrow("falha sintética");
+    expect(reserva.tentarReservar()).toBe(true);
+  });
+
+
   it("permite quarto e quinto documentos sem ampliar envio de texto", () => {
     expect(envioExtraDeDanfeAdminPermitido(base)).toBe(true);
     expect(
