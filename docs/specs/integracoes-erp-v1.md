@@ -167,6 +167,37 @@ DANFE e imediatamente executa o `send_message` que consome aquele documento; só
 próxima. Assim cada PDF atravessa o sender canônico, `before_send`, ledger e guardrails existentes,
 sem URL externa nem `storage_path` no contexto do modelo.
 
+**Orçamento exclusivo de documentos administrativos (preparo para entrega até 5 DANFEs):**
+O limite global de mensagens do agente continua protegendo leads e templates.
+Para o pedido **explícito de últimas N notas (2 a 5)**, a exceção de envio adicional
+exige cumulativamente: `crm_erp_prepare_admin_danfe` efetivamente montada após
+a autoridade do WhatsApp administrativo, busca fiscal completa no mesmo turno,
+número da DANFE preparada pertencente ao conjunto comprovado e documento privado
+ainda pendente. Somente o `send_message` que consome esse **documento** pode ultrapassar
+o teto geral. A quota de até **cinco PDFs** é contada separadamente do limite
+de até três mensagens comuns: uma introdução textual não retira a quinta DANFE.
+Mesmo nessa exceção o teto físico não ultrapassa a soma finita entre o limite
+geral configurado no turno e N documentos (com o padrão de 3, até 8 mensagens
+físicas para 5 DANFEs). `send_template`, texto livre e mídias comuns
+não recebem privilégio. O orçamento de steps do modelo é ampliado com teto finito
+de `2 × N + 4`, apenas neste mesmo contexto; nenhum knob da organização é alterado.
+Configuração geral de menos de três envios permanece respeitada, sem exceção.
+Duas preparações simultâneas ou novo preparo enquanto existe um PDF pendente
+são recusados para impedir sobrescrita no slot de documento. Duas chamadas de
+`send_message` concorrentes também não podem consumir a mesma reserva de DANFE;
+o bloqueio é por turno e liberado ao fim da tentativa, mesmo sob exceção. A seleção do anexo
+é vinculada ao instante inicial do `send_message`: um PDF preparado durante
+esperas da cadeia não pode ser anexado por outra chamada já em andamento.
+Antes da entrega, a mesma referência, NFe e prova fiscal são revalidadas;
+revogação de recência falha fechada. Um aviso de recência substituído pelo gate
+continua podendo sair como texto, sem reanexar documento revogado.
+
+**Esta preparação não resolve a falha do Chromium/Playwright**; cinco DANFEs
+só devem ser consideradas entregues após teste da renderização e aceite real do
+sender/ledger por NFe distintas. Quantidades acima de cinco ainda exigem
+desenho de entrega em lotes/turnos duráveis com idempotência, sem ampliar
+automaticamente os limites de segurança.
+
 A coordenação do mesmo turno é determinística: uma busca de pedidos por Nome/Razão Social registra
 seu resultado pelo `requestId`. Quando todos os pedidos encontrados carregam a mesma `pessoaID`,
 o backend reutiliza a autoridade de identidade da PR #45: procura vínculo ativo por

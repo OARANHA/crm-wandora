@@ -172,6 +172,13 @@ import {
   mencionaNfeNaoComprovada,
 } from './recencia-fiscal-gate';
 import { AVISO_FALHA_DANFE, GuardaFalhaDanfeNoTurno } from './danfe-failure-guard';
+import {
+  envioExtraDeDanfeAdminPermitido,
+  orcamentoDeStepsDanfeAdmin,
+  ReservaEnvioDanfeAdmin,
+  envioDanfeAceitoPeloSender,
+  reservaDanfeAindaValida,
+} from './danfe-admin-budget';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
 import { cancelPendingCronsForLead } from '../cron/scheduler';
 import {
@@ -2620,12 +2627,21 @@ async function executarTurnoDoAgente(
 
   // Estado do RUN — vive só neste closure (isolamento por construção, acc 3).
   let seq = 0;
+  // Contagem de documentos fiscais efetivamente entregues ao sender no turno.
+  // Mensagens de introdução não consomem a quota das N DANFEs solicitadas.
+  let danfesAdminEnviadas = 0;
   // Documento administrativo preparado por uma capability MCP NESTE turno.
   // Fica só no closure do runtime: o modelo nunca recebe storage_path. A próxima
   // send_message o entrega pelo sender canônico, sob before_send + ledger.
   let documentoAdminPreparado:
     | { storagePath: string; mime: string; filename: string }
     | null = null;
+  // Identidade somente server-side do documento efetivamente preparado neste turno.
+  let numeroNfeAdminPreparada: string | null = null;
+  // Evita que chamadas paralelas de preparo sobrescrevam o único slot do sender.
+  let preparoDanfeAdminEmAndamento = false;
+  // Slot privado de DANFE: um único send_message pode consumi-lo por vez.
+  const reservaEnvioDanfeAdmin = new ReservaEnvioDanfeAdmin();
   // O que o modelo de fato mandou neste turno (depois da cadeia). A trava "a
   // pergunta saiu?" do roteiro de atendimento lê daqui.
   const corposEnviados: string[] = [];
@@ -3047,6 +3063,22 @@ async function executarTurnoDoAgente(
     send_message: tool({
       ...AGENT_TOOL_DEFS.send_message,
       execute: async ({ body, produto_codigo }) => {
+        // Snapshot ANTES de qualquer await: um documento criado mais tarde não
+        // pode ser consumido por uma mensagem textual iniciada antes do preparo.
+        const documentoReservadoNoInicio = documentoAdminPreparado;
+        const numeroNfeReservadaNoInicio = numeroNfeAdminPreparada;
+        const haviaDanfePendente = documentoReservadoNoInicio !== null;
+        let avisoDeRecenciaSubstituido = false;
+        if (haviaDanfePendente && !reservaEnvioDanfeAdmin.tentarReservar()) {
+          return {
+            ok: false,
+            error: {
+              code: 'danfe_envio_concorrente',
+              message: 'Uma DANFE já está em envio. Não tente consumi-la duas vezes em paralelo.',
+            },
+          };
+        }
+        try {
         // Falha fechada: enquanto o agente não publicar a capacidade fiscal
         // (ou a busca não concluir o ranking), NUNCA atribuir recência a uma
         // nota conhecida do histórico nem enviar uma DANFE preparada sem prova.
@@ -3062,7 +3094,9 @@ async function executarTurnoDoAgente(
           )
         ) {
           body = AVISO_SEM_RECENCIA_FISCAL;
+          avisoDeRecenciaSubstituido = true;
           documentoAdminPreparado = null;
+          numeroNfeAdminPreparada = null;
           runLog.warn('recência fiscal não comprovada — resposta e anexo protegidos', {
             job_id: liveJob().id,
           });
@@ -3125,7 +3159,21 @@ async function executarTurnoDoAgente(
             vetos: falseEmptyInboundVetoCount,
           });
         }
-        if (seq >= maxSendsPerTurn) {
+        if (
+          seq >= maxSendsPerTurn &&
+          !envioExtraDeDanfeAdminPermitido({
+            ferramentaAdminMontada: mcpToolIdsDoTurno.includes('crm_erp_prepare_admin_danfe'),
+            pedidoRecente: pedidoDeNfeMaisRecente(mensagemDoJob),
+            quantidade: quantidadeDeNotasMaisRecentesPedida(mensagemDoJob),
+            limiteEnviosGeral: maxSendsPerTurn,
+            enviosRealizados: seq,
+            danfesEnviadas: danfesAdminEnviadas,
+            documentoPreparado: documentoAdminPreparado !== null,
+            numeroDaNotaPreparada: numeroNfeAdminPreparada,
+            recenciaComprovada: recenciaFiscalComprovadaNesteTurno,
+            numerosComprovados: numerosNfeFiscaisComprovados,
+          })
+        ) {
           return {
             ok: false,
             error: {
@@ -3360,16 +3408,49 @@ async function executarTurnoDoAgente(
                   ...(media ? { media } : {}),
                 });
               };
-              // DANFE administrativo preparado: a próxima send_message vira UMA
-              // mensagem documental. A referência fica interna ao turno e o arquivo sai
-              // pelo MESMO sender/ledger/guardrails do texto — nunca direto da tool ERP.
-              if (documentoAdminPreparado !== null) {
-                const documento = documentoAdminPreparado;
+              // O próprio gate pode revogar o PDF e trocar o corpo pelo aviso
+              // de recência antes de chegar ao before_send: preserve a
+              // comunicação segura, sem tentar anexar o PDF revogado.
+              if (
+                haviaDanfePendente &&
+                avisoDeRecenciaSubstituido &&
+                documentoAdminPreparado === null
+              ) {
+                return enviar(finalBody);
+              }
+              // Uma DANFE que apareceu DEPOIS do início do send_message jamais
+              // pode ser anexada a um texto mais antigo. Se uma reserva perdeu
+              // identidade ou prova fiscal durante o before_send, também não
+              // fazemos fallback silencioso para mensagem sem anexo.
+              if (haviaDanfePendente || documentoAdminPreparado !== null) {
+                if (
+                  documentoReservadoNoInicio === null ||
+                  !reservaDanfeAindaValida({
+                    documentoNoInicio: documentoReservadoNoInicio,
+                    documentoNoEnvio: documentoAdminPreparado,
+                    numeroNoInicio: numeroNfeReservadaNoInicio,
+                    numeroNoEnvio: numeroNfeAdminPreparada,
+                    pedidoRecente: pedidoDeNfeMaisRecente(mensagemDoJob),
+                    recenciaComprovada: recenciaFiscalComprovadaNesteTurno,
+                    numerosComprovados: numerosNfeFiscaisComprovados,
+                  })
+                ) {
+                  throw new Error('danfe_reserva_invalida_antes_do_sender');
+                }
+                const documento = documentoReservadoNoInicio;
                 documentoAdminPreparado = null;
+                numeroNfeAdminPreparada = null;
                 return enviar(finalBody, {
                   storagePath: documento.storagePath,
                   mime: documento.mime,
                   kind: 'document',
+                }).then((outcome) => {
+                  // Uma tentativa rejeitada pelo canal não é uma DANFE entregue.
+                  // 'queued' e 'already_sent' já têm aceite durável/idempotente.
+                  if (envioDanfeAceitoPeloSender(outcome.kind)) {
+                    danfesAdminEnviadas += 1;
+                  }
+                  return outcome;
                 });
               }
 
@@ -3581,6 +3662,9 @@ async function executarTurnoDoAgente(
               message: 'erro interno no envio — encerre o turno agora.',
             },
           };
+        }
+        } finally {
+          if (haviaDanfePendente) reservaEnvioDanfeAdmin.liberar();
         }
       },
     }),
@@ -4087,6 +4171,19 @@ async function executarTurnoDoAgente(
                   );
                   // Registra ANTES da execução: chamadas paralelas da mesma NFe
                   // também são bloqueadas, sem segunda ida ao renderer.
+                  if (
+                    documentoAdminPreparado !== null ||
+                    preparoDanfeAdminEmAndamento ||
+                    reservaEnvioDanfeAdmin.estaOcupada()
+                  ) {
+                    return {
+                      ok: false,
+                      error: {
+                        code: 'danfe_documento_pendente',
+                        message: 'Envie a DANFE já preparada por send_message antes de preparar outra. Não execute preparos paralelos.',
+                      },
+                    };
+                  }
                   if (!guardaDanfe.iniciarTentativa(numero)) {
                     return {
                       ok: false,
@@ -4096,13 +4193,25 @@ async function executarTurnoDoAgente(
                       },
                     };
                   }
+                  preparoDanfeAdminEmAndamento = true;
                   try {
                     const resultado = await prepararDanfe(...args);
                     guardaDanfe.registrarResultado(resultado);
+                    if (
+                      resultado !== null &&
+                      typeof resultado === 'object' &&
+                      'ok' in resultado &&
+                      resultado.ok === true &&
+                      documentoAdminPreparado !== null
+                    ) {
+                      numeroNfeAdminPreparada = numero;
+                    }
                     return resultado;
                   } catch (erro) {
                     guardaDanfe.registrarExcecao();
                     throw erro;
+                  } finally {
+                    preparoDanfeAdminEmAndamento = false;
                   }
                 }) as typeof mcpTool.execute,
               };
@@ -4462,7 +4571,13 @@ async function executarTurnoDoAgente(
         system,
         messages: openingMessages,
         tools,
-        maxSteps,
+        maxSteps: orcamentoDeStepsDanfeAdmin({
+          ferramentaAdminMontada: mcpToolIdsDoTurno.includes('crm_erp_prepare_admin_danfe'),
+          pedidoRecente: pedidoDeNfeMaisRecente(mensagemDoJob),
+          quantidade: quantidadeDeNotasMaisRecentesPedida(mensagemDoJob),
+          limiteEnviosGeral: maxSendsPerTurn,
+          maxSteps,
+        }),
         // Rascunho: a resposta é o send_message ACEITO; a etapa seguinte só
         // "encerrava". Aceito, e não chamado: o envio vetado pela cadeia
         // before_send volta ao modelo para ele reescrever (o 1º veto ensina).
