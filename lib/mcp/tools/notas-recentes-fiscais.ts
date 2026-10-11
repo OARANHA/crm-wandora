@@ -28,12 +28,14 @@ const inputShape = {
     .string()
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
     .optional(),
+  data_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  data_fim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 };
 
 export const crmErpSearchRecentInvoices: McpToolDefinition<typeof inputShape> = {
   name: "crm_erp_search_recent_invoices",
   description:
-    "Localiza as últimas N NFes EMITIDAS por data fiscal comprovada, com PDFs a enviar pela tool de DANFE. Sem quantidade, busca até 3; de 1 a 20, sem mês explícito, varre até sete meses anteriores por paginação com limites rígidos. mes_ano (AAAA-MM) é filtro opcional que restringe a um único mês, nunca requisito para mais de 3. Aceita nome, CPF/CNPJ ou cliente_contact_id. Sem cliente busca NFes de qualquer destinatário. Não confunda número de NFe com data; se faltar prova de recência ou esgotar os limites, retorna erro, nunca ausência presumida.",
+    "Pesquisa NFes autorizadas do cliente: por padrão apenas os últimos 30 dias civis (Brasília), sem ampliar automaticamente. Aceita quantidade de 1 a 20 (padrão 3), nome/CPF/CNPJ/cliente_contact_id, mes_ano OU data_inicio e data_fim no formato AAAA-MM-DD. Período explícito com datas não pode ultrapassar 30 dias inclusivos; dia específico usa a mesma data nos dois campos. Um mês explícito de 31 dias será dividido em consultas de até 30 dias. Se notas=[] com consultaCompleta=true, pergunte qual período deseja consultar e preserve o cliente, sem retroceder automaticamente. Se houver mais de uma NFe para pedido singular vago, peça número ou data antes da DANFE. Se for a última nota, use quantidade=1 e ordenação fiscal comprovada. Erro técnico/consulta_parcial não significam ausência. Nunca exponha XML, documento fiscal, nem URL externa.",
   inputSchema: inputShape,
   category: "read",
   erroParaAuditoria: erroFiscalRecenteParaAuditoria,
@@ -118,15 +120,22 @@ export const crmErpSearchRecentInvoices: McpToolDefinition<typeof inputShape> = 
       quantidade: input.quantidade,
       documento,
       mesAno: input.mes_ano,
+      dataInicio: input.data_inicio,
+      dataFim: input.data_fim,
     });
     if (!resultado.ok) {
       return {
         erro: resultado.motivo,
         mensagem:
-          resultado.motivo === "janela_fiscal_insuficiente" ||
-          resultado.motivo === "consulta_parcial"
-            ? "A pesquisa não comprovou a recência dentro dos limites de segurança. Informe mês e ano para uma consulta direcionada."
-            : "Não foi possível concluir a pesquisa fiscal no VendaERP.",
+          resultado.motivo === "periodo_excede_limite"
+            ? "Informe um período de até 30 dias por pesquisa."
+            : resultado.motivo === "periodo_incompleto"
+              ? "Informe data inicial e final no formato AAAA-MM-DD."
+              : resultado.motivo === "periodo_invalido"
+                ? "Informe datas válidas, sem período futuro e sem misturar mês com datas."
+                : resultado.motivo === "consulta_parcial"
+                  ? "Consulta fiscal incompleta: não é possível declarar ausência ou recência."
+                  : "Não foi possível concluir a pesquisa fiscal no VendaERP.",
         ...(resultado.detalhes ? { detalhes: resultado.detalhes } : {}),
       };
     }
@@ -143,7 +152,11 @@ export const crmErpSearchRecentInvoices: McpToolDefinition<typeof inputShape> = 
         quantidadeRetornada: resultado.dados.notas.length,
         mesesConsultados: resultado.dados.mesesConsultados,
         consultaCompleta: true,
+        periodoConsultado: resultado.dados.periodoConsultado,
       },
+      ...(resultado.dados.notas.length === 0
+        ? { orientacao: "Nenhuma NFe comprovada no período. Pergunte qual período deseja consultar; não amplie a janela automaticamente." }
+        : {}),
     };
   },
 };
