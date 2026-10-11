@@ -74,10 +74,96 @@ describe("VendaERP — busca fiscal regressiva READ-ONLY", () => {
     ).toThrow("invalid_response");
   });
 
-  it("pede mês antes de consultar mais de três NFes", async () => {
-    const r = await buscarUltimasNfesFiscais(db, org, { quantidade: 4 });
-    expect(r).toEqual({ ok: false, motivo: "mes_necessario" });
-    expect(service.buscarNfesPeriodoErp).not.toHaveBeenCalled();
+  it("últimas cinco sem mês: percorre período, ordena e retorna cinco NFes distintas", async () => {
+    vi.mocked(service.buscarNfesPeriodoErp).mockResolvedValueOnce({
+      ok: true,
+      dados: {
+        notas: normalizarNfesPeriodoVendaErp([
+          entrada(10, "08/10/2026 - 08:00"),
+          entrada(11, "08/10/2026 - 09:00"),
+          entrada(12, "08/10/2026 - 11:00"),
+          entrada(13, "08/10/2026 - 10:00"),
+          entrada(14, "08/10/2026 - 13:00"),
+        ]),
+        retornados: 5,
+      },
+    });
+    const r = await buscarUltimasNfesFiscais(db, org, {
+      quantidade: 5,
+      documento: target,
+      agora: new Date("2026-10-08T15:00:00Z"),
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.dados.notas.map((n) => n.numero)).toEqual([14, 12, 13, 11, 10]);
+      expect(r.dados.quantidadeSolicitada).toBe(5);
+      expect(r.dados.mesesConsultados).toEqual(["2026-10"]);
+      expect(r.dados.consultaCompleta).toBe(true);
+    }
+    expect(service.buscarNfesPeriodoErp).toHaveBeenCalledOnce();
+    expect(vi.mocked(service.buscarNfesPeriodoErp).mock.calls[0]?.[2]).toMatchObject({
+      dataInicial: "10-01-2026",
+      dataFinal: "10-08-2026",
+      pageSize: 50,
+      skip: 0,
+    });
+  });
+
+  it("a tool da ISIS aceita cinco sem mes_ano e nunca devolve XML ou URL", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-08T15:00:00Z"));
+    try {
+      vi.mocked(service.buscarNfesPeriodoErp).mockResolvedValueOnce({
+        ok: true,
+        dados: {
+          notas: normalizarNfesPeriodoVendaErp([
+            entrada(1, "08/10/2026 - 09:00"),
+            entrada(2, "08/10/2026 - 09:10"),
+            entrada(3, "08/10/2026 - 09:20"),
+            entrada(4, "08/10/2026 - 09:30"),
+            entrada(5, "08/10/2026 - 09:40"),
+          ]),
+          retornados: 5,
+        },
+      });
+      const r = await crmErpSearchRecentInvoices.handler(
+        {
+          quantidade: 5,
+          cliente: undefined,
+          cpf_cnpj: undefined,
+          cliente_contact_id: undefined,
+          mes_ano: undefined,
+        },
+        ctx,
+      );
+      expect(r).toMatchObject({
+        resumo: { quantidadeSolicitada: 5, quantidadeRetornada: 5, consultaCompleta: true },
+      });
+      expect((r as { notas: Array<{ numeroNFe: string }> }).notas.map((n) => n.numeroNFe)).toEqual([
+        "5",
+        "4",
+        "3",
+        "2",
+        "1",
+      ]);
+      expect(JSON.stringify(r)).not.toMatch(/<nfeProc|UrlImpressaoUrl|app\.example\.test/);
+      expect(service.buscarNfesPeriodoErp).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cinco NFes sem mês falham fechado quando a paginação mensal excede o teto", async () => {
+    vi.mocked(service.buscarNfesPeriodoErp).mockResolvedValue({
+      ok: true,
+      dados: { notas: [], retornados: 50 },
+    });
+    const r = await buscarUltimasNfesFiscais(db, org, {
+      quantidade: 5,
+      agora: new Date("2026-10-08T15:00:00Z"),
+    });
+    expect(r).toMatchObject({ ok: false, motivo: "consulta_parcial" });
+    expect(service.buscarNfesPeriodoErp).toHaveBeenCalledTimes(12);
   });
 
   it("consulta outubro, setembro e agosto; encontra duas mais recentes só da empresa", async () => {

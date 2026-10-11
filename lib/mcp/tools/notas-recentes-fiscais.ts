@@ -5,7 +5,10 @@
 import { z } from "zod";
 
 import { buscarUltimasNfesFiscais } from "@/lib/integracoes-erp/busca-notas-recentes-fiscais";
-import { comprovarDocumentoFiscalDoVinculo, documentoFiscalValido } from "@/lib/integracoes-erp/identidade-fiscal-vinculo";
+import {
+  comprovarDocumentoFiscalDoVinculo,
+  documentoFiscalValido,
+} from "@/lib/integracoes-erp/identidade-fiscal-vinculo";
 import { carregarVinculoClienteExterno } from "@/lib/integracoes-erp/identidade-externa-cliente";
 import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
 import { resolverClienteVendaErp } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
@@ -30,7 +33,7 @@ const inputShape = {
 export const crmErpSearchRecentInvoices: McpToolDefinition<typeof inputShape> = {
   name: "crm_erp_search_recent_invoices",
   description:
-    "Localiza as últimas N NFes EMITIDAS por data fiscal comprovada, com PDFs a enviar pela tool de DANFE. Sem quantidade, retorna até 3; para mais de 3, solicite mes_ano (AAAA-MM) antes de consultar. Aceita opcionalmente nome, CPF/CNPJ ou cliente_contact_id. Sem cliente busca NFes emitidas para qualquer destinatário. Varre meses de trás para frente, página por página, sem usar número de NFe como data. Se não puder provar recência, retorna erro; não invente ausência.",
+    "Localiza as últimas N NFes EMITIDAS por data fiscal comprovada, com PDFs a enviar pela tool de DANFE. Sem quantidade, busca até 3; de 1 a 20, sem mês explícito, varre até sete meses anteriores por paginação com limites rígidos. mes_ano (AAAA-MM) é filtro opcional que restringe a um único mês, nunca requisito para mais de 3. Aceita nome, CPF/CNPJ ou cliente_contact_id. Sem cliente busca NFes de qualquer destinatário. Não confunda número de NFe com data; se faltar prova de recência ou esgotar os limites, retorna erro, nunca ausência presumida.",
   inputSchema: inputShape,
   category: "read",
   erroParaAuditoria: erroFiscalRecenteParaAuditoria,
@@ -46,13 +49,6 @@ export const crmErpSearchRecentInvoices: McpToolDefinition<typeof inputShape> = 
       ),
     ),
   handler: async (input, ctx) => {
-    if (input.quantidade > 3 && !input.mes_ano) {
-      return {
-        erro: "mes_necessario",
-        mensagem: "Para mais de 3 NFes, informe o mês e o ano (por exemplo, agosto de 2026).",
-      };
-    }
-
     const alvos = [input.cliente, input.cpf_cnpj, input.cliente_contact_id].filter(Boolean);
     if (alvos.length > 1)
       return {

@@ -503,3 +503,23 @@ Nunca exportar DOM, PDF, URLs, método bruto, chave, NFe, identidade ou
 payload de rede. Status de bloqueio **não comprova causalidade**. Sem
 nova consulta real ao VendaERP até a versão seguir CI → merge → publicação
 → deploy healthy. Falhas continuam fail-closed, sem entregar DANFE inválida.
+
+## Ajuste no contrato de quantidade de últimas NFes — 11/10/2026
+
+A quantidade solicitada não é um filtro de mês. A tool `crm_erp_search_recent_invoices`
+antes recusava **4 a 20 notas sem `mes_ano`**, embora a intenção seja localizar
+as últimas N notas independentemente do mês. O fluxo agora mantém **a mesma
+janela regressiva existente (mês atual + até seis anteriores)** e os limites
+inalterados de paginação (50 itens/página, 12 páginas/mês e 24 no total), mas
+**não exige mês apenas porque N é maior que 3**. O filtro `mes_ano` continua
+opcional para consultas dirigidas. Se a prova de recência não couber na janela
+ou nos limites, o resultado continua falhando fechado: `consulta_parcial` ou
+`janela_fiscal_insuficiente`, nunca uma ausência inventada. Mantidos GET
+read-only, documento do destinatário validado, filtragem local, deduplicação
+por chave e projeção sem XML ou URL para o agente.
+
+**Limitação separada, ainda aberta na issue #55:** este ajuste apenas destrava a
+**busca** de cinco ou mais NFes. Ele **não** amplia o teto geral do agente de
+3 envios por turno nem o orçamento de steps, não repara a renderização de DANFE
+e não comprova a entrega de N PDFs. Não promover a produção como correção
+funcional completa sem gates adicionais.
