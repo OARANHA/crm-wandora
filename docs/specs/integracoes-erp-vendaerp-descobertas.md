@@ -503,3 +503,21 @@ Nunca exportar DOM, PDF, URLs, método bruto, chave, NFe, identidade ou
 payload de rede. Status de bloqueio **não comprova causalidade**. Sem
 nova consulta real ao VendaERP até a versão seguir CI → merge → publicação
 → deploy healthy. Falhas continuam fail-closed, sem entregar DANFE inválida.
+
+
+## Gate de prova fiscal interna (preparação sem liberação de DANFE, 11/10/2026)
+
+O estudo `docs/research/danfe-prova-fiscal-privada.md` documenta o seam
+`examinarProvaFiscalDeNfeInterna`, que reutiliza a **mesma** função de GET
+`Fiscal/ConsultarNFE` por organização. Seu callback inspeciona uma única
+resposta estruturada do provider e **não projeta o XML, chave, número, URL,
+credenciais ou dados fiscais**. A saída é somente motivo sanitizado e estado
+`nao_comprovado`, inclusive quando a resposta alega sucesso ou contém
+`Xml`. Não é endpoint nem tool da ISIS; não chama o sender.
+
+Este primeiro gate **não é validação criptográfica/SEFAZ**. XMLDSig, assinatura,
+cadeia ICP-Brasil, anti-wrapping, protocolo externo e fidelidade da DANFE ainda
+não possuem prova e não podem ser presumidos. PRs #94/#95 permanecem como
+experimentos offline; a issue #55 continua aberta. Não executar consulta real
+apenas para investigação, não efetuar deploy ou canário por CI verde deste
+pré-gate e não introduzir provider/sender paralelo.

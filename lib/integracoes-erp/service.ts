@@ -5,6 +5,10 @@ import { logger } from "@/lib/logger";
 
 import { carregarConexaoVendaErp, dadosCifradosVendaErp } from "./credenciais";
 import { normalizarNfesPeriodoVendaErp, type NotaFiscalPeriodoErp } from "./notas-fiscais-periodo";
+import {
+  examinarEnvelopeFiscalDaRespostaPrivada,
+  type ProvaFiscalInternaPendente,
+} from "./prova-fiscal-privada";
 import type {
   ClienteErp,
   ConexaoErpSegura,
@@ -515,6 +519,32 @@ export async function obterNotaErp(
 ): Promise<ConsultaErpResultado<NotaErp>> {
   return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
     normalizarNotaVendaErp(await consultarNfeVendaErp(credenciais, codigoNFe)),
+  );
+}
+
+/**
+ * Seam EXCLUSIVAMENTE SERVER-SIDE e ainda não conectado à ISIS.
+ *
+ * Reaproveita o MESMO adapter/endpoint GET Fiscal/ConsultarNFE sem acrescentar
+ * provider, sender ou chamada externa. O Xml vive apenas no callback desta
+ * consulta e é descartado antes de qualquer resposta/camada de agente.
+ *
+ * O estado SEMPRE é "nao_comprovado" até existir verificador independente
+ * de assinatura XMLDSig e de autorização SEFAZ com trust anchors auditados.
+ */
+export async function examinarProvaFiscalDeNfeInterna(
+  admin: SupabaseClient,
+  organizationId: string,
+  codigoNfe: number,
+): Promise<ConsultaErpResultado<ProvaFiscalInternaPendente>> {
+  if (!Number.isSafeInteger(codigoNfe) || codigoNfe <= 0 || codigoNfe > 2147483647) {
+    return { ok: false, motivo: "invalid_request" };
+  }
+  return executarLeituraVendaErp(admin, organizationId, async (credenciais) =>
+    examinarEnvelopeFiscalDaRespostaPrivada(
+      await consultarNfeVendaErp(credenciais, codigoNfe),
+      codigoNfe,
+    ),
   );
 }
 
