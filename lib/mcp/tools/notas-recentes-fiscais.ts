@@ -5,7 +5,10 @@
 import { z } from "zod";
 
 import { buscarUltimasNfesFiscais } from "@/lib/integracoes-erp/busca-notas-recentes-fiscais";
-import { comprovarDocumentoFiscalDoVinculo, documentoFiscalValido } from "@/lib/integracoes-erp/identidade-fiscal-vinculo";
+import {
+  comprovarDocumentoFiscalDoVinculo,
+  documentoFiscalValido,
+} from "@/lib/integracoes-erp/identidade-fiscal-vinculo";
 import { carregarVinculoClienteExterno } from "@/lib/integracoes-erp/identidade-externa-cliente";
 import { PROVEDOR_VENDAERP } from "@/lib/integracoes-erp/provedores";
 import { resolverClienteVendaErp } from "@/lib/integracoes-erp/resolucao-cliente-vendaerp";
