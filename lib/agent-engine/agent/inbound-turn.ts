@@ -3067,6 +3067,7 @@ async function executarTurnoDoAgente(
         const documentoReservadoNoInicio = documentoAdminPreparado;
         const numeroNfeReservadaNoInicio = numeroNfeAdminPreparada;
         const haviaDanfePendente = documentoReservadoNoInicio !== null;
+        let avisoDeRecenciaSubstituido = false;
         if (haviaDanfePendente && !reservaEnvioDanfeAdmin.tentarReservar()) {
           return {
             ok: false,
@@ -3092,6 +3093,7 @@ async function executarTurnoDoAgente(
           )
         ) {
           body = AVISO_SEM_RECENCIA_FISCAL;
+          avisoDeRecenciaSubstituido = true;
           documentoAdminPreparado = null;
           numeroNfeAdminPreparada = null;
           runLog.warn('recência fiscal não comprovada — resposta e anexo protegidos', {
@@ -3405,6 +3407,16 @@ async function executarTurnoDoAgente(
                   ...(media ? { media } : {}),
                 });
               };
+              // O próprio gate pode revogar o PDF e trocar o corpo pelo aviso
+              // de recência antes de chegar ao before_send: preserve a
+              // comunicação segura, sem tentar anexar o PDF revogado.
+              if (
+                haviaDanfePendente &&
+                avisoDeRecenciaSubstituido &&
+                documentoAdminPreparado === null
+              ) {
+                return enviar(finalBody);
+              }
               // Uma DANFE que apareceu DEPOIS do início do send_message jamais
               // pode ser anexada a um texto mais antigo. Se uma reserva perdeu
               // identidade ou prova fiscal durante o before_send, também não
