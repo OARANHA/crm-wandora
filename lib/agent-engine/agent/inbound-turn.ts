@@ -170,6 +170,8 @@ import {
   numerosDaBuscaFiscalComprovada,
   quantidadeDeNotasMaisRecentesPedida,
   mencionaNfeNaoComprovada,
+  pedidoDeNotaFiscalVaga,
+  periodoDeBuscaFiscalVazia,
 } from './recencia-fiscal-gate';
 import { AVISO_FALHA_DANFE, GuardaFalhaDanfeNoTurno } from './danfe-failure-guard';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
@@ -1046,7 +1048,7 @@ export function blocosErpResidentes(toolIds: readonly string[]): string[] {
     "Se já houver um cliente_contact_id resolvido nesta conversa, prefira esse id. ";
 
   if (toolIds.includes(recent)) {
-    bloco += "PRIORIDADE PARA NOTAS RECENTES: sempre use crm_erp_search_recent_invoices (não a lista de pedidos) quando o administrador pedir as últimas notas emitidas, com ou sem nome do cliente. Até 3 notas, sem mês; por padrão são 3. Acima de 3, informe ao administrador que é necessário mês/ano e só então consulte com mes_ano=AAAA-MM. Se o período automático não provar a recência, peça um mês; nunca invente ausência de NFe. ";
+    bloco += "CONSULTA FISCAL: use crm_erp_search_recent_invoices para nota(s) de cliente, não pedidos comuns. Sem período informado, consulte somente os últimos 30 dias civis. Se notas=[] com consultaCompleta=true, diga que não encontrou no período pesquisado e PERGUNTE qual período deseja; NUNCA retroceda automaticamente. Preserve cliente_contact_id comprovado na continuação da conversa. Para dia exato, passe data_inicio=data_fim=AAAA-MM-DD; para período, ambas as datas (até 30 dias inclusivos); para mês informado, mes_ano. Para pedido singular vago sem data nem número, consulte com quantidade=2 e, se vier mais de uma NFe, pergunte qual número/data deseja, sem preparar DANFE. Para a última nota, use quantidade=1 e apenas a mais recente comprovada. Se vier menos que a quantidade pedida, informe somente o que foi encontrado no período, sem alegar ausência histórica. Nunca trate erro técnico ou consulta parcial como ausência. ";
   }
 
   if (toolIds.includes(customers)) {
@@ -2735,6 +2737,8 @@ async function executarTurnoDoAgente(
   // Prova fiscal vem somente da tool de NFes por período executada neste turno.
   // Histórico, NFe antiga e busca de pedidos não certificam "última nota".
   let recenciaFiscalComprovadaNesteTurno = false;
+  let periodoFiscalVazioNesteTurno: { dataInicio: string; dataFim: string } | null = null;
+  let notaFiscalVagaAmbiguaNesteTurno = false;
   const numerosNfeFiscaisComprovados = new Set<string>();
   // Estado apenas deste job: DANFE com falha não dispara quatro renderizações
   // iguais nem promessas de entrega futura inexistente.
@@ -3061,11 +3065,17 @@ async function executarTurnoDoAgente(
             mencionaNfeNaoComprovada(body, numerosNfeFiscaisComprovados)
           )
         ) {
-          body = AVISO_SEM_RECENCIA_FISCAL;
+          body = periodoFiscalVazioNesteTurno && !mencionaNfeNaoComprovada(body, numerosNfeFiscaisComprovados)
+            ? "Não encontrei NFes no período de " + periodoFiscalVazioNesteTurno.dataInicio + " a " + periodoFiscalVazioNesteTurno.dataFim + ". Qual período você deseja consultar?"
+            : AVISO_SEM_RECENCIA_FISCAL;
           documentoAdminPreparado = null;
           runLog.warn('recência fiscal não comprovada — resposta e anexo protegidos', {
             job_id: liveJob().id,
           });
+        }
+        if (notaFiscalVagaAmbiguaNesteTurno) {
+          body = "Encontrei mais de uma nota fiscal para esse cliente no período consultado. Qual número ou data da nota você deseja?";
+          documentoAdminPreparado = null;
         }
         // Falhou a materialização: não prometer envio em segundo plano.
         // Não encobre uma recência ainda não comprovada e não interfere
@@ -4041,8 +4051,17 @@ async function executarTurnoDoAgente(
                   // Invalida ANTES da chamada: até exceção do provider
                   // não pode reusar prova fiscal de uma consulta anterior.
                   recenciaFiscalComprovadaNesteTurno = false;
+                  periodoFiscalVazioNesteTurno = null;
+                  notaFiscalVagaAmbiguaNesteTurno = false;
                   numerosNfeFiscaisComprovados.clear();
                   const resultado = await executarConsultaFiscal(...args);
+                  periodoFiscalVazioNesteTurno = periodoDeBuscaFiscalVazia(resultado);
+                  if (pedidoDeNotaFiscalVaga(mensagemDoJob) && resultado && typeof resultado === "object" &&
+                    "notas" in resultado && Array.isArray(resultado.notas) && resultado.notas.length > 1 &&
+                    "resumo" in resultado && resultado.resumo && typeof resultado.resumo === "object" &&
+                    "consultaCompleta" in resultado.resumo && resultado.resumo.consultaCompleta === true) {
+                    notaFiscalVagaAmbiguaNesteTurno = true;
+                  }
                   // Somente um retorno completo libera afirmação de recência.
                   if (recenciaFiscalComprovada(resultado)) {
                     const limite = quantidadeDeNotasMaisRecentesPedida(mensagemDoJob);
@@ -4064,6 +4083,9 @@ async function executarTurnoDoAgente(
               rawTools[name] = {
                 ...mcpTool,
                 execute: (async (...args: Parameters<typeof prepararDanfe>) => {
+                  if (notaFiscalVagaAmbiguaNesteTurno) {
+                    return { erro: "nota_ambigua", mensagem: "Mais de uma NFe foi encontrada. Peça número ou data antes de preparar a DANFE." };
+                  }
                   if (
                     pedidoDeNfeMaisRecente(mensagemDoJob) &&
                     agentConfig?.toolIds.some(
