@@ -143,6 +143,44 @@ describe.runIf(process.env.ELUS_DANFE_CONTROLLED_SPA_OFFLINE === "1")(
       );
     }
 
+    for (const mode of ["normal", "cross-origin"]) {
+      it(
+        "impressão direta só ocorre depois do POST público e montagem assíncrona: " + mode,
+        async () => {
+          fixture.mode = mode;
+          fixture.hits = [];
+          const recursoEsperado =
+            mode === "cross-origin"
+              ? "https://api.invalid/data"
+              : "https://fiscal.invalid/data";
+          const pdf = await renderizarUrlParaPdfControlado("https://fiscal.invalid/danfe", {
+            nome: "fixture-spa-async-print-sem-validacao-fiscal",
+            permiteUrl: (url) => url === "https://fiscal.invalid/danfe",
+            impressaoDireta: true,
+            aguardarRecursoDeMontagem: (url, metodo) =>
+              url === recursoEsperado && metodo === "POST",
+            recursosBrowser: {
+              hostsAutorizados: ["assets.invalid", "api.invalid"],
+              permiteRecurso: (url, metodo) =>
+                (url === "https://fiscal.invalid/data" && metodo === "POST") ||
+                (url === "https://assets.invalid/app.js" && metodo === "GET") ||
+                (url === "https://api.invalid/data" && ["POST", "OPTIONS"].includes(metodo)),
+            },
+          });
+          const texto = await extractPdfText(pdf, {
+            estrategia: "processo-a-parte",
+            timeoutMs: 8_000,
+            heapMb: 96,
+          });
+          // Checagem da fixture SINTÉTICA apenas no teste; zero validação fiscal em produção.
+          expect(texto).toContain("PRODUTO FISCAL SINTETICO");
+          expect(texto).not.toContain("Carregando");
+          expect(fixture.hits.some((x) => x === "POST /data")).toBe(true);
+        },
+        35_000,
+      );
+    }
+
     it("não entrega PDF com outra identidade fiscal", async () => {
       fixture.mode = "wrong-key";
       fixture.hits = [];
