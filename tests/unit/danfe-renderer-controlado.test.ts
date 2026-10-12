@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   launch: vi.fn(),
   redirect: vi.fn(),
   extractPdfText: vi.fn(),
+  buscarPinado: vi.fn(),
 }));
 
 vi.mock("@/lib/documentos/egress-browser-pdf", async (importOriginal) => {
@@ -16,6 +17,9 @@ vi.mock("@/lib/documentos/egress-browser-pdf", async (importOriginal) => {
   return { ...original, resolverIpPublicoFixadoParaBrowser: mocks.resolver };
 });
 vi.mock("playwright-core", () => ({ chromium: { launch: mocks.launch } }));
+vi.mock("@/lib/documentos/recurso-browser-pdf-pinado", () => ({
+  buscarRecursoBrowserPdfPinado: mocks.buscarPinado,
+}));
 vi.mock("@/lib/ai/rag/extractors/pdf", async (importOriginal) => {
   const original = await importOriginal<typeof PdfExtractor>();
   return { ...original, extractPdfText: mocks.extractPdfText };
@@ -706,6 +710,87 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(env.page.pdf).not.toHaveBeenCalled();
     expect(env.browser.close).toHaveBeenCalledOnce();
     expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("DANFE: permite recursos comprovados através de proxy HTTPS pinado, sem continue externo", async () => {
+    const env = ambientePdf();
+    const extras = {
+      hostsAutorizados: ["novaapi.vendaerp.com.br", "d1fkuoqvag3bur.cloudfront.net"],
+      permiteRecurso: (url: string, method: string) =>
+        url ===
+          "https://novaapi.vendaerp.com.br/v3/CriaDANFE/GetDanfeInfoPublic?g=12345678-1234-4123-8123-123456789abc" &&
+        method === "POST",
+    };
+    mocks.buscarPinado.mockResolvedValue({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: Buffer.from("{}"),
+    });
+    await renderizarUrlParaPdfControlado(danfe, { ...policy, recursosBrowser: extras });
+    expect(mocks.resolver).toHaveBeenCalledTimes(3);
+
+    const handler = env.context.route.mock.calls[0]?.[1];
+    const fulfill = vi.fn().mockResolvedValue(undefined);
+    const continuar = vi.fn();
+    const abort = vi.fn();
+    await handler({
+      request: () => ({
+        url: () =>
+          "https://novaapi.vendaerp.com.br/v3/CriaDANFE/GetDanfeInfoPublic?g=12345678-1234-4123-8123-123456789abc",
+        method: () => "POST",
+        allHeaders: () => Promise.resolve({ origin: "https://app.vendaerp.com.br" }),
+        postDataBuffer: () => Buffer.from("{}"),
+      }),
+      fulfill,
+      continue: continuar,
+      abort,
+    });
+    expect(mocks.buscarPinado).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metodo: "POST",
+        ip: "8.8.8.8",
+        body: Buffer.from("{}"),
+      }),
+    );
+    expect(fulfill).toHaveBeenCalledWith(expect.objectContaining({ status: 200 }));
+    expect(continuar).not.toHaveBeenCalled();
+    expect(abort).not.toHaveBeenCalled();
+  });
+
+  it("DANFE: falha fechado em recurso não permitido ou falha de proxy pinado", async () => {
+    const env = ambientePdf();
+    const extras = {
+      hostsAutorizados: ["novaapi.vendaerp.com.br"],
+      permiteRecurso: (url: string, method: string) =>
+        url.startsWith("https://novaapi.vendaerp.com.br/v3/CriaDANFE/") && method === "POST",
+    };
+    await renderizarUrlParaPdfControlado(danfe, { ...policy, recursosBrowser: extras });
+    const handler = env.context.route.mock.calls[0]?.[1];
+    const bloqueado = vi.fn();
+    await handler({
+      request: () => ({
+        url: () => "http://169.254.169.254/latest/meta-data",
+        method: () => "GET",
+      }),
+      abort: bloqueado,
+      continue: vi.fn(),
+    });
+    expect(bloqueado).toHaveBeenCalledWith("blockedbyclient");
+    mocks.buscarPinado.mockRejectedValueOnce(new Error("redirecionamento_sanitizado"));
+    const abort = vi.fn();
+    const continuar = vi.fn();
+    await handler({
+      request: () => ({
+        url: () => "https://novaapi.vendaerp.com.br/v3/CriaDANFE/info",
+        method: () => "POST",
+        allHeaders: () => Promise.resolve({}),
+        postDataBuffer: () => Buffer.from("{}"),
+      }),
+      abort,
+      continue: continuar,
+    });
+    expect(abort).toHaveBeenCalledWith("blockedbyclient");
+    expect(continuar).not.toHaveBeenCalled();
   });
 
   it("não associa bloqueio de rede ao erro da impressão do PDF", async () => {
