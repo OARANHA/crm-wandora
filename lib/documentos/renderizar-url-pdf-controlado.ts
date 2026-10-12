@@ -62,7 +62,7 @@ export function diagnosticarTextoPdfFiscal(
   const corpoPrincipal = normalizado.split(
     /\b(?:DOCUMENTOS?\s+FISCAIS?\s+REFERENCIAD[OA]S?|NFE?\s+REFERENCIAD[OA]S?)\b/,
     1,
-  )[0];
+  )[0] ?? "";
   // Os agrupadores tipograficos sao permitidos; palavras e sequencias
   // maiores que 44 digitos nao podem formar uma chave artificial.
   const candidatas = [...corpoPrincipal.matchAll(/(?<!\d)\d(?:[\s.\-]*\d){43}(?!\d)/g)];
