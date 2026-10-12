@@ -56,8 +56,7 @@ export async function buscarRecursoBrowserPdfPinado(args: {
   if (args.body?.length) headers["Content-Length"] = String(args.body.length);
   if (args.metodo === "OPTIONS") {
     const solicitado = args.headers["access-control-request-method"];
-    if (solicitado && solicitado !== "POST")
-      throw new Error("recurso_pdf_preflight_recusado");
+    if (solicitado && solicitado !== "POST") throw new Error("recurso_pdf_preflight_recusado");
     if (solicitado) headers["Access-Control-Request-Method"] = solicitado;
     const campos = args.headers["access-control-request-headers"];
     if (campos) {
@@ -67,7 +66,6 @@ export async function buscarRecursoBrowserPdfPinado(args: {
       headers["Access-Control-Request-Headers"] = valores.join(", ");
     }
   }
-
 
   return new Promise((resolve, reject) => {
     const requisicao = requisitarHttps(
@@ -103,7 +101,9 @@ export async function buscarRecursoBrowserPdfPinado(args: {
         resposta.on("error", () => reject(new Error("recurso_pdf_falhou")));
         resposta.on("end", () => {
           try {
-            const codificacao = String(resposta.headers["content-encoding"] ?? "identity").toLowerCase();
+            const codificacao = String(
+              resposta.headers["content-encoding"] ?? "identity",
+            ).toLowerCase();
             const dados = Buffer.concat(partes, tamanho);
             const opcoes = { maxOutputLength: MAX_RESPOSTA_BYTES };
             const body =
