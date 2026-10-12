@@ -636,6 +636,7 @@ Resultados, RED→GREEN, PDFs e limitação preexistente de `release:conferir`:
 O proprietário solicita imprimir o conteúdo da página pública do VendaERP
 imediatamente após o evento `load` do Chromium, sem validação de conteúdo fiscal.
 O modo `impressaoDireta` é opt-in na policy `erp.vendaerp.danfe_to_pdf`:
+
 - esperar `load` e imprimir uma única vez sob `media=screen`;
 - não ler DOM fiscal, não verificar DANFE, chave de acesso nem extrair texto do PDF;
 - reaproveitar o bucket privado `whatsapp-media`, a mensagem e sender canônicos;
