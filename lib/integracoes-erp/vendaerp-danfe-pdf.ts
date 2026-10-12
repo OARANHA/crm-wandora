@@ -61,6 +61,20 @@ export async function renderizarDanfeVendaErpParaPdf(
   return renderizador(url, {
     nome: "erp.vendaerp.danfe_to_pdf",
     impressaoDireta: true,
+    // O dado da DANFE é montado por uma chamada POST pública, após o HTML ter carregado.
+    aguardarRecursoDeMontagem: (recurso, metodo) => {
+      if (metodo !== "POST") return false;
+      const urlRecurso = new URL(recurso);
+      return (
+        urlRecurso.origin === "https://novaapi.vendaerp.com.br" &&
+        urlRecurso.pathname === "/v3/CriaDANFE/GetDanfeInfoPublic" &&
+        recursoPublicoDanfeVendaErpPermitido(
+          recurso,
+          metodo,
+          new URL(url).searchParams.get("g") ?? "",
+        )
+      );
+    },
     permiteUrl: ehUrlDanfePublicoVendaErp,
     maxBytes: MAX_MEDIA_BYTES,
     timeoutMs: 60_000,

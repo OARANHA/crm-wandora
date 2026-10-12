@@ -647,3 +647,30 @@ O modo `impressaoDireta` é opt-in na policy `erp.vendaerp.danfe_to_pdf`:
   aceite fiscal nem funcional de duas DANFEs corretas.
 
 Não executar canário real antes de CI green, merge, imagens e deploy saudável.
+
+## Impressão direta de SPA assíncrona — revisão offline proposta 12/10/2026
+
+O canário real das 17h27 BRT após PR #105 enviou um documento
+`application/pdf` (status `read`), mas o proprietário abriu o arquivo e
+constatou que a **página estava em branco**. Assim, entrega de PDF não significa
+renderização bem-sucedida. O evento `load` do navegador é insuficiente para
+aplicações que buscam dados públicos depois da navegação.
+
+A proposta preserva `impressaoDireta` (sem procurar textos `DANFE` ou chave,
+sem extrair/comparar conteúdo fiscal do PDF), mas aguarda a resposta COMPLETA
+e HTTP 2xx da chamada pública específica de montagem,
+`POST /v3/CriaDANFE/GetDanfeInfoPublic?g=<uuid já autorizado>`, observando-a
+via Playwright antes da navegação. Depois espera `networkidle` e dois frames
+do navegador com CSS de tela, para que JavaScript assíncrono consiga atualizar
+a página antes da **única** impressão.
+
+Não são liberados novos hosts, métodos ou URLs; o transporte HTTPS fixado,
+a policy de egress/SSRF, o storage privado e o sender canônico continuam.
+Se a chamada não ocorrer, falhar ou a rede não estabilizar no prazo já
+existente, **não envia PDF incompleto**. O critério é exclusivamente
+prontidão de carregamento HTTP e navegador, **não validação de NFe**.
+
+Mesmo essas condições não garantem que toda SPA desenhou conteúdo correto:
+esta é uma hipótese de correção técnica e deve ter teste Chromium offline
+antes de PR green, merge, imagens, deploy saudável e novo canário controlado.
+Nenhuma chamada real VendaERP é feita para investigar esta hipótese.

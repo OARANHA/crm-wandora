@@ -37,6 +37,11 @@ describe("capability erp.vendaerp.danfe_to_pdf", () => {
     expect(politica.permiteUrl(URL_DANFE)).toBe(true);
     expect(politica.timeoutMs).toBe(60_000);
     expect(politica.impressaoDireta).toBe(true);
+    const requerido =
+      "https://novaapi.vendaerp.com.br/v3/CriaDANFE/GetDanfeInfoPublic?g=34b6208d-4d02-49bc-8a59-8823d1b10765";
+    expect(politica.aguardarRecursoDeMontagem?.(requerido, "POST")).toBe(true);
+    expect(politica.aguardarRecursoDeMontagem?.(requerido, "GET")).toBe(false);
+    expect(politica.aguardarRecursoDeMontagem?.("https://evil.invalid/", "POST")).toBe(false);
 
     const serializado = JSON.stringify(politica);
     expect(serializado).not.toContain("Authorization-Token");

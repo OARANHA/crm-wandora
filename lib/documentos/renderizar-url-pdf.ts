@@ -97,6 +97,9 @@ export interface PoliticaRenderizacaoUrlPdf {
   timeoutMs?: number;
   /** Imprime a página carregada, sem inspecionar DOM fiscal ou texto do PDF. */
   impressaoDireta?: boolean;
+  /** Recurso público cuja resposta completa indica que a SPA terminou de receber dados para imprimir.
+   * Apenas o adapter do provider define este predicado; nunca vem do modelo. */
+  aguardarRecursoDeMontagem?: (url: string, metodo: string) => boolean;
   /** Chave fiscal comprovada, somente quando fornecida por leitura estruturada ERP. */
   chaveFiscalEsperada?: string;
 }
