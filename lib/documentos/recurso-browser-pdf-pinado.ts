@@ -145,7 +145,15 @@ export async function buscarRecursoBrowserPdfPinado(args: {
       },
     );
     requisicao.on("timeout", () => requisicao.destroy(new Error("recurso_pdf_timeout")));
-    requisicao.on("error", () => reject(new Error("recurso_pdf_falhou")));
+    requisicao.on("error", (erro) =>
+      reject(
+        new Error(
+          erro instanceof Error && erro.message === "recurso_pdf_timeout"
+            ? "recurso_pdf_timeout"
+            : "recurso_pdf_falhou",
+        ),
+      ),
+    );
     if (args.body?.length) requisicao.write(args.body);
     requisicao.end();
   });
