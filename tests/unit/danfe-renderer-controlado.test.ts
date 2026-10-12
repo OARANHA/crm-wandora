@@ -45,6 +45,7 @@ function ambientePdf() {
   const page = {
     goto: vi.fn().mockResolvedValue({ ok: () => true }),
     url: vi.fn().mockReturnValue(danfe),
+    waitForURL: vi.fn().mockResolvedValue(undefined),
     waitForFunction: vi.fn().mockResolvedValue(true),
     waitForLoadState: vi.fn().mockResolvedValue(undefined),
     waitForResponse: vi.fn().mockResolvedValue({
@@ -190,6 +191,50 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     await expect(
       renderizarUrlParaPdfControlado(danfe, { ...policy, impressaoDireta: true }),
     ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_navegacao" });
+    expect(env.page.pdf).not.toHaveBeenCalled();
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("aguarda a URL fiscal exata depois do bootstrap HTML interceptado", async () => {
+    const env = ambientePdf();
+    // A primeira navegacao concluiu no bootstrap local. O destino fiscal
+    // so pode ser considerado carregado DEPOIS da segunda navegacao JS.
+    env.page.url.mockReturnValue(local);
+    env.page.waitForURL.mockImplementationOnce(async () => {
+      env.page.url.mockReturnValue(danfe);
+    });
+
+    const pdf = await renderizarUrlParaPdfControlado(danfe, {
+      ...policy,
+      impressaoDireta: true,
+      recursosBrowser: { hostsAutorizados: [], permiteRecurso: () => false },
+    });
+
+    expect(pdf).toEqual(env.pdf);
+    expect(env.page.goto).toHaveBeenCalledWith(
+      local,
+      expect.objectContaining({ waitUntil: "commit" }),
+    );
+    expect(env.page.waitForURL).toHaveBeenCalledWith(
+      danfe,
+      expect.objectContaining({ waitUntil: "domcontentloaded" }),
+    );
+    expect(env.page.pdf).toHaveBeenCalledOnce();
+  });
+
+  it("falha fechado quando o destino fiscal nao chega apos o bootstrap", async () => {
+    const env = ambientePdf();
+    env.page.waitForURL.mockRejectedValueOnce(new Error("navegacao fiscal nao concluida"));
+
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, {
+        ...policy,
+        impressaoDireta: true,
+        recursosBrowser: { hostsAutorizados: [], permiteRecurso: () => false },
+      }),
+    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_navegacao" });
+
     expect(env.page.pdf).not.toHaveBeenCalled();
     expect(env.browser.close).toHaveBeenCalledOnce();
     expect(env.fechar).toHaveBeenCalledOnce();
