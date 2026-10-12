@@ -47,17 +47,29 @@ export function diagnosticarTextoPdfFiscal(
   // A chave inteira continua obrigatória, impedindo aceitar um HTML vazio.
   if (!semEspacos.includes("DANFE")) return "marcador_danfe_ausente";
   if (!semEspacos.includes("CHAVEDEACESSO")) return "rotulo_chave_ausente";
-  // A chave fiscal deve ser a do campo principal, imediatamente após seu
-  // rótulo. Não juntar dígitos do PDF inteiro nem aceitar NFe referenciada.
+  // O extrator de PDF nao garante ordem visual: a chave principal pode
+  // anteceder o rotulo "CHAVE DE ACESSO" na string retornada. O PDF real
+  // de 05/10 apresentou exatamente esse formato. A identidade continua
+  // vindo apenas da leitura fiscal estruturada do ERP.
   const rotulo = /(?<![A-Z])C\s*H\s*A\s*V\s*E\s*D\s*E\s*A\s*C\s*E\s*S\s*S\s*O(?![A-Z])/.exec(
     normalizado,
   );
   if (!rotulo) return "rotulo_chave_ausente";
-  const inicio = rotulo.index + rotulo[0].length;
-  const campo = normalizado.slice(inicio, inicio + 176);
-  // Espaços/pontos/hífens são separadores gráficos; palavras não são.
-  const candidata = /^\s*[:#.\-]?\s*(\d(?:[\s.\-]*\d){43})(?!\d)/.exec(campo);
-  if (candidata?.[1]?.replace(/\D/g, "") !== chaveEsperada) return "chave_divergente";
+
+  // Uma chave de NFe referenciada nao pode satisfazer a validacao da NFe
+  // principal. Se houver zero ou mais de uma candidata no corpo principal,
+  // falhar fechado; nunca escolher pela ordem ou por mera coincidencia.
+  const corpoPrincipal =
+    normalizado.split(
+      /\b(?:DOCUMENTOS?\s+FISCAIS?\s+REFERENCIAD[OA]S?|NFE?\s+REFERENCIAD[OA]S?)\b/,
+      1,
+    )[0] ?? "";
+  // Os agrupadores tipograficos sao permitidos; palavras e sequencias
+  // maiores que 44 digitos nao podem formar uma chave artificial.
+  const candidatas = [...corpoPrincipal.matchAll(/(?<!\d)\d(?:[\s.\-]*\d){43}(?!\d)/g)];
+  if (candidatas.length !== 1 || candidatas[0]?.[0].replace(/\D/g, "") !== chaveEsperada) {
+    return "chave_divergente";
+  }
   return null;
 }
 

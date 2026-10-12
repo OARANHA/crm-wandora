@@ -533,6 +533,43 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(resultado).toBe("chave_divergente");
   });
 
+  it("aceita DANFE cuja chave principal aparece antes do rótulo na extração do PDF", () => {
+    const chave = "35261012345678000190550010649963971123456780";
+    const texto =
+      "DANFE " +
+      chave +
+      " DADOS DO EMITENTE ".repeat(8) +
+      " CHAVE DE ACESSO INFORMAÇÕES DA NOTA ".repeat(8);
+    expect(diagnosticarTextoPdfFiscal(texto, chave)).toBeNull();
+  });
+
+  it("não confunde a chave de uma NFe referenciada com a chave principal", () => {
+    const chave = "35261012345678000190550010649963971123456780";
+    const texto =
+      "DANFE " +
+      " DADOS DO EMITENTE ".repeat(10) +
+      " CHAVE DE ACESSO DOCUMENTOS FISCAIS REFERENCIADOS " +
+      chave;
+    expect(diagnosticarTextoPdfFiscal(texto, chave)).toBe("chave_divergente");
+  });
+
+  it("rejeita chave referenciada antes do rótulo da DANFE principal", () => {
+    const chave = "35261012345678000190550010649963971123456780";
+    const texto =
+      "DANFE DOCUMENTOS FISCAIS REFERENCIADOS " +
+      chave +
+      " DADOS DO EMITENTE ".repeat(8) +
+      " CHAVE DE ACESSO ";
+    expect(diagnosticarTextoPdfFiscal(texto, chave)).toBe("chave_divergente");
+  });
+
+  it("rejeita principal divergente ainda que a chave esperada siga o rótulo", () => {
+    const chave = "35261012345678000190550010649963971123456780";
+    const texto =
+      "DANFE " + "9".repeat(44) + " DADOS DA NOTA ".repeat(8) + " CHAVE DE ACESSO " + chave;
+    expect(diagnosticarTextoPdfFiscal(texto, chave)).toBe("chave_divergente");
+  });
+
   it("rejeita documento de outra NFe mesmo quando referencia a chave esperada", () => {
     const chave = "35261012345678000190550010649963971123456780";
     const cabecalho = `DANFE CHAVE DE ACESSO ${"9".repeat(44)}`;
