@@ -6,7 +6,7 @@ import { seedGov, GOV_ORG, GOV_AGENT_A, GOV_AGENT_B, GOV_VIEWER } from "./gov-he
 import { checkpoint, localProjection } from "@/lib/agenda/google/sync-model";
 import { appointmentSnapshotSchema, expectedAppointment } from "@/lib/agenda/google/sync-store";
 const pool = new pg.Pool({
-  connectionString: `postgresql://postgres:postgres@127.0.0.1:${process.env.TEST_DB_PORT ?? 54329}/postgres`,
+  connectionString: `[REDACTED]127.0.0.1:${process.env.TEST_DB_PORT ?? 54329}/postgres`,
   max: 5,
 });
 beforeAll(() => seedGov());
@@ -48,7 +48,13 @@ async function calendar(id: string, action: string, args: unknown = {}) {
     await pool.query("select fn_google_calendar($1,$2,$3,$4) result", [GOV_ORG, id, action, args])
   ).rows[0].result;
 }
-async function asUser(user: string, sql: string, values: unknown[], session?: string, aal = "aal1") {
+async function asUser(
+  user: string,
+  sql: string,
+  values: unknown[],
+  session?: string,
+  aal = "aal1",
+) {
   const c = await pool.connect();
   try {
     await c.query("begin");
@@ -672,7 +678,10 @@ it("suporte full conserva dono efetivo; readonly e expirado não decidem nem sel
       [GOV_ORG, f.id],
       session,
     );
-    await pool.query("insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')", [factor, GOV_AGENT_A]);
+    await pool.query(
+      "insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')",
+      [factor, GOV_AGENT_A],
+    );
     const protectedState = async () =>
       (
         await pool.query(
@@ -682,13 +691,38 @@ it("suporte full conserva dono efetivo; readonly e expirado não decidem nem sel
       ).rows[0].state;
     const beforeMfa = await protectedState();
     for (const [sql, values] of [
-      ["select fn_google_selection($1,$2,$3,$4)", [GOV_ORG, JSON.stringify(await revisions()), [], f.cal]],
+      [
+        "select fn_google_selection($1,$2,$3,$4)",
+        [GOV_ORG, JSON.stringify(await revisions()), [], f.cal],
+      ],
       ["select fn_google_resolve($1,$2,'1','1',null,'retry')", [GOV_ORG, f.id]],
-    ] as const) await expect(asUser(GOV_AGENT_A, sql, [...values], session, "aal1")).rejects.toMatchObject({ code: "42501" });
+    ] as const)
+      await expect(asUser(GOV_AGENT_A, sql, [...values], session, "aal1")).rejects.toMatchObject({
+        code: "42501",
+      });
     expect(await protectedState()).toEqual(beforeMfa);
-    await asUser(GOV_AGENT_A, "select fn_google_selection($1,$2,$3,$4)", [GOV_ORG, JSON.stringify(await revisions()), [], f.cal], session, "aal2");
-    await asUser(GOV_AGENT_A, "select fn_google_resolve($1,$2,'1','1',null,'retry')", [GOV_ORG, f.id], session, "aal2");
-    expect((await pool.query("select counts_for_conflicts from calendar_connection_calendars where id=$1", [f.cal])).rows[0].counts_for_conflicts).toBe(false);
+    await asUser(
+      GOV_AGENT_A,
+      "select fn_google_selection($1,$2,$3,$4)",
+      [GOV_ORG, JSON.stringify(await revisions()), [], f.cal],
+      session,
+      "aal2",
+    );
+    await asUser(
+      GOV_AGENT_A,
+      "select fn_google_resolve($1,$2,'1','1',null,'retry')",
+      [GOV_ORG, f.id],
+      session,
+      "aal2",
+    );
+    expect(
+      (
+        await pool.query(
+          "select counts_for_conflicts from calendar_connection_calendars where id=$1",
+          [f.cal],
+        )
+      ).rows[0].counts_for_conflicts,
+    ).toBe(false);
     await pool.query("delete from auth.mfa_factors where id=$1", [factor]);
     for (const state of [
       "access_mode='support_readonly'",
