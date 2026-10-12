@@ -30,7 +30,7 @@ export function ehUrlDanfePublicoVendaErp(urlBruta: string): boolean {
 
     const cod = url.searchParams.get("Cod") ?? "";
     const geren = url.searchParams.get("g") ?? "";
-    const [REDACTED]"t");
+    const token = url.searchParams.get("t");
     const print = url.searchParams.get("print");
     const trib = url.searchParams.get("trib");
 
