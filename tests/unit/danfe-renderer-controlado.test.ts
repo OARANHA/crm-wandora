@@ -47,6 +47,11 @@ function ambientePdf() {
     url: vi.fn().mockReturnValue(danfe),
     waitForFunction: vi.fn().mockResolvedValue(true),
     waitForLoadState: vi.fn().mockResolvedValue(undefined),
+    waitForResponse: vi.fn().mockResolvedValue({
+      ok: () => true,
+      finished: async () => null,
+    }),
+    evaluate: vi.fn().mockResolvedValue(undefined),
     pdf: vi.fn().mockResolvedValue(pdf),
     emulateMedia: vi.fn().mockResolvedValue(undefined),
   };
@@ -107,6 +112,75 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(env.page.pdf).toHaveBeenCalledTimes(1);
     expect(env.browser.close).toHaveBeenCalledOnce();
     expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("impressão direta aguarda a resposta pública e networkidle antes de imprimir", async () => {
+    const env = ambientePdf();
+    let resolverResposta!: (resposta: {
+      ok: () => boolean;
+      finished: () => Promise<null>;
+    }) => void;
+    env.page.waitForResponse.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolverResposta = resolve;
+        }),
+    );
+    const pedido = renderizarUrlParaPdfControlado(danfe, {
+      ...policy,
+      impressaoDireta: true,
+      aguardarRecursoDeMontagem: (url, metodo) =>
+        url === "https://api.invalid/public" && metodo === "POST",
+    });
+    await vi.waitFor(() => expect(env.page.waitForResponse).toHaveBeenCalledOnce());
+    const predicado = env.page.waitForResponse.mock.calls[0]?.[0];
+    expect(predicado({
+      url: () => "https://api.invalid/public",
+      request: () => ({ method: () => "POST" }),
+    })).toBe(true);
+    expect(predicado({
+      url: () => "http://127.0.0.1/private",
+      request: () => ({ method: () => "POST" }),
+    })).toBe(false);
+    expect(env.page.pdf).not.toHaveBeenCalled();
+    resolverResposta({ ok: () => true, finished: async () => null });
+    const pdf = await pedido;
+    expect(pdf).toEqual(env.pdf);
+    expect(env.page.waitForLoadState).toHaveBeenCalledWith("networkidle", {
+      timeout: expect.any(Number),
+    });
+    expect(env.page.evaluate).toHaveBeenCalledOnce();
+    expect(env.page.pdf).toHaveBeenCalledOnce();
+    expect(mocks.extractPdfText).not.toHaveBeenCalled();
+  });
+
+  it("não imprime página sem resposta bem-sucedida da API pública", async () => {
+    const env = ambientePdf();
+    env.page.waitForResponse.mockResolvedValueOnce({
+      ok: () => false,
+      finished: async () => null,
+    });
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, {
+        ...policy,
+        impressaoDireta: true,
+        aguardarRecursoDeMontagem: () => true,
+      }),
+    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_navegacao" });
+    expect(env.page.pdf).not.toHaveBeenCalled();
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("não imprime se a SPA não alcançar networkidle", async () => {
+    const env = ambientePdf();
+    env.page.waitForLoadState.mockRejectedValueOnce(
+      Object.assign(new Error("rede ocupada"), { name: "TimeoutError" }),
+    );
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, impressaoDireta: true }),
+    ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_navegacao" });
+    expect(env.page.pdf).not.toHaveBeenCalled();
   });
 
   it("não imprime quando o carregamento load falha", async () => {
