@@ -742,6 +742,60 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(env.fechar).toHaveBeenCalledOnce();
   });
 
+  it("mantém o motivo sanitizado de falha HTTPS do POST sem esconder bloqueio externo", async () => {
+    const env = ambientePdf();
+    const chave = "35261012345678000190550010649963971123456780";
+    const urlApi =
+      "https://novaapi.vendaerp.com.br/v3/CriaDANFE/GetDanfeInfoPublic?g=12345678-1234-4123-8123-123456789abc";
+    mocks.buscarPinado.mockRejectedValueOnce(new Error("recurso_pdf_http_recusado"));
+    env.page.waitForFunction.mockImplementationOnce(async () => {
+      const handler = env.context.route.mock.calls[0]?.[1];
+      const abort = vi.fn();
+      await handler({
+        request: () => ({
+          url: () => urlApi,
+          method: () => "POST",
+          allHeaders: async () => ({ origin: "https://app.vendaerp.com.br" }),
+          postDataBuffer: () => Buffer.from("{}"),
+        }),
+        abort,
+      });
+      expect(abort).toHaveBeenCalledWith("blockedbyclient");
+      await handler({
+        request: () => ({
+          url: () => "https://fonts.googleapis.com/css?family=X",
+          method: () => "GET",
+        }),
+        abort: vi.fn(),
+      });
+      throw Object.assign(new Error("conteudo reservado"), { name: "TimeoutError" });
+    });
+    mocks.extractPdfText.mockRejectedValue(
+      new PdfExtractError("sem texto", undefined, "sem_texto", "sem_texto"),
+    );
+    let falha: unknown;
+    try {
+      await renderizarUrlParaPdfControlado(danfe, {
+        ...policy,
+        chaveFiscalEsperada: chave,
+        recursosBrowser: {
+          hostsAutorizados: ["novaapi.vendaerp.com.br"],
+          permiteRecurso: (url, method) => url === urlApi && method === "POST",
+        },
+      });
+    } catch (erro) {
+      falha = erro;
+    }
+    expect(falha).toMatchObject({
+      codigo: "render_falhou",
+      etapa: "pdf_validacao",
+      evidenciaValidacaoPdf: "extracao_sem_texto_apos_screen_dom_nao_confirmado",
+      evidenciaEgress: "destino_fora_origem",
+      evidenciaTransporte: "recurso_post_http_recusado",
+    });
+    expect(JSON.stringify(falha)).not.toContain(urlApi);
+  });
+
   it("DANFE: permite recursos comprovados através de proxy HTTPS pinado, sem continue externo", async () => {
     const env = ambientePdf();
     const extras = {
