@@ -366,6 +366,24 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     );
     etapa = "chromium_pagina";
     const page = await executarDentroDoPrazo(() => context.newPage(), restante());
+    // Inscrever antes da navegação: a chamada AJAX pode acontecer antes do DOMContentLoaded.
+    // Só observa status de um recurso público allowlisted; nunca lê body, URL fiscal ou texto.
+    const respostaDeMontagem =
+      politica.impressaoDireta && politica.aguardarRecursoDeMontagem
+        ? page
+            .waitForResponse(
+              (resposta) =>
+                politica.aguardarRecursoDeMontagem!(
+                  resposta.url(),
+                  resposta.request().method(),
+                ),
+              { timeout: restante() },
+            )
+            .then(
+              async (resposta) => resposta.ok() && (await resposta.finished()) === null,
+              () => false,
+            )
+        : null;
     etapa = "chromium_navegacao";
     const resposta = await page.goto(redirect.url, {
       waitUntil: "domcontentloaded",
@@ -388,8 +406,30 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
         () => page.waitForLoadState("load", { timeout: restante() }),
         restante(),
       );
+      // A SPA busca os dados DEPOIS do evento load. Aguardar a resposta HTTP completa
+      // do recurso público autorizado; não inspecionar seu conteúdo nem conferir NFe.
+      if (respostaDeMontagem) {
+        const respostaOk = await executarDentroDoPrazo(() => respostaDeMontagem, restante());
+        if (!respostaOk) throw new ErroRenderizacaoDocumento("render_falhou", "chromium_navegacao");
+      }
       // Renderiza o visual de tela, evitando CSS print que oculta a SPA.
       await executarDentroDoPrazo(() => page.emulateMedia({ media: "screen" }), restante());
+      // Aguarda a rede assentar (incluindo microtarefas de renderização da SPA)
+      // em vez de imprimir assim que o HTML está carregado. Sem leitura de DOM fiscal.
+      await executarDentroDoPrazo(
+        () => page.waitForLoadState("networkidle", { timeout: restante() }),
+        restante(),
+      );
+      await executarDentroDoPrazo(
+        () =>
+          page.evaluate(
+            () =>
+              new Promise<void>((resolve) =>
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+              ),
+          ),
+        restante(),
+      );
     } else {
       // Não imprimir uma SPA vazia, "Carregando..." ou tela de autenticação.
       // A prontidão é medida no browser; nunca exportar texto fiscal para logs.
