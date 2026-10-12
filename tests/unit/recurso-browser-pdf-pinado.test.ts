@@ -94,13 +94,14 @@ describe("transporte de documento via HTTPS IP pinado", () => {
   });
 
   it("rejeita preflight com headers ou método não autorizados", async () => {
-    for (const headers of [
+    const casos: Record<string, string>[] = [
       { "access-control-request-method": "DELETE" },
       {
         "access-control-request-method": "POST",
         "access-control-request-headers": "authorization",
       },
-    ]) {
+    ];
+    for (const headers of casos) {
       await expect(
         buscarRecursoBrowserPdfPinado({
           ...args,
