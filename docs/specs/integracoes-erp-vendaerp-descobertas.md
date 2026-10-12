@@ -547,3 +547,20 @@ A seleção mantém identidade fiscal comprovada, filtro local, data de
 emissão real, deduplicação por chave, GET READ-ONLY e saída sanitizada.
 Esse contrato **não demonstra PDF ou entrega real**, que seguem pendentes
 de CI/merge/publicação/deploy/canário humano.
+
+## DANFE HTML VendaERP — dependências públicas comprovadas pelo navegador (11/10/2026)
+
+Um navegador humano renderizou a DANFE como **HTML imprimível**, com `document.readyState=complete`, `document.body.innerText` contendo 2.524 caracteres, `DANFE` e `CHAVE DE ACESSO`, sem iframes. O PDF nasce da impressão desse HTML, não de um arquivo PDF servido diretamente.
+
+No Network foram comprovadas as seguintes requisições da mesma página (sem conservar parâmetros ou segredos):
+
+- `POST` com HTTP 200 em `https://novaapi.vendaerp.com.br/v3/CriaDANFE/GetDanfeInfoPublic`, com parâmetro `g` validado;
+- `GET` com HTTP 200 de `main.<hash>.js`, `styles.<hash>.css` e `fiscal-nfe-nfe-module.<hash>.js` em `https://d1fkuoqvag3bur.cloudfront.net/v3/`.
+
+Outras origens de recursos foram observadas (`fonts.googleapis.com`, `cdn.jsdelivr.net`, `code.jquery.com`, `s3-sa-east-1.amazonaws.com`), **sem paths/métodos comprovados nesta evidência**. Elas não são liberadas automaticamente; caso tenham importância para integridade visual/fiscal, exigir prova específica antes de ampliar a policy.
+
+O renderer antigo só permitia `GET/HEAD` para a origem `app.vendaerp.com.br`; portanto barrava de forma determinística a API de montagem da DANFE e os bundles citados. Isso explica uma incompatibilidade entre navegadores. O bloqueio registrado no canário anterior é consistente, mas não prova por si só que o novo renderer será suficiente.
+
+**Slice de correção:** `erp.vendaerp.danfe_to_pdf` opta por allowlist finita e proxy HTTPS com TLS/SNI do hostname, IP público resolvido e fixado antes da requisição, corpo limitado, headers sensíveis filtrados e redirects HTTP 3xx recusados. O Chromium recebe as respostas por `route.fulfill` (sem socket externo para subrecursos); o bootstrap HTTP local com nonce permanece. Chamadas de API fiscal autenticada, envio WhatsApp, XML, storage e providers externos não mudam.
+
+**Gates:** testes adversariais offline → PR/CI → merge/publicação de imagem e deploy healthy → canário real. Prova de funcionamento continua sendo PDF íntegro e fiscalmente correspondente, aceito no sender canônico e recebido pelo administrador. Não reconsultar VendaERP real para diagnosticar, não aumentar timeout sem evidência e não logar URLs fiscais, `t`, `g`, XML ou PII.

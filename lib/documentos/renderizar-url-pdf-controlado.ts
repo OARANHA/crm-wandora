@@ -2,6 +2,7 @@ import { chromium, type Browser } from "playwright-core";
 
 import { extractPdfText, PdfExtractError } from "@/lib/ai/rag/extractors/pdf";
 import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
+import { buscarRecursoBrowserPdfPinado } from "./recurso-browser-pdf-pinado";
 
 import {
   abrirRedirectLocalParaDocumento,
@@ -135,11 +136,22 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   // DNS: confirmar todos os IPs e piná-los no Chromium antes de navegar.
   // A consulta DNS subjacente pode terminar tardiamente, porém a resposta
   // atrasada jamais será usada depois de expirar o prazo.
-  const ipv4 = await executarDentroDoPrazo(
-    () => resolverIpPublicoFixadoParaBrowser(origem.hostname),
-    Math.min(3_000, restante()),
-  );
-  if (!ipv4) throw new ErroRenderizacaoDocumento("destino_inseguro");
+  const hosts = [
+    ...new Set([origem.hostname, ...(politica.recursosBrowser?.hostsAutorizados ?? [])]),
+  ];
+  const ipsPinados = new Map<string, string>();
+  for (const host of hosts) {
+    // A lista adicional só existe no adapter do provider, nunca vem do modelo.
+    if (!/^[a-z0-9.-]+$/i.test(host) || host.length > 253)
+      throw new ErroRenderizacaoDocumento("destino_inseguro");
+    const ip = await executarDentroDoPrazo(
+      () => resolverIpPublicoFixadoParaBrowser(host),
+      Math.min(3_000, restante()),
+    );
+    if (!ip) throw new ErroRenderizacaoDocumento("destino_inseguro");
+    ipsPinados.set(host, ip);
+  }
+  const ipv4 = ipsPinados.get(origem.hostname)!;
 
   // Identidade fiscal só pode vir da leitura estruturada ERP.
   if (
@@ -232,12 +244,72 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
             redirect!.url,
             metodo,
           );
-          if (!permitido) {
+          // O bootstrap em loopback nunca passa pelo proxy remoto. Sem
+          // recursosBrowser, preservar o renderer genérico sem mudar seu fluxo.
+          if (!politica.recursosBrowser) {
+            if (!permitido) {
+              if (metodo !== "GET" && metodo !== "HEAD") metodoBloqueado = true;
+              else destinoBloqueado = true;
+              return route.abort("blockedbyclient");
+            }
+            return route.continue();
+          }
+
+          if (requisicao.url() === redirect!.url && metodo === "GET") {
+            try {
+              // route.continue() segue o 302 sem uma nova interceptação.
+              // Capturar o 302 sem seguir redirects e reenviá-lo via fulfill
+              // faz o Chromium iniciar outra requisição interceptável.
+              const respostaInicial = await route.fetch({
+                maxRedirects: 0,
+                timeout: restante(),
+              });
+              if (
+                respostaInicial.status() !== 302 ||
+                respostaInicial.headers()["location"] !== url ||
+                !redirect!.houveRedirecionamento()
+              ) {
+                return route.abort("blockedbyclient");
+              }
+              return route.fulfill({ response: respostaInicial, body: "" });
+            } catch {
+              return route.abort("blockedbyclient");
+            }
+          }
+          const adicional = politica.recursosBrowser.permiteRecurso(requisicao.url(), metodo);
+          if (!permitido && !adicional) {
             if (metodo !== "GET" && metodo !== "HEAD") metodoBloqueado = true;
             else destinoBloqueado = true;
             return route.abort("blockedbyclient");
           }
-          return route.continue();
+          let hostname: string;
+          try {
+            hostname = new URL(requisicao.url()).hostname;
+          } catch {
+            destinoBloqueado = true;
+            return route.abort("blockedbyclient");
+          }
+          const ip = ipsPinados.get(hostname);
+          if (!ip) {
+            destinoBloqueado = true;
+            return route.abort("blockedbyclient");
+          }
+          try {
+            // Via HTTPS pinado: sem segunda resolução, sem redirect e sem
+            // conexões externas diretas do Chromium.
+            const resposta = await buscarRecursoBrowserPdfPinado({
+              url: requisicao.url(),
+              metodo,
+              ip,
+              headers: await requisicao.allHeaders(),
+              body: metodo === "POST" ? requisicao.postDataBuffer() : null,
+              prazoMs: restante(),
+            });
+            return route.fulfill(resposta);
+          } catch {
+            // Nenhum detalhe de request/response fiscal chega ao log ou agente.
+            return route.abort("blockedbyclient");
+          }
         }),
       restante(),
     );
