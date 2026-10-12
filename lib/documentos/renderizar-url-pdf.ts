@@ -73,6 +73,11 @@ export class ErroRenderizacaoDocumento extends Error {
 }
 
 export interface PoliticaRenderizacaoUrlPdf {
+  /** Exceção controlada: recursos externos da página de impressão comprovados. */
+  recursosBrowser?: {
+    hostsAutorizados: readonly string[];
+    permiteRecurso: (url: string, metodo: string) => boolean;
+  };
   nome: string;
   permiteUrl: (url: string) => boolean;
   maxBytes?: number;
