@@ -10,6 +10,7 @@ import {
   type EtapaRenderizacaoDocumento,
   type EvidenciaEgressBrowserDocumento,
   type EvidenciaValidacaoPdfDocumento,
+  type EvidenciaTransporteBrowserDocumento,
   type PoliticaRenderizacaoUrlPdf,
   type RenderizadorUrlPdf,
 } from "./renderizar-url-pdf";
@@ -167,6 +168,26 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   let domFiscalValidado = false;
   let metodoBloqueado = false;
   let destinoBloqueado = false;
+  let evidenciaTransporte: EvidenciaTransporteBrowserDocumento | undefined;
+  // A URL fica interna; somente classe finita de um HTTPS autorizado que falhou.
+  const registrarFalhaTransporte = (metodo: string, adicional: boolean, erro: unknown) => {
+    const familia = !adicional
+      ? "origem"
+      : metodo === "POST" || metodo === "OPTIONS"
+        ? "post"
+        : "get";
+    const causa =
+      erro instanceof Error && erro.message === "recurso_pdf_http_recusado"
+        ? "http_recusado"
+        : erro instanceof Error && erro.message === "recurso_pdf_timeout"
+          ? "timeout"
+          : "falhou";
+    const categoria = ("recurso_" + familia + "_" + causa) as EvidenciaTransporteBrowserDocumento;
+    const prioridade = (v: EvidenciaTransporteBrowserDocumento) =>
+      v.startsWith("recurso_post_") ? 3 : v.startsWith("recurso_get_") ? 2 : 1;
+    if (!evidenciaTransporte || prioridade(categoria) > prioridade(evidenciaTransporte))
+      evidenciaTransporte = categoria;
+  };
   // Resumo finito de eventos interceptados; nao registra metodos, destinos ou URLs.
   const evidenciaEgress = (): EvidenciaEgressBrowserDocumento => {
     if (metodoBloqueado && destinoBloqueado) return "ambas_classes_bloqueadas";
@@ -306,7 +327,8 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
               prazoMs: restante(),
             });
             return route.fulfill(resposta);
-          } catch {
+          } catch (erro) {
+            registrarFalhaTransporte(metodo, adicional, erro);
             // Nenhum detalhe de request/response fiscal chega ao log ou agente.
             return route.abort("blockedbyclient");
           }
@@ -501,6 +523,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
             ? evidenciaEgress()
             : undefined),
         erro.evidenciaValidacaoPdf,
+        erro.evidenciaTransporte ?? evidenciaTransporte,
       );
     }
     const timeout =
@@ -512,6 +535,8 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       etapa,
       undefined,
       timeout && etapa === "chromium_validacao_conteudo" ? evidenciaEgress() : undefined,
+      undefined,
+      evidenciaTransporte,
     );
   } finally {
     if (browser) {
