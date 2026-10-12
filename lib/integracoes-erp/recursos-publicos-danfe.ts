@@ -11,7 +11,11 @@ const ORIGEM_DANFE = "https://app.vendaerp.com.br";
 const API_PUBLICA = "https://novaapi.vendaerp.com.br";
 const CDN_PUBLICA = "https://d1fkuoqvag3bur.cloudfront.net";
 
-export function recursoPublicoDanfeVendaErpPermitido(urlBruta: string, metodo: string): boolean {
+export function recursoPublicoDanfeVendaErpPermitido(
+  urlBruta: string,
+  metodo: string,
+  gEsperado?: string,
+): boolean {
   try {
     const url = new URL(urlBruta);
     if (url.protocol !== "https:" || url.port || url.username || url.password || url.hash) {
@@ -24,8 +28,10 @@ export function recursoPublicoDanfeVendaErpPermitido(urlBruta: string, metodo: s
       if (url.pathname !== "/v3/CriaDANFE/GetDanfeInfoPublic") return false;
       const chaves = [...url.searchParams.keys()];
       if (chaves.length !== 1 || chaves[0] !== "g") return false;
-      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        url.searchParams.get("g") ?? "",
+      const g = url.searchParams.get("g") ?? "";
+      return (
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(g) &&
+        (!gEsperado || g === gEsperado)
       );
     }
 
