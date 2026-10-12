@@ -447,7 +447,7 @@ export async function prepararDanfeAdminWhatsapp(
       evidenciaPdf?: EvidenciaPdfAoExpirar | null;
       evidenciaEgress?: EvidenciaEgressBrowserDocumento | null;
       evidenciaValidacaoPdf?: EvidenciaValidacaoPdfDocumento | null;
-  evidenciaTransporte?: EvidenciaTransporteBrowserDocumento | null;
+      evidenciaTransporte?: EvidenciaTransporteBrowserDocumento | null;
     },
   ): Promise<PrepararDanfeAdminWhatsappResultado> => {
     await auditarConsultaAdminWhatsapp({
