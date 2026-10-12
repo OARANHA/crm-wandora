@@ -136,7 +136,9 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   // DNS: confirmar todos os IPs e piná-los no Chromium antes de navegar.
   // A consulta DNS subjacente pode terminar tardiamente, porém a resposta
   // atrasada jamais será usada depois de expirar o prazo.
-  const hosts = [...new Set([origem.hostname, ...(politica.recursosBrowser?.hostsAutorizados ?? [])])];
+  const hosts = [
+    ...new Set([origem.hostname, ...(politica.recursosBrowser?.hostsAutorizados ?? [])]),
+  ];
   const ipsPinados = new Map<string, string>();
   for (const host of hosts) {
     // A lista adicional só existe no adapter do provider, nunca vem do modelo.
