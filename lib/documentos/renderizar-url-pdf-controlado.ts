@@ -383,17 +383,30 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
             )
         : null;
     etapa = "chromium_navegacao";
+    // O bootstrap 200 de recursosBrowser executa location.replace() para
+    // iniciar UMA SEGUNDA navegacao interceptavel. Esperar DOMContentLoaded na
+    // primeira goto pode observar a pagina local ou abortar durante a troca.
+    // "commit" confirma apenas a resposta do bootstrap; o destino exato
+    // precisa ser confirmado separadamente antes de qualquer leitura/impressao.
+    // Sem recursosBrowser, preservar o fluxo generico legado (302 HTTP direto).
+    const bootstrapControlado = Boolean(politica.recursosBrowser);
     const resposta = await page.goto(redirect.url, {
-      waitUntil: "domcontentloaded",
+      waitUntil: bootstrapControlado ? "commit" : "domcontentloaded",
       timeout: restante(),
     });
+
+    if (!redirect.houveRedirecionamento() || !resposta?.ok()) {
+      throw new ErroRenderizacaoDocumento("render_falhou", "chromium_navegacao");
+    }
+    if (bootstrapControlado) {
+      await page.waitForURL(url, {
+        waitUntil: "domcontentloaded",
+        timeout: restante(),
+      });
+    }
     etapa = "chromium_apos_redirect";
 
-    if (
-      !redirect.houveRedirecionamento() ||
-      !resposta?.ok() ||
-      new URL(page.url()).origin !== origem.origin
-    ) {
+    if (new URL(page.url()).origin !== origem.origin) {
       throw new ErroRenderizacaoDocumento("render_falhou");
     }
 
