@@ -27,6 +27,18 @@ describe("DANFE VendaERP: exceção de recursos públicos estritamente limitada"
     }
   });
 
+  it("vincula o POST de dados públicos ao g exato da DANFE solicitada", () => {
+    const esperado = "12345678-1234-4123-8123-123456789abc";
+    expect(recursoPublicoDanfeVendaErpPermitido(api, "POST", esperado)).toBe(true);
+    expect(
+      recursoPublicoDanfeVendaErpPermitido(
+        api,
+        "POST",
+        "87654321-1234-4123-8123-123456789abc",
+      ),
+    ).toBe(false);
+  });
+
   it.each([
     [api, "GET"],
     [api + "&outro=1", "POST"],
