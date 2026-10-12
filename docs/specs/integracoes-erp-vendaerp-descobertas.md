@@ -588,3 +588,27 @@ falha do transporte autorizado do bloqueio de recursos não autorizados
 em um futuro turno legítimo. Não repetir o canário nem chamar o VendaERP
 somente para diagnóstico. O aceite segue condicionado à DANFE válida
 recebida na conversa autorizada.
+
+## DANFE: ordem de texto do PDF comprovado — 12/10/2026
+
+O documento administrativo **realmente recebido** no WhatsApp em 05/10
+foi reaberto somente em memória a partir do `whatsapp-media` privado,
+sem nova chamada VendaERP ou publicação de dados fiscais. Seu PDF contém
+uma página, texto extraível e os rótulos DANFE/CHAVE DE ACESSO. A extração
+retorna os 44 dígitos da chave **antes** do rótulo, e não imediatamente
+depois, como exigia a validação anterior.
+
+A validação foi ajustada para exigir **uma única** chave candidata de
+44 dígitos no corpo principal do documento, coincidindo com a chave
+fiscal estruturada já comprovada no ERP. As seções marcadas de documentos
+fiscais referenciados não contam como identidade principal. Zero ou mais
+de uma candidata falham fechado; nunca usar número da NFe como substituto
+da chave ou texto de erro como comprovação. Testes sintéticos cobrem
+inversão da ordem, chave principal divergente, referência fiscal e
+sequências artificiais de dígitos.
+
+**Limite:** corrigir a validação de um PDF gerado não faz a SPA do
+VendaERP voltar a carregar. O canário de 11/10 às 23h48 gerou PDF sem
+texto/DOM fiscal não confirmado. **Geração/impressão ainda precisa de
+correção separada e aceite real de uma DANFE no WhatsApp**; não reverter
+proteções SSRF/egress nem repetir VendaERP para investigar.
