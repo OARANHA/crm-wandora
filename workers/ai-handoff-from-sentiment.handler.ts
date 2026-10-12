@@ -26,15 +26,11 @@ export const aiHandoffFromSentimentHandler: EventHandler = {
   naOrgParada: "pula",
   events: ["ai.sentiment_alert"],
   async handle(row): Promise<HandlerResult> {
-    const messageId =
-      (row.payload?.["message_id"] as string | undefined) ?? row.entity_id ?? null;
-    const conversationIdHint =
-      (row.payload?.["conversation_id"] as string | undefined) ?? null;
-    const sentimentScore =
-      (row.payload?.["sentiment_score"] as number | undefined) ?? null;
+    const messageId = (row.payload?.["message_id"] as string | undefined) ?? row.entity_id ?? null;
+    const conversationIdHint = (row.payload?.["conversation_id"] as string | undefined) ?? null;
+    const sentimentScore = (row.payload?.["sentiment_score"] as number | undefined) ?? null;
     /** Qual motor mediu — a passagem marca "(percebido pelo Jev)" quando foi ele. */
-    const sentimentEngine =
-      (row.payload?.[CHAVES_DO_CLIMA.motor] as string | undefined) ?? null;
+    const sentimentEngine = (row.payload?.[CHAVES_DO_CLIMA.motor] as string | undefined) ?? null;
 
     if (!messageId && !conversationIdHint) {
       return {
@@ -46,9 +42,15 @@ export const aiHandoffFromSentimentHandler: EventHandler = {
 
     const admin = createAdminClient();
 
-    const boundary = messageId ? await serviceFromMessage(admin, row.organization_id, messageId) : null;
+    const boundary = messageId
+      ? await serviceFromMessage(admin, row.organization_id, messageId)
+      : null;
     if (!boundary || (conversationIdHint && boundary.conversation_id !== conversationIdHint)) {
-      return { consumer_key: AI_HANDOFF_FROM_SENTIMENT_KEY, status: "skipped", detail: "service_boundary_stale" };
+      return {
+        consumer_key: AI_HANDOFF_FROM_SENTIMENT_KEY,
+        status: "skipped",
+        detail: "service_boundary_stale",
+      };
     }
     const conversationId = boundary.conversation_id;
     const contactId = boundary.contact_id;
