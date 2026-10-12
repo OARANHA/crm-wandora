@@ -548,7 +548,6 @@ emissão real, deduplicação por chave, GET READ-ONLY e saída sanitizada.
 Esse contrato **não demonstra PDF ou entrega real**, que seguem pendentes
 de CI/merge/publicação/deploy/canário humano.
 
-
 ## DANFE HTML VendaERP — dependências públicas comprovadas pelo navegador (11/10/2026)
 
 Um navegador humano renderizou a DANFE como **HTML imprimível**, com `document.readyState=complete`, `document.body.innerText` contendo 2.524 caracteres, `DANFE` e `CHAVE DE ACESSO`, sem iframes. O PDF nasce da impressão desse HTML, não de um arquivo PDF servido diretamente.
