@@ -66,7 +66,11 @@ export async function renderizarDanfeVendaErpParaPdf(
     recursosBrowser: {
       hostsAutorizados: HOSTS_RECURSOS_DANFE_VENDAERP,
       permiteRecurso: (recurso, metodo) =>
-        recursoPublicoDanfeVendaErpPermitido(recurso, metodo, new URL(url).searchParams.get("g") ?? ""),
+        recursoPublicoDanfeVendaErpPermitido(
+          recurso,
+          metodo,
+          new URL(url).searchParams.get("g") ?? "",
+        ),
     },
     ...(chaveFiscalEsperada ? { chaveFiscalEsperada } : {}),
   });
