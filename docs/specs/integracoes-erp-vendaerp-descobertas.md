@@ -630,3 +630,20 @@ canônico; o comando de workflow passou 68/68. Isto não comprova que o bootstra
 foi a única causa do canário anterior nem substitui UMA DANFE real após os gates.
 Resultados, RED→GREEN, PDFs e limitação preexistente de `release:conferir`:
 [`danfe-bootstrap-offline-20261012.md`](../testing/danfe-bootstrap-offline-20261012.md).
+
+## DANFE — impressão direta da página carregada (proposta de 12/10/2026)
+
+O proprietário solicita imprimir o conteúdo da página pública do VendaERP
+imediatamente após o evento `load` do Chromium, sem validação de conteúdo fiscal.
+O modo `impressaoDireta` é opt-in na policy `erp.vendaerp.danfe_to_pdf`:
+
+- esperar `load` e imprimir uma única vez sob `media=screen`;
+- não ler DOM fiscal, não verificar DANFE, chave de acesso nem extrair texto do PDF;
+- reaproveitar o bucket privado `whatsapp-media`, a mensagem e sender canônicos;
+- manter restrições de navegação, egress/SSRF, auth, tamanho/formato de mídia
+  do sender, before_send e ledger, sem novo provider/bucket;
+- limite explícito: evento `load` não confirma que os dados assíncronos da SPA
+  terminaram; um PDF pode retratar tela em branco ou erro. Isso não equivale a
+  aceite fiscal nem funcional de duas DANFEs corretas.
+
+Não executar canário real antes de CI green, merge, imagens e deploy saudável.

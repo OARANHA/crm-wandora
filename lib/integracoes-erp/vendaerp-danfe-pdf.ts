@@ -60,6 +60,7 @@ export async function renderizarDanfeVendaErpParaPdf(
 ): Promise<Buffer> {
   return renderizador(url, {
     nome: "erp.vendaerp.danfe_to_pdf",
+    impressaoDireta: true,
     permiteUrl: ehUrlDanfePublicoVendaErp,
     maxBytes: MAX_MEDIA_BYTES,
     timeoutMs: 60_000,

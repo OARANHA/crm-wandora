@@ -95,6 +95,8 @@ export interface PoliticaRenderizacaoUrlPdf {
   permiteUrl: (url: string) => boolean;
   maxBytes?: number;
   timeoutMs?: number;
+  /** Imprime a página carregada, sem inspecionar DOM fiscal ou texto do PDF. */
+  impressaoDireta?: boolean;
   /** Chave fiscal comprovada, somente quando fornecida por leitura estruturada ERP. */
   chaveFiscalEsperada?: string;
 }
