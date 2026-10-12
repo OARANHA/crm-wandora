@@ -381,48 +381,59 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       throw new ErroRenderizacaoDocumento("render_falhou");
     }
 
-    // Não imprimir uma SPA vazia, "Carregando..." ou tela de autenticação.
-    // A prontidão é medida no browser; nunca exportar texto fiscal para logs.
-    etapa = "chromium_validacao_conteudo";
-    try {
-      await page.waitForFunction(
-        (chaveEsperada) => {
-          const texto = document.body?.innerText ?? "";
-          const normalizado = texto
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toUpperCase();
-          // Nota Fiscal isolada e a chave repetida por uma tela de erro nao
-          // comprovam que a DANFE esta pronta para impressao.
-          if (
-            normalizado.trim().length < 80 ||
-            !/\bDANFE\b/.test(normalizado) ||
-            !/\bCHAVE\s+DE\s+ACESSO\b/.test(normalizado) ||
-            /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(
-              normalizado,
-            ) ||
-            /\bERRO\s+AO\s+(?:CARREGAR|CONSULTAR)\b/.test(normalizado)
-          ) {
-            return false;
-          }
-          // Mesmo com marcadores de DANFE, exige a chave exata de 44 digitos
-          // comprovada na leitura estruturada ERP antes de gerar o PDF.
-          // Nenhum texto fiscal é devolvido ao Node, logs, auditoria ou modelo.
-          return !chaveEsperada || texto.replace(/\D/g, "").includes(chaveEsperada);
-        },
-        politica.chaveFiscalEsperada ?? null,
-        { timeout: restante() },
+    if (politica.impressaoDireta) {
+      // Somente aguarda o evento load, sem inspecionar conteúdo.
+      etapa = "chromium_navegacao";
+      await executarDentroDoPrazo(
+        () => page.waitForLoadState("load", { timeout: restante() }),
+        restante(),
       );
-      domFiscalValidado = true;
-    } catch (erro) {
-      // O HTML da SPA pode não expor texto selecionável, mesmo que a impressão
-      // contenha a DANFE. Só continuamos para imprimir se existir chave fiscal
-      // comprovada e a espera do DOM simplesmente tiver expirado.
-      const expirou =
-        erro instanceof Error &&
-        (erro.name === "TimeoutError" ||
-          (erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout"));
-      if (!expirou || !politica.chaveFiscalEsperada || Date.now() >= deadline) throw erro;
+      // Renderiza o visual de tela, evitando CSS print que oculta a SPA.
+      await executarDentroDoPrazo(() => page.emulateMedia({ media: "screen" }), restante());
+    } else {
+      // Não imprimir uma SPA vazia, "Carregando..." ou tela de autenticação.
+      // A prontidão é medida no browser; nunca exportar texto fiscal para logs.
+      etapa = "chromium_validacao_conteudo";
+      try {
+        await page.waitForFunction(
+          (chaveEsperada) => {
+            const texto = document.body?.innerText ?? "";
+            const normalizado = texto
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .toUpperCase();
+            // Nota Fiscal isolada e a chave repetida por uma tela de erro nao
+            // comprovam que a DANFE esta pronta para impressao.
+            if (
+              normalizado.trim().length < 80 ||
+              !/\bDANFE\b/.test(normalizado) ||
+              !/\bCHAVE\s+DE\s+ACESSO\b/.test(normalizado) ||
+              /\b(?:DANFE|NOTA\s+FISCAL)\s+(?:INDISPONIVEL|NAO\s+ENCONTRAD[AO])\b/.test(
+                normalizado,
+              ) ||
+              /\bERRO\s+AO\s+(?:CARREGAR|CONSULTAR)\b/.test(normalizado)
+            ) {
+              return false;
+            }
+            // Mesmo com marcadores de DANFE, exige a chave exata de 44 digitos
+            // comprovada na leitura estruturada ERP antes de gerar o PDF.
+            // Nenhum texto fiscal é devolvido ao Node, logs, auditoria ou modelo.
+            return !chaveEsperada || texto.replace(/\D/g, "").includes(chaveEsperada);
+          },
+          politica.chaveFiscalEsperada ?? null,
+          { timeout: restante() },
+        );
+        domFiscalValidado = true;
+      } catch (erro) {
+        // O HTML da SPA pode não expor texto selecionável, mesmo que a impressão
+        // contenha a DANFE. Só continuamos para imprimir se existir chave fiscal
+        // comprovada e a espera do DOM simplesmente tiver expirado.
+        const expirou =
+          erro instanceof Error &&
+          (erro.name === "TimeoutError" ||
+            (erro instanceof ErroRenderizacaoDocumento && erro.codigo === "timeout"));
+        if (!expirou || !politica.chaveFiscalEsperada || Date.now() >= deadline) throw erro;
+      }
     }
 
     etapa = "chromium_impressao_pdf";
@@ -448,6 +459,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     };
 
     let pdf = await imprimir();
+    if (politica.impressaoDireta) return pdf;
     etapa = "pdf_validacao";
     conferirBytes(pdf);
 
