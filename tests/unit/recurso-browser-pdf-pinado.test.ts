@@ -2,7 +2,14 @@ import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockRequest = vi.hoisted(() => vi.fn());
-vi.mock("node:https", () => ({ request: mockRequest }));
+vi.mock("node:https", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:https")>();
+  return {
+    ...actual,
+    request: mockRequest,
+    default: { ...(actual as { default?: object }).default, request: mockRequest },
+  };
+});
 
 import { buscarRecursoBrowserPdfPinado } from "@/lib/documentos/recurso-browser-pdf-pinado";
 
