@@ -1,6 +1,10 @@
 import { type RenderizadorUrlPdf } from "@/lib/documentos/renderizar-url-pdf";
 import { renderizarUrlParaPdfControlado } from "@/lib/documentos/renderizar-url-pdf-controlado";
 import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
+import {
+  HOSTS_RECURSOS_DANFE_VENDAERP,
+  recursoPublicoDanfeVendaErpPermitido,
+} from "./recursos-publicos-danfe";
 
 const VENDAERP_DANFE_HOST = "app.vendaerp.com.br";
 const VENDAERP_DANFE_PATH = "/v3/public/NFe/Danfe";
@@ -59,6 +63,10 @@ export async function renderizarDanfeVendaErpParaPdf(
     permiteUrl: ehUrlDanfePublicoVendaErp,
     maxBytes: MAX_MEDIA_BYTES,
     timeoutMs: 60_000,
+    recursosBrowser: {
+      hostsAutorizados: HOSTS_RECURSOS_DANFE_VENDAERP,
+      permiteRecurso: recursoPublicoDanfeVendaErpPermitido,
+    },
     ...(chaveFiscalEsperada ? { chaveFiscalEsperada } : {}),
   });
 }
