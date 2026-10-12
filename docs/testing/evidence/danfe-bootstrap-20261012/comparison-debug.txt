@@ -1,0 +1,45 @@
+
+ RUN  v4.1.11 /app
+
+stdout | work/danfe/comparison.test.ts > current real renderer normal
+SYNTHETIC_REQUEST_FAILED https://fiscal.invalid/danfe { errorText: 'net::ERR_INTERNET_DISCONNECTED' }
+
+stdout | work/danfe/comparison.test.ts > current real renderer normal
+SYNTHETIC_RENDER_ERROR {"codigo":"render_falhou","etapa":"chromium_navegacao","name":"ErroRenderizacaoDocumento"} HITS []
+
+stdout | work/danfe/comparison.test.ts > current real renderer print-hidden
+SYNTHETIC_REQUEST_FAILED https://fiscal.invalid/danfe { errorText: 'net::ERR_INTERNET_DISCONNECTED' }
+
+stdout | work/danfe/comparison.test.ts > current real renderer print-hidden
+SYNTHETIC_RENDER_ERROR {"codigo":"render_falhou","etapa":"chromium_navegacao","name":"ErroRenderizacaoDocumento"} HITS []
+
+stdout | work/danfe/comparison.test.ts > PR37 original renderer same SPA
+{"renderer":"PR37-original","pdf_bytes":10526,"fiscal_identity":true,"product":true,"total":true,"hits":["GET /danfe","GET /style.css","GET /app.js","POST /data","GET /favicon.ico"]}
+
+ ❯ work/danfe/comparison.test.ts (3 tests | 2 failed) 2973ms
+   × current real renderer normal 985ms
+   × current real renderer print-hidden 668ms
+   ✓ PR37 original renderer same SPA  1317ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  work/danfe/comparison.test.ts > current real renderer normal
+ FAIL  work/danfe/comparison.test.ts > current real renderer print-hidden
+ErroRenderizacaoDocumento: render_falhou
+ ❯ Module.renderizarUrlParaPdfControlado lib/documentos/renderizar-url-pdf-controlado.ts:545:11
+    543|     // Nunca repassar a mensagem original: Playwright inclui endereço …
+    544|     // detalhes da navegação e argv (possível token na query).
+    545|     throw new ErroRenderizacaoDocumento(
+       |           ^
+    546|       timeout ? "timeout" : "render_falhou",
+    547|       etapa,
+ ❯ work/danfe/comparison.test.ts:28:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  07:07:41
+   Duration  4.03s (transform 230ms, setup 0ms, import 871ms, tests 2.97s, environment 0ms)
+

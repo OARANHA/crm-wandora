@@ -1,0 +1,33 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+  - ESM syntax in a file loaded as CommonJS (vitest.cercas.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+  - ESM syntax in a file loaded as CommonJS (vitest.cercas.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+  - ESM syntax in a file loaded as CommonJS (vitest.cercas.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /app
+
+ ✓  produto  tests/unit/danfe-renderer-controlado.test.ts (56 tests) 2247ms
+     ✓ não mantém o turno preso se browser.close não resolve  2006ms
+ ✓  produto  tests/integration/danfe-controlled-spa-offline.test.ts (5 tests) 16686ms
+     ✓ renderer controlado imprime SPA normal com identidade e conteúdo  2382ms
+     ✓ renderer controlado imprime SPA print-hidden com identidade e conteúdo  2151ms
+     ✓ renderer controlado imprime SPA cross-origin com identidade e conteúdo  1735ms
+     ✓ não entrega PDF com outra identidade fiscal  9134ms
+     ✓ controle PR #37: mesma SPA em file:// + location.replace imprime conteúdo fiscal  1280ms
+ ✓  produto  tests/integration/danfe-chromium-offline.test.ts (2 tests) 2205ms
+     ✓ controle legado: imprime SPA local após file:// + location.replace  1138ms
+     ✓ renderer atual: imprime mesma SPA por redirect HTTP 302 com URL allowlisted  1057ms
+ ✓  produto  tests/unit/documentos-renderizar-url-pdf.test.ts (5 tests) 56ms
+
+ Test Files  4 passed (4)
+      Tests  68 passed (68)
+   Start at  07:23:31
+   Duration  26.30s (transform 424ms, setup 837ms, import 911ms, tests 21.19s, environment 2.71s)
+

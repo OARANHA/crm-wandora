@@ -1,0 +1,22 @@
+
+ RUN  v4.1.11 /app
+
+stdout | work/danfe/comparison.test.ts > current real renderer normal
+{"renderer":"current","mode":"normal","pdf_bytes":9876,"fiscal_identity":true,"product":true,"total":true,"hits":["GET /danfe","GET /style.css","GET /app.js","POST /data"]}
+
+stdout | work/danfe/comparison.test.ts > current real renderer print-hidden
+{"renderer":"current","mode":"print-hidden","pdf_bytes":10672,"fiscal_identity":true,"product":true,"total":true,"hits":["GET /danfe","GET /style.css","GET /app.js","POST /data"]}
+
+stdout | work/danfe/comparison.test.ts > PR37 original renderer same SPA
+{"renderer":"PR37-original","pdf_bytes":10526,"fiscal_identity":true,"product":true,"total":true,"hits":["GET /danfe","GET /style.css","GET /app.js","POST /data","GET /favicon.ico"]}
+
+ ✓ work/danfe/comparison.test.ts (3 tests) 6240ms
+   ✓ current real renderer normal  2514ms
+   ✓ current real renderer print-hidden  2388ms
+   ✓ PR37 original renderer same SPA  1335ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  07:09:17
+   Duration  7.37s (transform 250ms, setup 0ms, import 884ms, tests 6.24s, environment 0ms)
+

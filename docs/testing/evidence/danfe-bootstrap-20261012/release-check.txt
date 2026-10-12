@@ -1,0 +1,30 @@
+fragmento(s) inválido(s):
+  admin-danfe-document-delivery.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  checkpoint-recuperacao-local.md: falta o bloco `---` de abertura na primeira linha
+  danfe-admin-tool-trigger.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  danfe-browser-public-resource-egress-20261011.md: falta o bloco `---` de abertura na primeira linha
+  danfe-historical-pdf-text-order.md: falta o bloco `---` de abertura na primeira linha
+  elus-danfe-dom-identity-20261009.md: falta o bloco `---` de abertura na primeira linha
+  elus-danfe-egress-observability-20261009.md: falta o bloco `---` de abertura na primeira linha
+  elus-danfe-fases-chromium-20261009.md: falta o bloco `---` de abertura na primeira linha
+  elus-danfe-postprint-fiscal-evidence-20261009.md: falta o bloco `---` de abertura na primeira linha
+  elus-danfe-worker-playwright-diagnostics.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  elus-document-renderer-sandbox.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  elus-isis-danfe-failure-notice-spinning-20261009.md: falta o bloco `---` de abertura na primeira linha
+  elus-semantic-document-renderer.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  elus-vendaerp-public-danfe-pdf.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  elus-worker-chromium.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  elus-worker-runtime-env.md: falta o bloco `---` de abertura na primeira linha
+  erp-latest-invoices-provider-filter-and-danfe-render.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  erp-latest-invoices-with-danfe.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  erp-recent-invoices-quantity-without-month.md: falta o bloco `---` de abertura na primeira linha
+  integracoes-erp-admin-whatsapp-readonly.md: falta o bloco `---` de abertura na primeira linha
+  integracoes-erp-customer-name-discovery.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"
+  integracoes-erp-order-identity-strong-fallback.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"
+  integracoes-erp-order-name-fast-path.md: falta o bloco `---` de abertura na primeira linha
+  integracoes-erp-same-turn-order-guard.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"
+  isis-fiscal-period-recent-invoices.md: falta o bloco `---` de abertura na primeira linha
+  isis-fiscal-structured-audit.md: falta o bloco `---` de abertura na primeira linha
+  isis-fiscal-window-30-days-and-period-question.md: falta o bloco `---` de abertura na primeira linha
+  vendaerp-danfe-direct-render.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined
+  vendaerp-danfe-timeout-render-fallback.md: frontmatter inválido → impacto: Invalid option: expected one of "nada_mudou"|"capacidade_nova"|"exige_acao"; secao: Invalid option: expected one of "adicionado"|"alterado"|"corrigido"; titulo: Invalid input: expected string, received undefined

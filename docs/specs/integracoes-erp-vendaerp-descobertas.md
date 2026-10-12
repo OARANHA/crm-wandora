@@ -612,3 +612,21 @@ VendaERP voltar a carregar. O canário de 11/10 às 23h48 gerou PDF sem
 texto/DOM fiscal não confirmado. **Geração/impressão ainda precisa de
 correção separada e aceite real de uma DANFE no WhatsApp**; não reverter
 proteções SSRF/egress nem repetir VendaERP para investigar.
+
+## Bootstrap controlado — prova real offline no Alpine (12/10/2026)
+
+A comparação sintética no worker publicado `5aaa69ca` comprovou que entregar
+um bootstrap HTTP 302 por `route.fulfill` **não** faz a continuação do redirect
+receber nova interceptação Playwright. O renderer controlado tentava conexão
+direta para a página principal, saltando o transporte HTTPS pinado. Sob
+`--network none`, falhou em `chromium_navegacao`; o controle PR #37 imprimiu a
+mesma SPA local com conteúdo fiscal correto.
+
+A correção valida o bootstrap existente, mas entrega HTML 200 efêmero com uma
+nova navegação JavaScript interceptável. Allowlist, DNS/TLS pinado, identidade
+fiscal e sender da PR #36 foram preservados. Prova final: cinco casos reais
+na imagem Alpine, PDFs com chave/produto/total sintéticos conferidos pelo extrator
+canônico; o comando de workflow passou 68/68. Isto não comprova que o bootstrap
+foi a única causa do canário anterior nem substitui UMA DANFE real após os gates.
+Resultados, RED→GREEN, PDFs e limitação preexistente de `release:conferir`:
+[`danfe-bootstrap-offline-20261012.md`](../testing/danfe-bootstrap-offline-20261012.md).
