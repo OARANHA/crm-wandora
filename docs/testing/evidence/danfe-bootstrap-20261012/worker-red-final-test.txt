@@ -1,0 +1,59 @@
+
+ RUN  v4.1.11 /app
+
+ ❯ tests/integration/danfe-controlled-spa-offline.test.ts (5 tests | 4 failed) 6566ms
+     × renderer controlado imprime SPA normal com identidade e conteúdo 1401ms
+     × renderer controlado imprime SPA print-hidden com identidade e conteúdo 1092ms
+     × renderer controlado imprime SPA cross-origin com identidade e conteúdo 1177ms
+     × não entrega PDF com outra identidade fiscal 1049ms
+     ✓ controle PR #37: mesma SPA em file:// + location.replace imprime conteúdo fiscal  1844ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/danfe-controlled-spa-offline.test.ts > DANFE fiscal sintética — renderer real no worker sem egress > renderer controlado imprime SPA normal com identidade e conteúdo
+ FAIL  tests/integration/danfe-controlled-spa-offline.test.ts > DANFE fiscal sintética — renderer real no worker sem egress > renderer controlado imprime SPA print-hidden com identidade e conteúdo
+ FAIL  tests/integration/danfe-controlled-spa-offline.test.ts > DANFE fiscal sintética — renderer real no worker sem egress > renderer controlado imprime SPA cross-origin com identidade e conteúdo
+ErroRenderizacaoDocumento: render_falhou
+ ❯ Module.renderizarUrlParaPdfControlado lib/documentos/renderizar-url-pdf-controlado.ts:545:11
+    543|     // Nunca repassar a mensagem original: Playwright inclui endereço …
+    544|     // detalhes da navegação e argv (possível token na query).
+    545|     throw new ErroRenderizacaoDocumento(
+       |           ^
+    546|       timeout ? "timeout" : "render_falhou",
+    547|       etapa,
+ ❯ tests/integration/danfe-controlled-spa-offline.test.ts:117:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/integration/danfe-controlled-spa-offline.test.ts > DANFE fiscal sintética — renderer real no worker sem egress > não entrega PDF com outra identidade fiscal
+AssertionError: expected ErroRenderizacaoDocumento: render_falhou { …(6) } to match object { codigo: 'render_falhou', …(2) }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
++ ErroRenderizacaoDocumento {
+    "codigo": "render_falhou",
+-   "etapa": "pdf_validacao",
+-   "evidenciaValidacaoPdf": "chave_divergente",
++   "etapa": "chromium_navegacao",
++   "evidenciaValidacaoPdf": undefined,
+  }
+
+ ❯ tests/integration/danfe-controlled-spa-offline.test.ts:162:8
+    160|           },
+    161|         }),
+    162|       ).rejects.toMatchObject({
+       |        ^
+    163|         codigo: "render_falhou",
+    164|         etapa: "pdf_validacao",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 1 passed (5)
+   Start at  07:23:16
+   Duration  8.15s (transform 472ms, setup 0ms, import 1.35s, tests 6.57s, environment 0ms)
+

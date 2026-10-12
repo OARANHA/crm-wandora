@@ -1,0 +1,62 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+  - ESM syntax in a file loaded as CommonJS (vitest.cercas.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+  - ESM syntax in a file loaded as CommonJS (vitest.cercas.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+  - ESM syntax in a file loaded as CommonJS (vitest.cercas.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /workspace/crm-wandora
+
+ ❯ |produto| tests/unit/danfe-renderer-controlado.test.ts (52 tests | 1 failed) 2266ms
+     × DANFE: bootstrap validado inicia navegação JS interceptável, sem 302 no Chromium 15ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |produto| tests/unit/danfe-renderer-controlado.test.ts > renderer controlado DANFE — fronteiras seguras > DANFE: bootstrap validado inicia navegação JS interceptável, sem 302 no Chromium
+AssertionError: expected "vi.fn()" to be called with arguments: [ { status: 200, …(3) } ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+    {
+-     "body": "<!doctype html><meta charset=\"utf-8\"><script>location.replace(\"https://app.vendaerp.com.br/v3/public/NFe/Danfe?Cod=abcdef123456abcdef123456&g=12345678-1234-4123-8123-123456789abc\")</script>",
+-     "contentType": "text/html; charset=utf-8",
+-     "headers": {
+-       "cache-control": "no-store",
+-       "referrer-policy": "no-referrer",
++     "body": "",
++     "response": {
++       "headers": [Function headers],
++       "status": [Function status],
+      },
+-     "status": 200,
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ tests/unit/danfe-renderer-controlado.test.ts:162:21
+    160|       expect.objectContaining({ maxRedirects: 0, timeout: expect.any(N…
+    161|     );
+    162|     expect(fulfill).toHaveBeenCalledWith({
+       |                     ^
+    163|       status: 200,
+    164|       contentType: "text/html; charset=utf-8",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 51 passed (52)
+   Start at  07:10:56
+   Duration  4.09s (transform 262ms, setup 350ms, import 282ms, tests 2.27s, environment 962ms)
+

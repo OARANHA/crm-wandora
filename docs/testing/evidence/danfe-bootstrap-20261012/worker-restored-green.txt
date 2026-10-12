@@ -1,0 +1,15 @@
+
+ RUN  v4.1.11 /app
+
+ ✓ tests/integration/danfe-controlled-spa-offline.test.ts (5 tests) 17418ms
+     ✓ renderer controlado imprime SPA normal com identidade e conteúdo  2152ms
+     ✓ renderer controlado imprime SPA print-hidden com identidade e conteúdo  2400ms
+     ✓ renderer controlado imprime SPA cross-origin com identidade e conteúdo  1994ms
+     ✓ não entrega PDF com outra identidade fiscal  9421ms
+     ✓ controle PR #37: mesma SPA em file:// + location.replace imprime conteúdo fiscal  1446ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  07:24:33
+   Duration  18.37s (transform 201ms, setup 0ms, import 774ms, tests 17.42s, environment 0ms)
+

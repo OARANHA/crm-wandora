@@ -290,9 +290,10 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
 
           if (requisicao.url() === redirect!.url && metodo === "GET") {
             try {
-              // route.continue() segue o 302 sem uma nova interceptação.
-              // Capturar o 302 sem seguir redirects e reenviá-lo via fulfill
-              // faz o Chromium iniciar outra requisição interceptável.
+              // Playwright não intercepta a continuação de um redirect, mesmo
+              // quando o 302 é entregue por fulfill. Validar o bootstrap local,
+              // mas iniciar uma navegação JS nova: ela passa pela policy e pelo
+              // transporte HTTPS pinado, sem socket remoto direto do Chromium.
               const respostaInicial = await route.fetch({
                 maxRedirects: 0,
                 timeout: restante(),
@@ -304,7 +305,16 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
               ) {
                 return route.abort("blockedbyclient");
               }
-              return route.fulfill({ response: respostaInicial, body: "" });
+              const destino = JSON.stringify(url).replace(/</g, "\\u003c");
+              return route.fulfill({
+                status: 200,
+                contentType: "text/html; charset=utf-8",
+                headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" },
+                body:
+                  '<!doctype html><meta charset="utf-8"><script>location.replace(' +
+                  destino +
+                  ")</script>",
+              });
             } catch {
               return route.abort("blockedbyclient");
             }

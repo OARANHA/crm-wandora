@@ -134,7 +134,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     }
   });
 
-  it("DANFE: bootstrap 302 passa por fulfill sem seguir redirects ocultos", async () => {
+  it("DANFE: bootstrap validado inicia navegação JS interceptável, sem 302 no Chromium", async () => {
     const env = ambientePdf();
     await renderizarUrlParaPdfControlado(danfe, {
       ...policy,
@@ -159,9 +159,77 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     expect(fetch).toHaveBeenCalledWith(
       expect.objectContaining({ maxRedirects: 0, timeout: expect.any(Number) }),
     );
-    expect(fulfill).toHaveBeenCalledWith({ response: resposta, body: "" });
+    expect(fulfill).toHaveBeenCalledWith({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" },
+      body:
+        '<!doctype html><meta charset="utf-8"><script>location.replace(' +
+        JSON.stringify(danfe) +
+        ")</script>",
+    });
     expect(continuar).not.toHaveBeenCalled();
     expect(abort).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { status: 200, location: danfe, consumido: true },
+    { status: 302, location: "https://outro.invalid/", consumido: true },
+    { status: 302, location: danfe, consumido: false },
+  ])("recusa bootstrap inconsistente: %j", async ({ status, location, consumido }) => {
+    const env = ambientePdf();
+    mocks.redirect.mockResolvedValue({
+      url: local,
+      fechar: vi.fn(),
+      houveRedirecionamento: () => consumido,
+    });
+    // O mock de navegação não dispara route; exercitar a guarda real abaixo.
+    if (consumido) {
+      await renderizarUrlParaPdfControlado(danfe, {
+        ...policy,
+        recursosBrowser: { hostsAutorizados: [], permiteRecurso: () => false },
+      });
+    } else {
+      await expect(
+        renderizarUrlParaPdfControlado(danfe, {
+          ...policy,
+          recursosBrowser: { hostsAutorizados: [], permiteRecurso: () => false },
+        }),
+      ).rejects.toMatchObject({ codigo: "render_falhou" });
+    }
+    const abort = vi.fn();
+    const fulfill = vi.fn();
+    await env.context.route.mock.calls[0]?.[1]({
+      request: () => ({ url: () => local, method: () => "GET" }),
+      fetch: vi.fn().mockResolvedValue({ status: () => status, headers: () => ({ location }) }),
+      abort,
+      fulfill,
+    });
+    expect(abort).toHaveBeenCalledWith("blockedbyclient");
+    expect(fulfill).not.toHaveBeenCalled();
+    expect(mocks.buscarPinado).not.toHaveBeenCalled();
+  });
+
+  it("escapa delimitadores HTML da URL no bootstrap JS", async () => {
+    const env = ambientePdf();
+    const destino = danfe + "&extra=</script><script>alert(1)</script>";
+    await renderizarUrlParaPdfControlado(destino, {
+      ...policy,
+      permiteUrl: () => true,
+      recursosBrowser: { hostsAutorizados: [], permiteRecurso: () => false },
+    });
+    const fulfill = vi.fn();
+    await env.context.route.mock.calls[0]?.[1]({
+      request: () => ({ url: () => local, method: () => "GET" }),
+      fetch: vi
+        .fn()
+        .mockResolvedValue({ status: () => 302, headers: () => ({ location: destino }) }),
+      abort: vi.fn(),
+      fulfill,
+    });
+    const body = fulfill.mock.calls[0]?.[0].body;
+    expect(body).toContain("\\u003c/script>");
+    expect(body).not.toContain("</script><script>");
   });
 
   it("route intercepta e nega URL de intranet e POST mesmo depois do redirect", async () => {
