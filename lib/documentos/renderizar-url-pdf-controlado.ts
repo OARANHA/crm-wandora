@@ -168,6 +168,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
 
   // Identidade fiscal só pode vir da leitura estruturada ERP.
   if (
+    !politica.impressaoDireta &&
     politica.chaveFiscalEsperada !== undefined &&
     !/^\d{44}$/.test(politica.chaveFiscalEsperada)
   ) {
