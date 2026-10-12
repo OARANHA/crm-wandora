@@ -134,6 +134,36 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     }
   });
 
+  it("DANFE: bootstrap 302 passa por fulfill sem seguir redirects ocultos", async () => {
+    const env = ambientePdf();
+    await renderizarUrlParaPdfControlado(danfe, {
+      ...policy,
+      recursosBrowser: { hostsAutorizados: [], permiteRecurso: () => false },
+    });
+    const handler = env.context.route.mock.calls[0]?.[1];
+    const resposta = {
+      status: () => 302,
+      headers: () => ({ location: danfe }),
+    };
+    const fetch = vi.fn().mockResolvedValue(resposta);
+    const fulfill = vi.fn().mockResolvedValue(undefined);
+    const continuar = vi.fn();
+    const abort = vi.fn();
+    await handler({
+      request: () => ({ url: () => local, method: () => "GET" }),
+      fetch,
+      fulfill,
+      continue: continuar,
+      abort,
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({ maxRedirects: 0, timeout: expect.any(Number) }),
+    );
+    expect(fulfill).toHaveBeenCalledWith({ response: resposta, body: "" });
+    expect(continuar).not.toHaveBeenCalled();
+    expect(abort).not.toHaveBeenCalled();
+  });
+
   it("route intercepta e nega URL de intranet e POST mesmo depois do redirect", async () => {
     const env = ambientePdf();
     await renderizarUrlParaPdfControlado(danfe, policy);
