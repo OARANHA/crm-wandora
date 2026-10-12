@@ -564,3 +564,27 @@ O renderer antigo só permitia `GET/HEAD` para a origem `app.vendaerp.com.br`; p
 **Slice de correção:** `erp.vendaerp.danfe_to_pdf` opta por allowlist finita e proxy HTTPS com TLS/SNI do hostname, IP público resolvido e fixado antes da requisição, corpo limitado, headers sensíveis filtrados e redirects HTTP 3xx recusados. O Chromium recebe as respostas por `route.fulfill` (sem socket externo para subrecursos); o bootstrap HTTP local com nonce permanece. Chamadas de API fiscal autenticada, envio WhatsApp, XML, storage e providers externos não mudam.
 
 **Gates:** testes adversariais offline → PR/CI → merge/publicação de imagem e deploy healthy → canário real. Prova de funcionamento continua sendo PDF íntegro e fiscalmente correspondente, aceito no sender canônico e recebido pelo administrador. Não reconsultar VendaERP real para diagnosticar, não aumentar timeout sem evidência e não logar URLs fiscais, `t`, `g`, XML ou PII.
+
+## Diagnóstico HTTPS do renderer — revisão offline de 12/10/2026
+
+O canário de 11/10/2026 às 23h48 (Brasília), mesmo após a PR #100, confirmou busca
+fiscal, mas duas falhas `danfe_download_failed` e nenhum PDF enviado. O campo
+`evidencia_egress_browser=destino_fora_origem` mostra que houve bloqueio de
+recurso externo, mas não prova que **esse recurso** causou o DOM/PDF vazio.
+Um transporte HTTPS previamente autorizado também podia falhar sem categoria na auditoria.
+
+A revisão isolada acrescenta `evidencia_transporte_browser` ao diagnóstico
+de falha da DANFE. É uma enumeração fechada: família `post` (recurso público
+autorizado), `get` (subrecurso autorizado) ou `origem` (página principal),
+com causa `http_recusado`, `timeout` ou `falhou`. O campo é independente
+da evidência de egress. Só são aceitos valores finitos na auditoria; URL,
+querystring, credenciais, HTML, PDF e identidade fiscal não são registrados.
+O proxy passa a preservar seu código sanitizado de timeout, antes mascarado
+como falha genérica. Nenhum destino ou método novo foi autorizado.
+
+**Limite de prova:** RED→GREEN de testes sintéticos e CI não resolvem por si
+só a geração da DANFE real. Esta instrumentação permite diferenciar a
+falha do transporte autorizado do bloqueio de recursos não autorizados
+em um futuro turno legítimo. Não repetir o canário nem chamar o VendaERP
+somente para diagnóstico. O aceite segue condicionado à DANFE válida
+recebida na conversa autorizada.

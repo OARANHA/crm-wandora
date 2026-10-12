@@ -77,6 +77,21 @@ describe("transporte de documento via HTTPS IP pinado", () => {
     expect(mockRequest).toHaveBeenCalledTimes(1);
   });
 
+  it("mantém código finito de timeout no transporte HTTPS pinado", async () => {
+    mockRequest.mockImplementationOnce(() => {
+      const request = new EventEmitter() as EventEmitter & {
+        end: () => void;
+        write: (body: Buffer) => void;
+        destroy: (reason: Error) => void;
+      };
+      request.write = vi.fn();
+      request.destroy = vi.fn((reason: Error) => request.emit("error", reason));
+      request.end = vi.fn(() => request.emit("timeout"));
+      return request;
+    });
+    await expect(buscarRecursoBrowserPdfPinado(args)).rejects.toThrow("recurso_pdf_timeout");
+  });
+
   it("não segue redirect 302, mesmo quando o destino é privado", async () => {
     respostaFake(302);
     await expect(buscarRecursoBrowserPdfPinado(args)).rejects.toThrow("recurso_pdf_http_recusado");

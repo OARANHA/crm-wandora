@@ -59,6 +59,18 @@ export type EvidenciaEgressBrowserDocumento =
   | "destino_fora_origem"
   | "ambas_classes_bloqueadas";
 
+/** Diagnóstico finito do transporte pinado; nenhuma URL, header ou documento. */
+export type EvidenciaTransporteBrowserDocumento =
+  | "recurso_post_http_recusado"
+  | "recurso_post_timeout"
+  | "recurso_post_falhou"
+  | "recurso_get_http_recusado"
+  | "recurso_get_timeout"
+  | "recurso_get_falhou"
+  | "recurso_origem_http_recusado"
+  | "recurso_origem_timeout"
+  | "recurso_origem_falhou";
+
 export class ErroRenderizacaoDocumento extends Error {
   constructor(
     public readonly codigo: CodigoErroRenderizacaoDocumento,
@@ -66,6 +78,7 @@ export class ErroRenderizacaoDocumento extends Error {
     public readonly evidenciaPdf?: EvidenciaPdfAoExpirar,
     public readonly evidenciaEgress?: EvidenciaEgressBrowserDocumento,
     public readonly evidenciaValidacaoPdf?: EvidenciaValidacaoPdfDocumento,
+    public readonly evidenciaTransporte?: EvidenciaTransporteBrowserDocumento,
   ) {
     super(codigo);
     this.name = "ErroRenderizacaoDocumento";
