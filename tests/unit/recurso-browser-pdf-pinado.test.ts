@@ -6,7 +6,8 @@ vi.mock("node:https", () => ({ request: mockRequest }));
 
 import { buscarRecursoBrowserPdfPinado } from "@/lib/documentos/recurso-browser-pdf-pinado";
 
-const url = "https://novaapi.vendaerp.com.br/v3/CriaDANFE/GetDanfeInfoPublic?g=12345678-1234-4123-8123-123456789abc";
+const url =
+  "https://novaapi.vendaerp.com.br/v3/CriaDANFE/GetDanfeInfoPublic?g=12345678-1234-4123-8123-123456789abc";
 
 function respostaFake(statusCode: number, body = "{}") {
   mockRequest.mockImplementationOnce((options, onResponse) => {
@@ -15,7 +16,9 @@ function respostaFake(statusCode: number, body = "{}") {
       write: (body: Buffer) => void;
       enviados?: Buffer;
     };
-    request.write = vi.fn((buffer: Buffer) => { request.enviados = buffer; });
+    request.write = vi.fn((buffer: Buffer) => {
+      request.enviados = buffer;
+    });
     request.end = vi.fn(() => {
       const response = new EventEmitter() as EventEmitter & {
         statusCode: number;
@@ -93,7 +96,10 @@ describe("transporte de documento via HTTPS IP pinado", () => {
   it("rejeita preflight com headers ou método não autorizados", async () => {
     for (const headers of [
       { "access-control-request-method": "DELETE" },
-      { "access-control-request-method": "POST", "access-control-request-headers": "authorization" },
+      {
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization",
+      },
     ]) {
       await expect(
         buscarRecursoBrowserPdfPinado({
