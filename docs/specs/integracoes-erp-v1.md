@@ -299,6 +299,28 @@ admin WhatsApp
 → consultas administrativas read-only da organização
 ```
 
+### G2 de sentimento não silencia canal ERP administrativo comprovado
+
+O alerta de sentimento (`ai.sentiment_alert`) é uma observação do texto, **não**
+uma autorização para retirar o atendimento administrativo. Antes de executar
+`triggerHandoff(reason=low_sentiment)`, o handler do alerta deve conferir a
+fronteira da mensagem e reutilizar `resolverAutoridadeAdminWhatsapp` com
+`organization_id` confiável e `contact_id` daquela fronteira.
+
+Somente quando houver **vínculo de WhatsApp habilitado, identidade de contato
+válida, membership admin não revogado e `erp.admin.read` comprovada** o
+handler marca o gatilho G2 como `skipped`, sem colocar a conversa em
+`bot_silenced_until=infinity`. Uma frase como "sou dono" ou nome de cliente
+não é autoridade. A ausência do vínculo ou falha em sua resolução **não**
+autoriza a exceção; o fluxo comum de sentimento continua valendo.
+
+Essa exceção não remove a medição do JEV, não interfere em pedidos explícitos
+de humano, opt-out ou outros gates, não dá ferramentas ERP a clientes e não
+libera automaticamente conversas que já estejam em handoff. A recuperação
+da conversa bloqueada depende da ação **humana** "Devolver ao automático",
+pela função canônica `devolverAtendimentoAoAgente`, com RBAC e auditoria;
+é proibido apagar registros ou atualizar apenas o campo de silêncio no SQL.
+
 O vínculo é explícito e tenant-scoped. O V1 permite ao próprio administrador
 ativo vincular o seu número em **Integrações ERP → WhatsApp administrativo**.
 Não se usa uma identidade do VendaERP para autenticar o administrador e não
