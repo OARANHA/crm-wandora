@@ -374,10 +374,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
         ? page
             .waitForResponse(
               (resposta) =>
-                politica.aguardarRecursoDeMontagem!(
-                  resposta.url(),
-                  resposta.request().method(),
-                ),
+                politica.aguardarRecursoDeMontagem!(resposta.url(), resposta.request().method()),
               { timeout: restante() },
             )
             .then(
