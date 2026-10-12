@@ -6,7 +6,11 @@ import { seedGov, GOV_ORG, GOV_AGENT_A, GOV_AGENT_B, GOV_VIEWER } from "./gov-he
 import { checkpoint, localProjection } from "@/lib/agenda/google/sync-model";
 import { appointmentSnapshotSchema, expectedAppointment } from "@/lib/agenda/google/sync-store";
 const pool = new pg.Pool({
-  connectionString: `[REDACTED]127.0.0.1:${process.env.TEST_DB_PORT ?? 54329}/postgres`,
+  host: "127.0.0.1",
+  port: Number(process.env.TEST_DB_PORT ?? 54329),
+  user: "postgres",
+  password: "postgres",
+  database: "postgres",
   max: 5,
 });
 beforeAll(() => seedGov());
