@@ -46,6 +46,7 @@ function ambientePdf() {
     goto: vi.fn().mockResolvedValue({ ok: () => true }),
     url: vi.fn().mockReturnValue(danfe),
     waitForFunction: vi.fn().mockResolvedValue(true),
+    waitForLoadState: vi.fn().mockResolvedValue(undefined),
     pdf: vi.fn().mockResolvedValue(pdf),
     emulateMedia: vi.fn().mockResolvedValue(undefined),
   };
@@ -85,6 +86,38 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
       "DANFE CHAVE DE ACESSO 35261012345678000190550010649963971123456780 " +
         "PRODUTO TESTE ".repeat(12),
     );
+  });
+
+  it("imprime página após load sem avaliar DOM ou texto fiscal", async () => {
+    const env = ambientePdf();
+    env.page.waitForFunction.mockRejectedValue(new Error("conteúdo fiscal ausente"));
+    mocks.extractPdfText.mockRejectedValue(new Error("nenhum texto extraído"));
+    const result = await renderizarUrlParaPdfControlado(danfe, {
+      ...policy,
+      impressaoDireta: true,
+      chaveFiscalEsperada: "35261012345678000190550010649963971123456780",
+    });
+    expect(result).toEqual(env.pdf);
+    expect(env.page.waitForLoadState).toHaveBeenCalledWith("load", {
+      timeout: expect.any(Number),
+    });
+    expect(env.page.emulateMedia).toHaveBeenCalledWith({ media: "screen" });
+    expect(env.page.waitForFunction).not.toHaveBeenCalled();
+    expect(mocks.extractPdfText).not.toHaveBeenCalled();
+    expect(env.page.pdf).toHaveBeenCalledTimes(1);
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("não imprime quando o carregamento load falha", async () => {
+    const env = ambientePdf();
+    env.page.waitForLoadState.mockRejectedValue(new Error("falha na carga"));
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, impressaoDireta: true }),
+    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_navegacao" });
+    expect(env.page.pdf).not.toHaveBeenCalled();
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
   });
 
   it("não abre navegador nem resolve DNS se a policy recusa o endereço", async () => {
