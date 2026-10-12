@@ -54,6 +54,20 @@ export async function buscarRecursoBrowserPdfPinado(args: {
   const origem = args.headers.origin;
   if (origem === "https://app.vendaerp.com.br") headers.Origin = origem;
   if (args.body?.length) headers["Content-Length"] = String(args.body.length);
+  if (args.metodo === "OPTIONS") {
+    const solicitado = args.headers["access-control-request-method"];
+    if (solicitado && solicitado !== "POST")
+      throw new Error("recurso_pdf_preflight_recusado");
+    if (solicitado) headers["Access-Control-Request-Method"] = solicitado;
+    const campos = args.headers["access-control-request-headers"];
+    if (campos) {
+      const valores = campos.split(",").map((item) => item.trim().toLowerCase());
+      if (valores.some((item) => !["content-type", "x-requested-with"].includes(item)))
+        throw new Error("recurso_pdf_preflight_recusado");
+      headers["Access-Control-Request-Headers"] = valores.join(", ");
+    }
+  }
+
 
   return new Promise((resolve, reject) => {
     const requisicao = requisitarHttps(
