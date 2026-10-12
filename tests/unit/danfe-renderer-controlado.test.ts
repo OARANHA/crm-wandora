@@ -116,10 +116,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
 
   it("impressão direta aguarda a resposta pública e networkidle antes de imprimir", async () => {
     const env = ambientePdf();
-    let resolverResposta!: (resposta: {
-      ok: () => boolean;
-      finished: () => Promise<null>;
-    }) => void;
+    let resolverResposta!: (resposta: { ok: () => boolean; finished: () => Promise<null> }) => void;
     env.page.waitForResponse.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -134,14 +131,18 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     });
     await vi.waitFor(() => expect(env.page.waitForResponse).toHaveBeenCalledOnce());
     const predicado = env.page.waitForResponse.mock.calls[0]?.[0];
-    expect(predicado({
-      url: () => "https://api.invalid/public",
-      request: () => ({ method: () => "POST" }),
-    })).toBe(true);
-    expect(predicado({
-      url: () => "http://127.0.0.1/private",
-      request: () => ({ method: () => "POST" }),
-    })).toBe(false);
+    expect(
+      predicado({
+        url: () => "https://api.invalid/public",
+        request: () => ({ method: () => "POST" }),
+      }),
+    ).toBe(true);
+    expect(
+      predicado({
+        url: () => "http://127.0.0.1/private",
+        request: () => ({ method: () => "POST" }),
+      }),
+    ).toBe(false);
     expect(env.page.pdf).not.toHaveBeenCalled();
     resolverResposta({ ok: () => true, finished: async () => null });
     const pdf = await pedido;
