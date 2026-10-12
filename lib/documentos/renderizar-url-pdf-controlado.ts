@@ -256,7 +256,25 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
           }
 
           if (requisicao.url() === redirect!.url && metodo === "GET") {
-            return route.continue();
+            try {
+              // route.continue() segue o 302 sem uma nova interceptação.
+              // Capturar o 302 sem seguir redirects e reenviá-lo via fulfill
+              // faz o Chromium iniciar outra requisição interceptável.
+              const respostaInicial = await route.fetch({
+                maxRedirects: 0,
+                timeout: restante(),
+              });
+              if (
+                respostaInicial.status() !== 302 ||
+                respostaInicial.headers()["location"] !== url ||
+                !redirect!.houveRedirecionamento()
+              ) {
+                return route.abort("blockedbyclient");
+              }
+              return route.fulfill({ response: respostaInicial, body: "" });
+            } catch {
+              return route.abort("blockedbyclient");
+            }
           }
           const adicional = politica.recursosBrowser.permiteRecurso(requisicao.url(), metodo);
           if (!permitido && !adicional) {
