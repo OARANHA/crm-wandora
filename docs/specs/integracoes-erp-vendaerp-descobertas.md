@@ -681,6 +681,7 @@ Após o operador desligar o JEV, a mensagem administrativa de 20h19min41s
 (Brasília) foi recebida; o agente respondeu às 20h21min06s, em **texto**
 (status final `read`), sem anexo PDF. Auditoria `api_audit_log` da mesma
 execução comprova:
+
 - `crm_erp_prepare_admin_danfe`, `success=false`, motivo
   `danfe_download_failed`, código `download_falhou`,
   `etapa_renderizacao=chromium_navegacao`,
