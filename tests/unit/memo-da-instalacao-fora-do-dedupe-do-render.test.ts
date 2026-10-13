@@ -23,14 +23,14 @@
  * `postgrest-js` → `fetchDoServidor`) até o `fetch` global, que é onde o Next
  * deduplica. É o que prova que o `signal` posto na consulta CHEGA ao `fetch` — o
  * dublê de cadeia do outro arquivo não alcança essa pergunta.
+ *
+ * No fork ELUS, `lib/instalacao/config.ts` já lê `platform_config` sem memo.
+ * O caso de `css-personalizado` do upstream NÃO existe neste fork, portanto
+ * não faz parte da matriz de memos reais abaixo.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { invalidarMarcaDaInstalacao, marcaDaInstalacao } from "@/lib/branding/instalacao";
-import {
-  cssPersonalizadoDaInstalacao,
-  invalidarCssPersonalizadoDaInstalacao,
-} from "@/lib/branding/css-personalizado";
 import { carregarComportamentoDaInstalacao } from "@/lib/instalacao/comportamento-servidor";
 import { esquecerComportamento, invalidarComportamento } from "@/lib/instalacao/comportamento";
 import {
@@ -121,25 +121,6 @@ const MEMOS: Memo[] = [
     ler: async () => (await marcaDaInstalacao())?.logo_path ?? null,
     invalidar: invalidarMarcaDaInstalacao,
     esperado: "platform/logo-novo.png",
-  },
-  {
-    nome: "CSS personalizado (lib/branding/css-personalizado.ts, lido por lib/instalacao/config.ts)",
-    tabela: "platform_config:APP_CUSTOM_CSS",
-    antes: {
-      chave: "APP_CUSTOM_CSS",
-      valor: "/* antes */",
-      eh_segredo: false,
-      semeado_do_env: false,
-    },
-    depois: {
-      chave: "APP_CUSTOM_CSS",
-      valor: "/* depois */",
-      eh_segredo: false,
-      semeado_do_env: false,
-    },
-    ler: cssPersonalizadoDaInstalacao,
-    invalidar: invalidarCssPersonalizadoDaInstalacao,
-    esperado: "/* depois */",
   },
   {
     nome: "comportamento da instalação (lib/instalacao/comportamento-servidor.ts)",
