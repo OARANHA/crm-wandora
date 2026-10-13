@@ -54,6 +54,21 @@ jobs:
           tests/unit/branding-pares-pintados.test.ts
           tests/unit/nome-da-marca-nas-telas-vem-do-banco.test.ts
 
+      - name: Verify TypeScript
+        run: pnpm typecheck
+
+      - name: Verify upstream installation memo regression
+        run: >-
+          pnpm vitest run
+          lib/auth/politica-de-cadastro.test.ts
+          tests/unit/branding-memo-da-instalacao.test.ts
+          tests/unit/memo-da-instalacao-fora-do-dedupe-do-render.test.ts
+          tests/unit/agenda-google-credencial-do-banco.test.ts
+          tests/unit/app-da-meta-credencial-do-banco.test.ts
+          tests/unit/canal-oficial-token-de-verificacao-vem-da-instalacao.test.ts
+          tests/unit/portao-do-webhook-le-a-instalacao-no-processo-frio.test.ts
+          tests/unit/webhook-meta-le-do-banco.test.ts
+
       - name: Check candidate E2E formatting
         run: >-
           pnpm exec prettier --check
