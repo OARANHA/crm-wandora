@@ -741,3 +741,45 @@ CI green, merge, publicação de ambas as imagens, deploy saudável por SHA
 exato e um único canário WhatsApp com DANFE fiscal correta e legível.
 A issue #55 permanece aberta até duas notas comprovadamente mais recentes
 e dois PDFs enviados na conversa correta.
+
+## DANFE — transporte HTTPS pinado e orçamento confirmado em reprodução externa (13/10/2026)
+
+**Evidência do operador / GLM-5.3:** a DANFE pública foi reproduzida em um
+navegador e depois pelo renderer controlado fiel ao commit `b008542`.
+Sem `User-Agent` explícito, o CDN retornou `200 text/html` com cerca
+de 2,3 KiB no lugar dos bundles JavaScript; o browser não montou o
+Angular nem disparou o POST público da DANFE. Com `User-Agent`, surgiu o
+segundo bloqueio: `main.js` tinha aproximadamente 10,9 MB, maior que o
+limite de 8 MiB dos bytes HTTP e do corpo descomprimido. Segundo o
+experimento relatado, o ajuste de headers, tamanho e prazos gerou um PDF
+fiscal legível em cerca de 7,4s. O PDF e a URL reais **não foram lidos
+nem repetidos nesta sessão**; a prova específica do experimento foi
+fornecida pelo operador, não por um teste independente desta branch.
+
+**Revisão do núcleo reaproveitado (não abrir novo provider):**
+- `recurso-browser-pdf-pinado.ts` envia `User-Agent` literal
+  `HeadlessChrome/156` controlado pelo servidor, sem propagar header
+  fornecido pela SPA. Anuncia somente `gzip, br`; reutiliza a
+  descompressão já implementada. Eleva o limite de bytes recebidos e
+  descomprimidos para **16 MiB**, mantendo vedação de bomba de compressão.
+  Prazo por operação até **12s**.
+- `renderizar-url-pdf-controlado.ts` usa deadline por etapa de **12s**
+  e aceita até **60s totais** apenas quando a política explicitamente
+  solicita. Fluxo genérico sem prazo informado mantém os 28s anteriores.
+  `vendaerp-danfe-pdf.ts` já solicitava `timeoutMs: 60_000`.
+- **Invariantes preservadas:** DNS público e IP pinado, TLS+SNI por
+  hostname, host/path/método allowlisted, sem cookies/Authorization,
+  sem redirects 3xx, resposta redigida, CSP/CORS selecionados, sem
+  mudança no sender, armazenamento, identidade fiscal ou ERP READ-ONLY.
+
+**Teste local offline em checkout isolado:** 3 testes RED no código
+anterior (UA, limite 11 MiB, prazo 12s); os casos de gzip/br e limite
+descomprimido já passavam. A implementação exige regressões de 11 MiB,
+corpo acima de 16 MiB, inflação gzip acima de 16 MiB, headers seguros,
+prazos, renderer e PDF genérico. Não se deve confundir essa cobertura
+com uma segunda reprodução real contra o VendaERP.
+
+**Aceite pendente:** CI `green` → merge `main` → publicação de app/worker
+pelo SHA → deploy Portainer seguro → saúde/version exatas → **um** canário
+WhatsApp administrativo. Issue #55 não é resolvida até a entrega de
+duas DANFEs corretas e legíveis das duas NFes mais recentes distintas.
