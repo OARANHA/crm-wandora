@@ -234,10 +234,9 @@ describe("transporte de documento via HTTPS IP pinado", () => {
     await expect(
       buscarRecursoBrowserPdfPinado({ ...args, prazoMs: 12_000 }),
     ).resolves.toMatchObject({ status: 200 });
-    await expect(
-      buscarRecursoBrowserPdfPinado({ ...args, prazoMs: 12_001 }),
-    ).rejects.toThrow("recurso_pdf_recusado");
+    await expect(buscarRecursoBrowserPdfPinado({ ...args, prazoMs: 12_001 })).rejects.toThrow(
+      "recurso_pdf_recusado",
+    );
     expect(mockRequest).toHaveBeenCalledTimes(1);
   });
-
 });
