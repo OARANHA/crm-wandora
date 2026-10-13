@@ -20,7 +20,8 @@ import {
 } from "./egress-browser-pdf";
 
 const LIMITE_TOTAL_MS = 28_000;
-const LIMITE_ETAPA_MS = 8_000;
+const TETO_TOTAL_EXPLICITO_MS = 60_000;
+const LIMITE_ETAPA_MS = 12_000;
 
 /**
  * A DANFE só pode ser entregue após conferência dos bytes impressos, e não
@@ -138,7 +139,8 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
   // O prazo total inclui o DNS: anteriormente o relógio só começava
   // DEPOIS da resolução, deixando o pedido travar sem deadline.
   const maxBytes = politica.maxBytes ?? MAX_MEDIA_BYTES;
-  const limiteMs = Math.min(politica.timeoutMs ?? LIMITE_TOTAL_MS, LIMITE_TOTAL_MS);
+  // Política explícita da DANFE pode usar até 60s; ausência mantém default genérico.
+  const limiteMs = Math.min(politica.timeoutMs ?? LIMITE_TOTAL_MS, TETO_TOTAL_EXPLICITO_MS);
   const deadline = Date.now() + limiteMs;
   const restante = () => {
     const ms = Math.min(LIMITE_ETAPA_MS, deadline - Date.now());

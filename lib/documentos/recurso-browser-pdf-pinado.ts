@@ -5,8 +5,11 @@ import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib";
 
 import { ipEhEspecial } from "@/lib/automation/outbound-ip";
 
-const MAX_RESPOSTA_BYTES = 8 * 1024 * 1024;
+const MAX_RESPOSTA_BYTES = 16 * 1024 * 1024;
 const MAX_POST_BYTES = 128 * 1024;
+// Valor literal definido pelo servidor; nunca aceitar User-Agent da página fiscal.
+const USER_AGENT_BROWSER_PINADO =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36";
 
 /**
  * Faz a requisição autorizada através do IP previamente validado, sem nova
@@ -35,7 +38,7 @@ export async function buscarRecursoBrowserPdfPinado(args: {
     !["GET", "HEAD", "POST", "OPTIONS"].includes(args.metodo) ||
     !Number.isFinite(args.prazoMs) ||
     args.prazoMs <= 0 ||
-    args.prazoMs > 8_000 ||
+    args.prazoMs > 12_000 ||
     (args.body?.length ?? 0) > MAX_POST_BYTES ||
     (args.metodo !== "POST" && args.body?.length)
   ) {
@@ -46,8 +49,9 @@ export async function buscarRecursoBrowserPdfPinado(args: {
   // arbitrários produzidos pelo documento remoto.
   const headers: Record<string, string> = {
     Host: url.hostname,
+    "User-Agent": USER_AGENT_BROWSER_PINADO,
     Accept: args.headers.accept || "*/*",
-    "Accept-Encoding": "identity",
+    "Accept-Encoding": "gzip, br",
   };
   const tipo = args.headers["content-type"];
   if (tipo && tipo.length <= 120) headers["Content-Type"] = tipo;
