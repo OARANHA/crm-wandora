@@ -784,3 +784,24 @@ com uma segunda reprodução real contra o VendaERP.
 pelo SHA → deploy Portainer seguro → saúde/version exatas → **um** canário
 WhatsApp administrativo. Issue #55 não é resolvida até a entrega de
 duas DANFEs corretas e legíveis das duas NFes mais recentes distintas.
+
+## DANFE — canário real com uma entrega WhatsApp comprovada em 13/10/2026
+
+Com a PR #110 **já implantada** no SHA
+`628e1332a37343af8ceb041072c1d6e91cefaf1e`, o operador solicitou
+**uma** nota à ISIS às 05h09 (Brasília). A auditoria read-only comprovou:
+entrada às 05:09:34.533, job `inbound_turn` `done` em uma tentativa,
+`crm_erp_prepare_admin_danfe` `success=true` às 05:10:23.517,
+`send_ledger` `accepted` e um `application/pdf` enviado pelo agente,
+com armazenamento privado e status WhatsApp `read` às 05:10:35.462.
+O usuário confirmou que recebeu **um** documento.
+
+**Marco comprovado:** o fluxo completo de preparação e entrega de **uma**
+DANFE funciona na versão implantada. **Não comprovado nesta auditoria:**
+abertura visual do arquivo, correspondência de campos fiscais externos e
+o fluxo com duas notas. A issue #55 continua aberta para o aceite de
+duas NFes mais recentes distintas com dois PDFs corretos e legíveis.
+
+A receita reproduzível, SHAs, parâmetros finitos, regressões, segurança,
+comandos de validação e registros sanitizados estão no documento:
+[marco DANFE/ISIS — 1 PDF real via WhatsApp](../testing/isis-danfe-whatsapp-real-one-pdf-20261013.md).
