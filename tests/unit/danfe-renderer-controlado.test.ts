@@ -1146,4 +1146,35 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
       evidenciaEgress: undefined,
     });
   });
+  it("honra timeout explícito de 60s após transcorrerem 44s sintéticos", async () => {
+    const env = ambientePdf();
+    let agora = 1_000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => agora);
+    // Quatro passos completam dentro de seus respectivos deadlines de 12s,
+    // mas ultrapassam os 28s que antes truncavam a política fiscal de 60s.
+    env.browser.newContext.mockImplementationOnce(async () => {
+      agora += 11_000;
+      return env.context;
+    });
+    env.context.addInitScript.mockImplementationOnce(async () => {
+      agora += 11_000;
+    });
+    env.context.route.mockImplementationOnce(async () => {
+      agora += 11_000;
+    });
+    env.context.routeWebSocket.mockImplementationOnce(async () => {
+      agora += 11_000;
+    });
+    try {
+      const result = await renderizarUrlParaPdfControlado(danfe, {
+        ...policy,
+        impressaoDireta: true,
+      });
+      expect(result).toEqual(env.pdf);
+      expect(agora).toBe(45_000);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
 });
