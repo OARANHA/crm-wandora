@@ -54,7 +54,10 @@ describe("DANFE VendaERP: exceção de recursos públicos estritamente limitada"
     [main + "?redirect=https://127.0.0.1", "GET"],
     ["https://d1fkuoqvag3bur.cloudfront.net/v3/../admin.js", "GET"],
     ["https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-module.abc12xyz.js", "GET"],
-    ["https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-module.abc123ab.js?next=x", "GET"],
+    [
+      "https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-module.abc123ab.js?next=x",
+      "GET",
+    ],
     ["https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-module.abc123ab.js#frag", "GET"],
     ["https://d1fkuoqvag3bur.cloudfront.net/v3/../default~fiscal-nfe-module.abc123ab.js", "GET"],
     ["https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-module.abc123ab/evil.js", "GET"],
