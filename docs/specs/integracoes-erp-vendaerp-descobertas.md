@@ -674,3 +674,38 @@ Mesmo essas condições não garantem que toda SPA desenhou conteúdo correto:
 esta é uma hipótese de correção técnica e deve ter teste Chromium offline
 antes de PR green, merge, imagens, deploy saudável e novo canário controlado.
 Nenhuma chamada real VendaERP é feita para investigar esta hipótese.
+
+## Canário administrativo 20h19 — 12/10/2026: falha na navegação do Chromium
+
+Após o operador desligar o JEV, a mensagem administrativa de 20h19min41s
+(Brasília) foi recebida; o agente respondeu às 20h21min06s, em **texto**
+(status final `read`), sem anexo PDF. Auditoria `api_audit_log` da mesma
+execução comprova:
+
+- `crm_erp_prepare_admin_danfe`, `success=false`, motivo
+  `danfe_download_failed`, código `download_falhou`,
+  `etapa_renderizacao=chromium_navegacao`,
+  `autenticacao_same_origin=false`;
+- `crm_erp_get_invoice`, `success=true`, minutos depois, no mesmo request;
+- ledger aceitou somente uma mensagem de texto, nenhuma mídia PDF.
+
+**Limite da prova:** a categoria `chromium_navegacao` pode indicar falha
+do bootstrap, da transição JS, do evento `load` ou da montagem pública
+esperada pela SPA. Ausência de `evidencia_transporte_browser` na auditoria
+não prova que a rede funcionou ou que o destino foi bloqueado. Não extrair
+ou registrar URLs fiscais/HTML/texto do PDF para tentar resolver a dúvida.
+
+**Correção defensiva proposta (offline, não implantada):** no modo de
+recursos controlados do navegador, aguardar apenas `commit` no bootstrap
+local HTTP 200, validar que ele realmente ocorreu e então aguardar
+`waitForURL` da URL fiscal HTTPS **exata**, com `domcontentloaded`.
+A navegação genérica sem `recursosBrowser` mantém o fluxo anterior.
+O renderer não deve aceitar uma página intermediária como DANFE,
+nem contornar pinning/allowlists por falha de navegação.
+
+Os testes adicionados reproduziram **RED 2 novos / 61 existentes PASS**
+no código anterior e **GREEN 63/63** após o ajuste, sem chamada ao
+VendaERP. Isso **não comprova** que a transição seja a única causa da
+falha real; falta validação na imagem de worker e um canário novo **apenas
+após** CI green, merge, publicação e deploy healthy. A issue #55 permanece
+aberta até conteúdo real correto da DANFE e envio no WhatsApp.
