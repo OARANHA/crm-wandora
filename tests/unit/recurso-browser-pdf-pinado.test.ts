@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { brotliCompressSync, gzipSync } from "node:zlib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockRequest = vi.hoisted(() => vi.fn());
@@ -46,6 +47,36 @@ function respostaFake(statusCode: number, body = "{}") {
     expect(options.headers.Authorization).toBeUndefined();
     expect(options.headers.Cookie).toBeUndefined();
     expect(options.headers.Referer).toBeUndefined();
+    return request;
+  });
+}
+
+/** Resposta fake por bytes, sem sockets ou consultas externas. */
+function respostaEmBytes(
+  bytes: Buffer,
+  headers: Record<string, string> = { "content-type": "application/javascript" },
+) {
+  mockRequest.mockImplementationOnce((_options, onResponse) => {
+    const request = new EventEmitter() as EventEmitter & {
+      end: () => void;
+      write: (body: Buffer) => void;
+    };
+    request.write = vi.fn();
+    request.end = vi.fn(() => {
+      const response = new EventEmitter() as EventEmitter & {
+        statusCode: number;
+        headers: Record<string, string>;
+        destroy: (reason?: Error) => void;
+      };
+      response.statusCode = 200;
+      response.headers = headers;
+      response.destroy = vi.fn((reason?: Error) => {
+        if (reason) response.emit("error", reason);
+      });
+      onResponse(response);
+      response.emit("data", bytes);
+      response.emit("end");
+    });
     return request;
   });
 }
@@ -135,4 +166,78 @@ describe("transporte de documento via HTTPS IP pinado", () => {
     }
     expect(mockRequest).not.toHaveBeenCalled();
   });
+  it("usa User-Agent literal e compressão controlada, ignorando headers fornecidos pela página", async () => {
+    respostaFake(200);
+    await buscarRecursoBrowserPdfPinado({
+      ...args,
+      headers: {
+        ...args.headers,
+        "user-agent": "NÃO ENCAMINHAR",
+        "accept-encoding": "identity",
+      },
+    });
+    const options = mockRequest.mock.calls[0]?.[0];
+    expect(options.headers["User-Agent"]).toContain("HeadlessChrome/156");
+    expect(options.headers["User-Agent"]).not.toContain("NÃO ENCAMINHAR");
+    expect(options.headers["Accept-Encoding"]).toBe("gzip, br");
+    expect(options.headers.Cookie).toBeUndefined();
+    expect(options.headers.Authorization).toBeUndefined();
+  });
+
+  it("aceita bundle JS de 11 MiB sem truncar a resposta", async () => {
+    const bytes = Buffer.alloc(11 * 1024 * 1024, 97);
+    respostaEmBytes(bytes);
+    const result = await buscarRecursoBrowserPdfPinado({ ...args, metodo: "GET", body: null });
+    expect(result.body.length).toBe(bytes.length);
+    expect(result.body.equals(bytes)).toBe(true);
+  });
+
+  it("recusa corpo recebido acima de 16 MiB sem entregar bytes ao navegador", async () => {
+    respostaEmBytes(Buffer.alloc(16 * 1024 * 1024 + 1, 97));
+    await expect(
+      buscarRecursoBrowserPdfPinado({ ...args, metodo: "GET", body: null }),
+    ).rejects.toThrow();
+  });
+
+  it("descomprime gzip e preserva o corpo original para route.fulfill", async () => {
+    const body = Buffer.from("SCRIPT FISCAL SINTETICO ".repeat(1000));
+    respostaEmBytes(gzipSync(body), {
+      "content-type": "application/javascript",
+      "content-encoding": "gzip",
+    });
+    const result = await buscarRecursoBrowserPdfPinado({ ...args, metodo: "GET", body: null });
+    expect(result.body).toEqual(body);
+  });
+
+  it("descomprime brotli e preserva o corpo original para route.fulfill", async () => {
+    const body = Buffer.from("SCRIPT FISCAL SINTETICO ".repeat(1000));
+    respostaEmBytes(brotliCompressSync(body), {
+      "content-type": "application/javascript",
+      "content-encoding": "br",
+    });
+    const result = await buscarRecursoBrowserPdfPinado({ ...args, metodo: "GET", body: null });
+    expect(result.body).toEqual(body);
+  });
+
+  it("recusa expansão gzip para mais de 16 MiB mesmo quando o download comprimido é pequeno", async () => {
+    respostaEmBytes(gzipSync(Buffer.alloc(16 * 1024 * 1024 + 1, 97)), {
+      "content-type": "application/javascript",
+      "content-encoding": "gzip",
+    });
+    await expect(
+      buscarRecursoBrowserPdfPinado({ ...args, metodo: "GET", body: null }),
+    ).rejects.toThrow("recurso_pdf_validacao_falhou");
+  });
+
+  it("aceita prazo de 12 s e recusa prazo acima de 12 s antes da rede", async () => {
+    respostaFake(200);
+    await expect(
+      buscarRecursoBrowserPdfPinado({ ...args, prazoMs: 12_000 }),
+    ).resolves.toMatchObject({ status: 200 });
+    await expect(
+      buscarRecursoBrowserPdfPinado({ ...args, prazoMs: 12_001 }),
+    ).rejects.toThrow("recurso_pdf_recusado");
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+
 });
