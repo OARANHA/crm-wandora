@@ -38,9 +38,9 @@ export function recursoPublicoDanfeVendaErpPermitido(
     if (url.origin === CDN_PUBLICA) {
       if (metodo !== "GET" && metodo !== "HEAD") return false;
       if (url.search) return false;
-      // Bundles de compilação Angular observados: main, styles e lazy chunks.
+      // Bundles Angular/webpack: main, styles e chunks compartilhados com ~.
       // Sem wildcards de host, paths de API, extensões arbitrárias nem traversal.
-      return /^\/v3\/[a-z0-9_-]+\.[a-f0-9]{8,64}\.(?:js|css)$/i.test(url.pathname);
+      return /^\/v3\/[a-z0-9_~-]+\.[a-f0-9]{8,64}\.(?:js|css)$/i.test(url.pathname);
     }
 
     // Origem da própria página segue a régua genérica, não esta exceção.
