@@ -1176,5 +1176,4 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
       clock.mockRestore();
     }
   });
-
 });
