@@ -709,3 +709,35 @@ VendaERP. Isso **não comprova** que a transição seja a única causa da
 falha real; falta validação na imagem de worker e um canário novo **apenas
 após** CI green, merge, publicação e deploy healthy. A issue #55 permanece
 aberta até conteúdo real correto da DANFE e envio no WhatsApp.
+
+## DANFE — chunks webpack do CloudFront (13/10/2026)
+
+O diagnóstico trazido pelo operador após a falha de 12/10 identificou que a
+página pública fiscal possui chunks compartilhados webpack com `~` no nome
+(`default~fiscal-nfe-nfe-module~fiscal-nfse-nfse-module.*.js`).
+A `main` em `318eb9bacba1295a7e25622e34e14b7cfac3503e` ainda
+aceitava no CDN apenas `[a-z0-9_-]+` seguido de hash hexadecimal e extensão
+`.js`/`.css`: essa política recusava deterministicamente os nomes apresentados,
+independentemente de a URL fiscal principal ser válida.
+
+Reprodução **offline no código antigo:** 23/24 testes passaram, 1 falhou
+exatamente ao exigir liberação desses chunks. Com a adição restrita de
+`~` ao segmento do nome, o conjunto de segurança do adapter, os
+testes do renderer e os de PDF genérico passaram **92/92**. Permanecem
+proibidos hosts alternativos, métodos não previstos, query/fragment do
+CDN, hashes não hexadecimais, extensões arbitrárias, paths fora de
+`/v3/` e traversal. Não mudaram egress/SSRF, credenciais, DNS pinado,
+timeout, XML, consulta ERP nem sender WhatsApp.
+
+**Distinção de evidência:** o teste com navegador real e `ChunkLoadError`
+foi relatado pelo operador, não repetido nesta sessão. O defeito da regex
+e a regressão RED→GREEN foram comprovados localmente. Outros riscos
+continuam **não medidos**: arquivo `main.js` maior que o limite por
+recurso, prazo de rede no worker e efeitos de scripts externos não
+autorizados. Não ampliar os controles apenas por hipótese.
+
+**Aceite:** a correção da allowlist só poderá ser considerada funcional após
+CI green, merge, publicação de ambas as imagens, deploy saudável por SHA
+exato e um único canário WhatsApp com DANFE fiscal correta e legível.
+A issue #55 permanece aberta até duas notas comprovadamente mais recentes
+e dois PDFs enviados na conversa correta.
