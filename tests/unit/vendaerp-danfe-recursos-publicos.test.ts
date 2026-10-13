@@ -11,6 +11,12 @@ const main = "https://d1fkuoqvag3bur.cloudfront.net/v3/main.92dd4700c482a54b467d
 const css = "https://d1fkuoqvag3bur.cloudfront.net/v3/styles.6f06af8287b64a3b4b7a.css";
 const fiscal =
   "https://d1fkuoqvag3bur.cloudfront.net/v3/fiscal-nfe-nfe-module.ea31513d184754b3eb79.js";
+// Chunks compartilhados de code-splitting webpack usados pela SPA fiscal.
+// Nomes sem query, hash de conteúdo hexadecimal e host CDN exato.
+const webpackCompartilhados = [
+  "https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-cte-cte-module~fiscal-nfe-nfe-module~7f2cdd2a.a054f60fc760903fef37.js",
+  "https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-nfe-module~fiscal-nfse-nfse-module.bafb47867cc414dbe8ed.js",
+];
 
 describe("DANFE VendaERP: exceção de recursos públicos estritamente limitada", () => {
   it("admite apenas POST/OPTIONS no endpoint fiscal público e bundles observados", () => {
@@ -20,7 +26,7 @@ describe("DANFE VendaERP: exceção de recursos públicos estritamente limitada"
     ]);
     expect(recursoPublicoDanfeVendaErpPermitido(api, "POST")).toBe(true);
     expect(recursoPublicoDanfeVendaErpPermitido(api, "OPTIONS")).toBe(true);
-    for (const url of [main, css, fiscal]) {
+    for (const url of [main, css, fiscal, ...webpackCompartilhados]) {
       expect(recursoPublicoDanfeVendaErpPermitido(url, "GET")).toBe(true);
       expect(recursoPublicoDanfeVendaErpPermitido(url, "HEAD")).toBe(true);
       expect(recursoPublicoDanfeVendaErpPermitido(url, "POST")).toBe(false);
@@ -47,6 +53,11 @@ describe("DANFE VendaERP: exceção de recursos públicos estritamente limitada"
     ["https://d1fkuoqvag3bur.cloudfront.net/v3/main.js", "GET"],
     [main + "?redirect=https://127.0.0.1", "GET"],
     ["https://d1fkuoqvag3bur.cloudfront.net/v3/../admin.js", "GET"],
+    ["https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-module.abc12xyz.js", "GET"],
+    ["https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-module.abc123ab.js?next=x", "GET"],
+    ["https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-module.abc123ab.js#frag", "GET"],
+    ["https://d1fkuoqvag3bur.cloudfront.net/v3/../default~fiscal-nfe-module.abc123ab.js", "GET"],
+    ["https://d1fkuoqvag3bur.cloudfront.net/v3/default~fiscal-nfe-module.abc123ab/evil.js", "GET"],
     ["https://d1fkuoqvag3bur.cloudfront.net/v3/evil.abc123ab.html", "GET"],
     ["https://d1fkuoqvag3bur.cloudfront.net/v3/evil.abc123ab.js", "POST"],
     ["https://s3-sa-east-1.amazonaws.com/private", "GET"],
