@@ -757,6 +757,7 @@ nem repetidos nesta sessão**; a prova específica do experimento foi
 fornecida pelo operador, não por um teste independente desta branch.
 
 **Revisão do núcleo reaproveitado (não abrir novo provider):**
+
 - `recurso-browser-pdf-pinado.ts` envia `User-Agent` literal
   `HeadlessChrome/156` controlado pelo servidor, sem propagar header
   fornecido pela SPA. Anuncia somente `gzip, br`; reutiliza a
