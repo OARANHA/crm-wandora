@@ -128,11 +128,16 @@ export function numerosFiscaisPermitidosParaPedido(resultado: unknown, texto: st
   if (numeros.length < posicao) return [];
   const notas = (resultado as { notas: Array<{ dataEmissao: string }> }).notas;
   const indice = posicao - 1;
+  const notaSelecionada = notas[indice];
+  const numeroSelecionado = numeros[indice];
+  if (!notaSelecionada || !numeroSelecionado) return [];
+  const notaAnterior = notas[indice - 1];
+  const notaPosterior = notas[indice + 1];
   if (
-    (indice > 0 && notas[indice].dataEmissao === notas[indice - 1].dataEmissao) ||
-    (indice + 1 < notas.length && notas[indice].dataEmissao === notas[indice + 1].dataEmissao)
+    (notaAnterior && notaSelecionada.dataEmissao === notaAnterior.dataEmissao) ||
+    (notaPosterior && notaSelecionada.dataEmissao === notaPosterior.dataEmissao)
   ) return [];
-  return [numeros[indice]];
+  return [numeroSelecionado];
 }
 
 /**
