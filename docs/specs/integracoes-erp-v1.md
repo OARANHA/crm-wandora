@@ -406,6 +406,28 @@ a projeção normaliza apenas NFe autorizada, número, série, chave,
   canônico, respeitando autoridade/admin, Storage, LGPD, auditoria, ledger,
   validação de mídia e isolamento por organização.
 
+### ISIS — posição ordinal de uma única NFe (13/10/2026)
+
+- Pedidos de **última**, **penúltima** e **antepenúltima** nota correspondem, respectivamente,
+  às posições fiscais 1, 2 e 3. "Segunda/terceira mais recente" é equivalente.
+- A consulta de NFes deve trazer ao menos a quantidade necessária para atingir a
+  posição e seguir a janela fiscal declarada (30 dias sem período explícito).
+  O runtime não amplia a janela automaticamente para completar a posição.
+- Para pedido **singular ordinal**, o gate de envio/preparo autoriza **somente**
+  o número da NFe naquela posição no resultado fiscal completo, ordenado pela
+  data de emissão validada. Encontrar três notas para "antepenúltima" NÃO
+  autoriza enviar as três, nem a primeira ou segunda.
+- Consulta parcial, quantidade insuficiente ou empate de data fiscal observado
+  no limite da posição não libera número/anexo. Nunca desempatar por número
+  de NFe, pedido ou posição arbitrária do provider.
+- A correção é no runtime e em sua instrução residente; **qualquer prompt
+  publicado da ISIS que ainda mande ordenar pela data genérica do pedido,
+  enviar link temporário ou tratar ordinal como pedido vago precisa ser
+  reconciliado por operação governada antes do aceite de produção**.
+- Testes offline: `tests/unit/erp-recencia-fail-closed.test.ts`. A prova final
+  exige intenção pelo agente e resultado da ferramenta com texto equivalente,
+  seguidos da entrega real quando autorizada.
+
 **Histórico:** entre 08 e 11/10/2026 a busca regressiva anterior
 percorria mês atual + até seis anteriores para atender pedidos sem período.
 Essa política foi substituída pela regra inicial de 30 dias. A mudança
