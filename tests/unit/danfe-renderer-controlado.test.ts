@@ -94,10 +94,9 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     );
   });
 
-  it("imprime página após load sem avaliar DOM ou texto fiscal", async () => {
+  it("imprime após load sem avaliar DOM e valida chave fiscal do PDF", async () => {
     const env = ambientePdf();
     env.page.waitForFunction.mockRejectedValue(new Error("conteúdo fiscal ausente"));
-    mocks.extractPdfText.mockRejectedValue(new Error("nenhum texto extraído"));
     const result = await renderizarUrlParaPdfControlado(danfe, {
       ...policy,
       impressaoDireta: true,
@@ -109,8 +108,39 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     });
     expect(env.page.emulateMedia).toHaveBeenCalledWith({ media: "screen" });
     expect(env.page.waitForFunction).not.toHaveBeenCalled();
-    expect(mocks.extractPdfText).not.toHaveBeenCalled();
+    expect(mocks.extractPdfText).toHaveBeenCalledTimes(1);
     expect(env.page.pdf).toHaveBeenCalledTimes(1);
+    expect(env.browser.close).toHaveBeenCalledOnce();
+    expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("impressão direta genérica sem chave mantém o comportamento anterior", async () => {
+    const env = ambientePdf();
+    const buffer = await renderizarUrlParaPdfControlado(danfe, {
+      ...policy,
+      impressaoDireta: true,
+    });
+    expect(buffer).toEqual(env.pdf);
+    expect(mocks.extractPdfText).not.toHaveBeenCalled();
+  });
+
+  it("impressão direta rejeita DANFE com chave diferente da nota solicitada", async () => {
+    const env = ambientePdf();
+    mocks.extractPdfText.mockResolvedValueOnce(
+      "DANFE CHAVE DE ACESSO " + "1".repeat(44) + " PRODUTO FISCAL SINTETICO ".repeat(12),
+    );
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, {
+        ...policy,
+        impressaoDireta: true,
+        chaveFiscalEsperada: "35261012345678000190550010649963971123456780",
+      }),
+    ).rejects.toMatchObject({
+      codigo: "render_falhou",
+      etapa: "pdf_validacao",
+      evidenciaValidacaoPdf: "chave_divergente",
+    });
+    expect(env.page.pdf).toHaveBeenCalledOnce();
     expect(env.browser.close).toHaveBeenCalledOnce();
     expect(env.fechar).toHaveBeenCalledOnce();
   });
