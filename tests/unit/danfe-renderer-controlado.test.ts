@@ -927,7 +927,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     env.page.goto.mockRejectedValueOnce(timeout);
     await expect(
       renderizarUrlParaPdfControlado(danfe, { ...policy, timeoutMs: 35 }),
-    ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_navegacao" });
+    ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_bootstrap" });
     expect(env.browser.close).toHaveBeenCalledTimes(1);
     expect(env.fechar).toHaveBeenCalledTimes(1);
   });
