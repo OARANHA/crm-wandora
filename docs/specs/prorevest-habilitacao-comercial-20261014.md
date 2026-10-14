@@ -150,3 +150,39 @@ apenas após gate de código/CI/publicação/deploy correspondente.
 roteamento e ERP read-only. Manter o pacote de preparação dos três
 materiais em armazenamento do operador, não publicá-lo no GitHub,
 não importar dados em `catalog_products` nem escrever credenciais por SQL.
+
+## 7. Gate técnico posterior — adaptador offline Chutes Qwen3 Embedding (14/10/2026)
+
+**Evidência externa:** a documentação do provedor descreve o modelo
+`Qwen/Qwen3-Embedding-8B-TEE`, endpoint HTTPS dedicado e corpo com
+`input` e `model`. O modelo original suporta até 4.096 dimensões e MRL,
+mas o contrato público do chute **não promete** que seu endpoint aceite o
+parâmetro `dimensions`. Não supor que um provedor `custom` de conversa
+seja automaticamente uma credencial válida de embeddings.
+
+**Gate de código separado:**
+`lib/ai/embeddings/chutes-qwen3-tee.ts` contém adaptador de transporte
+restrito ao endereço HTTPS oficial, sem URL dinâmica nem redirecionamentos.
+Valida a estrutura e o modelo retornado, aceita apenas 4.096 ou 1.536
+números finitos, projeta o prefixo MRL para 1.536 e normaliza L2.
+Documentos são enviados sem prefixo, consultas recebem instrução de
+recuperação. A identidade vetorial exclusiva
+`chutes/Qwen3-Embedding-8B-TEE:mrl1536-l2-v1` impede tratar vetores Qwen
+como se fossem o espaço de `text-embedding-3-small` ou Gemini.
+Testes com `fetch` injetado são **inteiramente offline**; nenhum teste
+autenticado do chute ou do banco é executado nesta etapa.
+
+**NO-GO para ativação direta:** esse adaptador ainda não é chamado pelo
+resolvedor `lib/ai/embeddings/chave.ts`, pelo indexador ou pela busca.
+Para ativar, requer-se slice posterior com credencial Chutes guardada no
+cofre canônico, vínculo explícito por tenant, resolução da família sem
+fallback silencioso, bloqueio de troca de família em bases ativas,
+integração em ambos os lados da busca, reindexação governada e provas em
+par. Somente depois verificar com uma chamada real **autorizada** ao Chutes
+se o chute efetivamente retorna vetor de 4.096 ou de 1.536 posições,
+sem expor credenciais e antes de liberar agentes. Não chamar VendaERP.
+
+**Fontes externas consultadas:**
+
+- https://chutes.ai/docs/models/chutes-qwen-qwen3-embedding-8b-tee
+- https://huggingface.co/Qwen/Qwen3-Embedding-8B
