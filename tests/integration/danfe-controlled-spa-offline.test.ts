@@ -150,13 +150,13 @@ describe.runIf(process.env.ELUS_DANFE_CONTROLLED_SPA_OFFLINE === "1")(
           fixture.mode = mode;
           fixture.hits = [];
           const recursoEsperado =
-            mode === "cross-origin"
-              ? "https://api.invalid/data"
-              : "https://fiscal.invalid/data";
+            mode === "cross-origin" ? "https://api.invalid/data" : "https://fiscal.invalid/data";
           const pdf = await renderizarUrlParaPdfControlado("https://fiscal.invalid/danfe", {
             nome: "fixture-spa-async-print-sem-validacao-fiscal",
             permiteUrl: (url) => url === "https://fiscal.invalid/danfe",
             impressaoDireta: true,
+            // A DANFE direta deve provar a chave no PDF realmente impresso.
+            chaveFiscalEsperada: CHAVE,
             aguardarRecursoDeMontagem: (url, metodo) =>
               url === recursoEsperado && metodo === "POST",
             recursosBrowser: {
@@ -180,6 +180,31 @@ describe.runIf(process.env.ELUS_DANFE_CONTROLLED_SPA_OFFLINE === "1")(
         35_000,
       );
     }
+
+    it("impressão direta recusa NFe com chave fiscal divergente", async () => {
+      fixture.mode = "wrong-key";
+      fixture.hits = [];
+      await expect(
+        renderizarUrlParaPdfControlado("https://fiscal.invalid/danfe", {
+          nome: "fixture-danfe-direta-chave-divergente",
+          permiteUrl: (url) => url === "https://fiscal.invalid/danfe",
+          impressaoDireta: true,
+          chaveFiscalEsperada: CHAVE,
+          aguardarRecursoDeMontagem: (url, metodo) =>
+            url === "https://fiscal.invalid/data" && metodo === "POST",
+          recursosBrowser: {
+            hostsAutorizados: [],
+            permiteRecurso: (url, metodo) =>
+              url === "https://fiscal.invalid/data" && metodo === "POST",
+          },
+        }),
+      ).rejects.toMatchObject({
+        codigo: "render_falhou",
+        etapa: "pdf_validacao",
+        evidenciaValidacaoPdf: "chave_divergente",
+      });
+      expect(fixture.hits).toContain("POST /data");
+    }, 35_000);
 
     it("não entrega PDF com outra identidade fiscal", async () => {
       fixture.mode = "wrong-key";
