@@ -384,7 +384,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
               () => false,
             )
         : null;
-    etapa = "chromium_navegacao";
+    etapa = "chromium_bootstrap";
     // O bootstrap 200 de recursosBrowser executa location.replace() para
     // iniciar UMA SEGUNDA navegacao interceptavel. Esperar DOMContentLoaded na
     // primeira goto pode observar a pagina local ou abortar durante a troca.
@@ -398,9 +398,10 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     });
 
     if (!redirect.houveRedirecionamento() || !resposta?.ok()) {
-      throw new ErroRenderizacaoDocumento("render_falhou", "chromium_navegacao");
+      throw new ErroRenderizacaoDocumento("render_falhou", "chromium_bootstrap");
     }
     if (bootstrapControlado) {
+      etapa = "chromium_destino_fiscal";
       await page.waitForURL(url, {
         waitUntil: "domcontentloaded",
         timeout: restante(),
@@ -414,7 +415,7 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
 
     if (politica.impressaoDireta) {
       // Somente aguarda o evento load, sem inspecionar conteúdo.
-      etapa = "chromium_navegacao";
+      etapa = "chromium_carga_pagina";
       await executarDentroDoPrazo(
         () => page.waitForLoadState("load", { timeout: restante() }),
         restante(),
@@ -422,17 +423,21 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
       // A SPA busca os dados DEPOIS do evento load. Aguardar a resposta HTTP completa
       // do recurso público autorizado; não inspecionar seu conteúdo nem conferir NFe.
       if (respostaDeMontagem) {
+        etapa = "chromium_resposta_montagem";
         const respostaOk = await executarDentroDoPrazo(() => respostaDeMontagem, restante());
-        if (!respostaOk) throw new ErroRenderizacaoDocumento("render_falhou", "chromium_navegacao");
+        if (!respostaOk) throw new ErroRenderizacaoDocumento("render_falhou", etapa);
       }
       // Renderiza o visual de tela, evitando CSS print que oculta a SPA.
+      etapa = "chromium_preparo_impressao";
       await executarDentroDoPrazo(() => page.emulateMedia({ media: "screen" }), restante());
       // Aguarda a rede assentar (incluindo microtarefas de renderização da SPA)
       // em vez de imprimir assim que o HTML está carregado. Sem leitura de DOM fiscal.
+      etapa = "chromium_rede_estabilizacao";
       await executarDentroDoPrazo(
         () => page.waitForLoadState("networkidle", { timeout: restante() }),
         restante(),
       );
+      etapa = "chromium_preparo_impressao";
       await executarDentroDoPrazo(
         () =>
           page.evaluate(
