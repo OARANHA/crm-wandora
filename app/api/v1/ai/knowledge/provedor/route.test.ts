@@ -34,7 +34,8 @@ vi.mock("@/lib/ai/embeddings/chave", () => ({
   familiaDaBase: vi.fn(),
   FamiliaDaBaseIlegivelError: class FamiliaDaBaseIlegivelError extends Error {},
   // Cópia da função pura: o módulo real puxa env e banco no import.
-  provedorDaBase: (c: { provedor: string }) => (c.provedor === "google" ? "google" : "openai"),
+  provedorDaBase: (c: { provedor: string }) =>
+    c.provedor === "chutes" ? "chutes" : c.provedor === "google" ? "google" : "openai",
 }));
 
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
@@ -58,11 +59,11 @@ async function chamar(corpo: unknown): Promise<Response> {
 }
 
 /** Qual família tem chave: o resolvedor restrito a ela responde, ou não. */
-function chavesDisponiveis(...familias: Array<"openai" | "google">) {
+function chavesDisponiveis(...familias: Array<"openai" | "google" | "chutes">) {
   vi.mocked(resolverChaveDeEmbedding).mockImplementation((async (
     _org: string,
     _ponto: string,
-    opcoes?: { familia?: "openai" | "google" | null },
+    opcoes?: { familia?: "openai" | "google" | "chutes" | null },
   ) => {
     const f = opcoes?.familia;
     if (f) return familias.includes(f) ? { provedor: f } : null;
@@ -167,6 +168,29 @@ describe("PUT /api/v1/ai/knowledge/provedor", () => {
     );
   });
 
+  it("Chutes exige chave validada antes de trocar e enfileira reindexação governada", async () => {
+    chavesDisponiveis("openai", "google", "chutes");
+    const r = await chamar({ provedor: "chutes" });
+    expect(r.status).toBe(200);
+    expect(updates[0]?.valores).toMatchObject({
+      settings: { base_de_conhecimento: { familia: "chutes" } },
+    });
+    expect(enfileirarTodosOsMateriais).toHaveBeenCalledTimes(1);
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORG_ID,
+        metadata: expect.objectContaining({ para: "chutes" }),
+      }),
+    );
+  });
+
+  it("Chutes sem chave: 422 e sem mutação", async () => {
+    chavesDisponiveis("openai", "google");
+    expect((await chamar({ provedor: "chutes" })).status).toBe(422);
+    expect(updates).toHaveLength(0);
+    expect(enfileirarTodosOsMateriais).not.toHaveBeenCalled();
+  });
+
   it("para o Google sem chave do Google validada: 422 e nada muda", async () => {
     chavesDisponiveis("openai");
     const r = await chamar({ provedor: "google" });
@@ -238,7 +262,9 @@ describe("PUT /api/v1/ai/knowledge/provedor", () => {
   });
 
   it("a família não pôde ser lida: 503, sem gravar, sem refazer a base", async () => {
-    vi.mocked(familiaDaBase).mockRejectedValue(new FamiliaDaBaseIlegivelError(ORG_ID, "banco fora"));
+    vi.mocked(familiaDaBase).mockRejectedValue(
+      new FamiliaDaBaseIlegivelError(ORG_ID, "banco fora"),
+    );
 
     const res = await chamar({ provedor: "google" });
 

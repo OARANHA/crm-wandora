@@ -186,3 +186,34 @@ sem expor credenciais e antes de liberar agentes. Não chamar VendaERP.
 
 - https://chutes.ai/docs/models/chutes-qwen-qwen3-embedding-8b-tee
 - https://huggingface.co/Qwen/Qwen3-Embedding-8B
+
+## 8. Integração proposta de embeddings Chutes — branch funcional
+
+**Estado:** implementação na branch feature, ainda sem CI/merge/deploy ou uso por tenant.
+Não presume que o endpoint TEE aceite dimensão no payload: o adaptador
+usa corpo documentado, recebe 4096/1536 e aplica projeção MRL local com
+normalização L2. A prova real autenticada continua pendente.
+
+- A Chutes entra na lista especializada de provedores **só de embedding**;
+  não fica disponível como modelo de conversa, nem como agente/LLM.
+- A chave usa a rota e o cofre AES-GCM existentes de credenciais por tenant.
+  A validação testa o próprio endpoint de embeddings usando um texto sintético;
+  sem credencial válida, o sistema falha fechado e não inventa catálogo.
+- A família chutes só é adotada quando escolhida explicitamente no painel
+  ou quando uma versão ativa já usa o identificador vetorial Qwen correto.
+  Criar credencial Chutes não troca automaticamente OpenAI ou Google.
+- A rota administrativa de troca de família usa as salvaguardas existentes:
+  organização obtida da sessão, validação de credencial, merge de settings,
+  auditoria e fila canônica de reindexação; não escreve diretamente em chunks.
+- O resolvedor, o worker e a consulta reutilizam embedText; o mesmo
+  identificador chutes/Qwen3-Embedding-8B-TEE:mrl1536-l2-v1 vale nos dois
+  sentidos, mas a consulta recebe instrução e os documentos não.
+- A seleção visual deve permitir trocas explícitas, inclusive partindo de
+  uma base ainda sem família, e avisar sobre a reindexação. Nunca esconder
+  uma credencial ausente atrás de um resultado vazio da busca.
+
+**Gate de aceite:** suíte offline, CI app+worker GREEN, merge, imagens por SHA,
+deploy seguro, validação de contrato Chutes com chave inserida pelo operador
+no ELUS e reindexação governada das 16 FAQs. Os catálogos PDF e o cadastro
+estruturado das cores continuam gates separados; o deploy deste código por
+si só **não prova** atendimento comercial.

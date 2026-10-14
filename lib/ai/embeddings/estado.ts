@@ -33,9 +33,11 @@ export interface EstadoDaChave {
   familia_sem_chave: ProvedorDaBase | null;
   /** Para onde dá para trocar AGORA (há chave utilizável do outro lado); `null` = nenhum. */
   pode_trocar_para: ProvedorDaBase | null;
+  /** Famílias alternativas com credencial validada. Não oferecer se a identidade da base é ilegível. */
+  opcoes_de_troca: ProvedorDaBase[];
   credenciais_embedding: Array<{
     id: string;
-    provider: "openai" | "openrouter" | "google";
+    provider: "openai" | "openrouter" | "google" | "chutes";
     label: string;
     api_key_last4: string | null;
     validated_at: string | null;
@@ -67,33 +69,38 @@ export async function montarEstadoDaChave(
       .from("ai_provider_credentials_safe")
       .select("id, provider, label, api_key_last4, validated_at, validation_error, is_active")
       .eq("organization_id", organizationId)
-      .in("provider", ["openai", "openrouter", "google"])
+      .in("provider", ["openai", "openrouter", "google", "chutes"])
       .order("created_at", { ascending: true }),
   ]);
   const credenciais = (data ?? []) as EstadoDaChave["credenciais_embedding"];
   const provedor = familiaIlegivel ? null : (familia ?? (chave ? provedorDaBase(chave) : null));
 
   // A troca só é oferecida quando a OUTRA família tem chave utilizável agora.
-  const outra: ProvedorDaBase | null =
-    provedor === "openai" ? "google" : provedor === "google" ? "openai" : null;
-  const podeTrocarPara =
-    outra &&
-    (await resolverChaveDeEmbedding(organizationId, "embedding_indexar", { familia: outra }))
-      ? outra
-      : null;
+  const opcoesDeTroca: ProvedorDaBase[] = [];
+  if (!familiaIlegivel) {
+    for (const candidata of ["openai", "google", "chutes"] as const) {
+      if (
+        candidata !== provedor &&
+        (await resolverChaveDeEmbedding(organizationId, "embedding_indexar", {
+          familia: candidata,
+        }))
+      ) {
+        opcoesDeTroca.push(candidata);
+      }
+    }
+  }
+  const podeTrocarPara = opcoesDeTroca[0] ?? null;
 
   return {
     pode_indexar: chave !== null,
     origem: chave?.origem ?? null,
     explicacao: chave ? EXPLICACAO_DA_ORIGEM[chave.origem] : null,
     chave_em_uso: chave?.rotulo ?? null,
-    avisos: [
-      ...(chave?.avisos ?? []),
-      ...(familiaIlegivel ? [AVISO_DA_FAMILIA_ILEGIVEL] : []),
-    ],
+    avisos: [...(chave?.avisos ?? []), ...(familiaIlegivel ? [AVISO_DA_FAMILIA_ILEGIVEL] : [])],
     provedor,
     familia_sem_chave: familia !== null && chave === null ? familia : null,
     pode_trocar_para: podeTrocarPara,
+    opcoes_de_troca: opcoesDeTroca,
     credenciais_embedding: credenciais,
   };
 }

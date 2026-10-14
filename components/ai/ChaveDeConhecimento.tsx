@@ -51,9 +51,13 @@ import type { EstadoDaChave } from "@/lib/ai/embeddings/estado";
 
 export type { EstadoDaChave };
 
-type ProvedorDaChave = "openai" | "openrouter" | "google";
+type ProvedorDaChave = "openai" | "openrouter" | "google" | "chutes";
 
-const NOME_DO_PROVEDOR: Record<ProvedorDaBase, string> = { openai: "OpenAI", google: "Google" };
+const NOME_DO_PROVEDOR: Record<ProvedorDaBase, string> = {
+  openai: "OpenAI",
+  google: "Google",
+  chutes: "Chutes Qwen3",
+};
 
 const ONDE_PEGAR: Record<ProvedorDaChave, { url: string; texto: string; placeholder: string }> = {
   openai: {
@@ -61,7 +65,16 @@ const ONDE_PEGAR: Record<ProvedorDaChave, { url: string; texto: string; placehol
     texto: "platform.openai.com/api-keys",
     placeholder: "sk-…",
   },
-  openrouter: { url: "https://openrouter.ai/keys", texto: "openrouter.ai/keys", placeholder: "sk-or-…" },
+  openrouter: {
+    url: "https://openrouter.ai/keys",
+    texto: "openrouter.ai/keys",
+    placeholder: "sk-or-…",
+  },
+  chutes: {
+    url: "https://chutes.ai/app/api-keys",
+    texto: "chutes.ai",
+    placeholder: "Chave da Chutes",
+  },
   google: {
     url: "https://aistudio.google.com/apikey",
     texto: "aistudio.google.com/apikey",
@@ -85,11 +98,13 @@ export function ChaveDeConhecimento({ estado, onChaveCadastrada }: Props) {
   const [chave, setChave] = useState("");
   const [enviando, setEnviando] = useState(false);
   const nomeDaChave =
-    provedor === "openrouter"
-      ? t("Chave da OpenRouter")
-      : provedor === "google"
-        ? t("Chave do Google")
-        : t("Chave da OpenAI");
+    provedor === "chutes"
+      ? t("Chave da Chutes")
+      : provedor === "openrouter"
+        ? t("Chave da OpenRouter")
+        : provedor === "google"
+          ? t("Chave do Google")
+          : t("Chave da OpenAI");
 
   async function cadastrar() {
     if (chave.trim().length < 8) {
@@ -150,13 +165,13 @@ export function ChaveDeConhecimento({ estado, onChaveCadastrada }: Props) {
               {t("Usando a chave")}{" "}
               <span className="font-medium text-foreground">{estado.chave_em_uso}</span>.
             </>
-          ) : (
-            // `explicacao` e `avisos` vêm do servidor, de catálogos fechados
-            // (`EXPLICACAO_DA_ORIGEM` em `lib/ai/embeddings/chave.ts`). Passar
-            // por um route handler não os tira do alcance do dicionário: a
-            // correspondência é por igualdade de string, venha de onde vier.
-            estado.explicacao ? t(estado.explicacao) : null
-          )}
+          ) : // `explicacao` e `avisos` vêm do servidor, de catálogos fechados
+          // (`EXPLICACAO_DA_ORIGEM` em `lib/ai/embeddings/chave.ts`). Passar
+          // por um route handler não os tira do alcance do dicionário: a
+          // correspondência é por igualdade de string, venha de onde vier.
+          estado.explicacao ? (
+            t(estado.explicacao)
+          ) : null}
         </span>
         {estado.avisos.map((a) => (
           <span key={a} className="w-full text-warning-fg">
@@ -166,7 +181,7 @@ export function ChaveDeConhecimento({ estado, onChaveCadastrada }: Props) {
         {estado.provedor ? (
           <TrocaDeProvedor
             atual={estado.provedor}
-            destino={estado.pode_trocar_para}
+            destinos={estado.opcoes_de_troca ?? []}
             onTrocado={onChaveCadastrada}
           />
         ) : null}
@@ -183,11 +198,13 @@ export function ChaveDeConhecimento({ estado, onChaveCadastrada }: Props) {
         <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden />
         <div className="space-y-1">
           <h3 className="text-sm font-medium">
-            {semChave === "google"
-              ? t("A base é preparada pelo Google, e a chave do Google não está mais utilizável")
-              : semChave === "openai"
-                ? t("A base é preparada pela OpenAI, e não há mais chave da OpenAI utilizável")
-                : t("Falta uma chave de embedding para o agente aprender o seu material")}
+            {semChave === "chutes"
+              ? t("A base é preparada pela Chutes Qwen3, e a chave não está mais utilizável")
+              : semChave === "google"
+                ? t("A base é preparada pelo Google, e a chave do Google não está mais utilizável")
+                : semChave === "openai"
+                  ? t("A base é preparada pela OpenAI, e não há mais chave da OpenAI utilizável")
+                  : t("Falta uma chave de embedding para o agente aprender o seu material")}
           </h3>
           <p className="text-xs text-text-muted">
             {semChave
@@ -198,15 +215,15 @@ export function ChaveDeConhecimento({ estado, onChaveCadastrada }: Props) {
                   "O agente não consegue consultar o material até isso ser resolvido. Chaves de outro provedor não são usadas sozinhas: o material já preparado só é encontrado com o mesmo provedor. Cadastre a chave de novo ou troque o provedor, o que refaz a base.",
                 )
               : t(
-                  "O material é preparado pela OpenAI (text-embedding-3-small, também pela OpenRouter) ou pelo Google (gemini-embedding-001). Sem uma dessas chaves, você pode cadastrar o documento, mas ele fica esperando para ser preparado.",
+                  "O material é preparado pela OpenAI, pelo Google ou pela Chutes Qwen3 quando essa família é escolhida explicitamente. Sem chave válida o documento aguarda preparação.",
                 )}
           </p>
         </div>
       </div>
-      {semChave ? (
+      {semChave || (estado.opcoes_de_troca ?? []).length > 0 ? (
         <TrocaDeProvedor
           atual={semChave}
-          destino={estado.pode_trocar_para}
+          destinos={estado.opcoes_de_troca ?? []}
           onTrocado={onChaveCadastrada}
         />
       ) : null}
@@ -250,6 +267,18 @@ export function ChaveDeConhecimento({ estado, onChaveCadastrada }: Props) {
                   disabled={enviando}
                 />
                 Google
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="embedding-provider"
+                  value="chutes"
+                  data-testid="conhecimento-provedor-chutes"
+                  checked={provedor === "chutes"}
+                  onChange={() => setProvedor("chutes")}
+                  disabled={enviando}
+                />
+                Chutes Qwen3
               </label>
             </div>
             <p className="text-xs text-text-muted">
@@ -300,7 +329,12 @@ export function ChaveDeConhecimento({ estado, onChaveCadastrada }: Props) {
             >
               {enviando ? t("Salvando…") : t("Salvar chave")}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setAbrindo(false)} disabled={enviando}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAbrindo(false)}
+              disabled={enviando}
+            >
               {t("Cancelar")}
             </Button>
           </div>
@@ -339,17 +373,17 @@ export function ChaveDeConhecimento({ estado, onChaveCadastrada }: Props) {
  */
 function TrocaDeProvedor({
   atual,
-  destino,
+  destinos,
   onTrocado,
 }: {
-  atual: ProvedorDaBase;
-  destino: ProvedorDaBase | null;
+  atual: ProvedorDaBase | null;
+  destinos: ProvedorDaBase[];
   onTrocado: () => void;
 }) {
   const t = useT();
   const [aberto, setAberto] = useState(false);
   const [trocando, setTrocando] = useState(false);
-
+  const [destino, setDestino] = useState<ProvedorDaBase | null>(null);
   async function trocar() {
     if (!destino) return;
     setTrocando(true);
@@ -359,17 +393,17 @@ function TrocaDeProvedor({
         { provedor: destino },
       );
       const fila = r.data.fila;
-      if (fila && fila.emitidos < fila.total) {
+      if (fila && fila.emitidos < fila.total)
         toast.warning(
-          t("Provedor trocado, mas parte do material não entrou na fila. Use “Preparar tudo de novo”."),
+          t(
+            "Provedor trocado, mas parte do material não entrou na fila. Use “Preparar tudo de novo”.",
+          ),
         );
-      } else if (!fila) {
+      else if (!fila)
         toast.warning(
           t("Provedor trocado, mas a base não começou a ser refeita. Use “Preparar tudo de novo”."),
         );
-      } else {
-        toast.success(t("Provedor trocado. A base está sendo refeita."));
-      }
+      else toast.success(t("Provedor trocado. A base está sendo refeita."));
       setAberto(false);
       onTrocado();
     } catch (err) {
@@ -378,42 +412,36 @@ function TrocaDeProvedor({
       setTrocando(false);
     }
   }
-
   return (
     <span data-testid="conhecimento-provedor" className="flex w-full flex-wrap items-center gap-2">
       <span>
         {t("Quem prepara a base:")}{" "}
-        <span className="font-medium text-foreground">{NOME_DO_PROVEDOR[atual]}</span>.
+        <span className="font-medium text-foreground">
+          {atual ? NOME_DO_PROVEDOR[atual] : t("nenhum provedor escolhido")}
+        </span>
+        .
       </span>
-      {destino ? (
+      {destinos.map((c) => (
         <Button
+          key={c}
           size="sm"
           variant="outline"
           className="h-7 text-xs"
-          onClick={() => setAberto(true)}
+          onClick={() => {
+            setDestino(c);
+            setAberto(true);
+          }}
           data-testid="conhecimento-trocar-provedor"
         >
-          {destino === "google" ? t("Trocar para o Google") : t("Trocar para a OpenAI")}
+          {t("Trocar para")} {NOME_DO_PROVEDOR[c]}
         </Button>
-      ) : atual === "openai" ? (
-        <span>
-          {t("Para usar o Google, cadastre a chave dele em")}{" "}
-          <Link
-            href="/app/ai/credentials"
-            className="font-medium text-foreground underline underline-offset-4"
-          >
-            {t("IA › Credenciais")}
-          </Link>
-          .
-        </span>
-      ) : null}
+      ))}
       <AlertDialog open={aberto} onOpenChange={(v) => !trocando && setAberto(v)}>
         <AlertDialogContent data-testid="conhecimento-trocar-provedor-dialogo">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {destino === "google"
-                ? t("Trocar para o Google refaz a base inteira")
-                : t("Trocar para a OpenAI refaz a base inteira")}
+              {t("Trocar para")} {destino ? NOME_DO_PROVEDOR[destino] : ""}{" "}
+              {t("refaz a base inteira")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {t(
