@@ -23,7 +23,10 @@ vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn() } }));
 // resolvedor, `embedText` e `buscarConhecimento` rodam de verdade no cenário
 // da família gravada, lá embaixo.
 vi.mock("ai", () => ({
-  embed: async () => ({ embedding: Array.from({ length: 1536 }, () => 0.01), usage: { tokens: 1 } }),
+  embed: async () => ({
+    embedding: Array.from({ length: 1536 }, () => 0.01),
+    usage: { tokens: 1 },
+  }),
 }));
 vi.mock("@/lib/crypto/aes_gcm", () => ({
   byteaToBuffer: (v: unknown) => v,
@@ -53,7 +56,11 @@ vi.mock("@/lib/supabase/admin", () => ({
         order: () => query,
         limit: () => query,
         then: (ok: (v: { data: unknown; error: unknown }) => void) =>
-          ok(state.falhas.has(table) ? { data: null, error: { message: "falha" } } : { data: achadas(), error: null }),
+          ok(
+            state.falhas.has(table)
+              ? { data: null, error: { message: "falha" } }
+              : { data: achadas(), error: null },
+          ),
         maybeSingle: async () =>
           state.falhas.has(table)
             ? { data: null, error: { message: "connection reset" } }
@@ -124,7 +131,11 @@ describe("resolverChaveDeEmbedding", () => {
   it("preserva a precedência da credencial OpenAI existente", async () => {
     state.credentials = [
       credential({}),
-      credential({ id: "cred-openai", provider: "openai", api_key_encrypted: "chave-ficticia-openai" }),
+      credential({
+        id: "cred-openai",
+        provider: "openai",
+        api_key_encrypted: "chave-ficticia-openai",
+      }),
     ];
 
     expect(await resolverChaveDeEmbedding("org-1")).toMatchObject({
@@ -222,7 +233,11 @@ describe("resolverChaveDeEmbedding", () => {
     ];
     state.env.OPENAI_API_KEY = "chave-ficticia-env-openai";
     state.credentials = [
-      credential({ id: "cred-google", provider: "google", api_key_encrypted: "chave-ficticia-google" }),
+      credential({
+        id: "cred-google",
+        provider: "google",
+        api_key_encrypted: "chave-ficticia-google",
+      }),
     ];
 
     const chave = await resolverChaveDeEmbedding("org-1", "embedding_consultar");
@@ -243,7 +258,11 @@ describe("resolverChaveDeEmbedding", () => {
 
   it("credencial do Google sem escolha só vale quando não há NENHUMA via OpenAI", async () => {
     state.credentials = [
-      credential({ id: "cred-google", provider: "google", api_key_encrypted: "chave-ficticia-google" }),
+      credential({
+        id: "cred-google",
+        provider: "google",
+        api_key_encrypted: "chave-ficticia-google",
+      }),
     ];
     expect(await resolverChaveDeEmbedding("org-1")).toMatchObject({
       provedor: "google",
@@ -269,7 +288,11 @@ describe("resolverChaveDeEmbedding", () => {
  */
 describe("a família da base não muda porque uma credencial apareceu ou sumiu", () => {
   const google = () =>
-    credential({ id: "cred-google", provider: "google", api_key_encrypted: "chave-ficticia-google" });
+    credential({
+      id: "cred-google",
+      provider: "google",
+      api_key_encrypted: "chave-ficticia-google",
+    });
   const openai = () =>
     credential({
       id: "cred-openai",
@@ -338,19 +361,26 @@ describe("a família da base não muda porque uma credencial apareceu ou sumiu",
   it("a escolha gravada vence o índice e a escada", async () => {
     state.credentials = [google(), openai()];
     indexou(modeloDeEmbedding("openai"));
-    state.organizations = [{ id: "org-1", settings: { base_de_conhecimento: { familia: "google" } } }];
+    state.organizations = [
+      { id: "org-1", settings: { base_de_conhecimento: { familia: "google" } } },
+    ];
 
     for (const ponto of ["embedding_indexar", "embedding_consultar"] as const) {
       expect(await resolverChaveDeEmbedding("org-1", ponto)).toMatchObject({ provedor: "google" });
     }
-    const { model } = await embedText("oi", { organizationId: "org-1", ponto: "embedding_consultar" });
+    const { model } = await embedText("oi", {
+      organizationId: "org-1",
+      ponto: "embedding_consultar",
+    });
     expect(model).toBe("google/gemini-embedding-001");
   });
 
   it("a chave da família sumiu: não há chave — nunca a outra família em silêncio", async () => {
     state.credentials = [openai()];
     state.env.OPENAI_API_KEY = "chave-ficticia-env-openai";
-    state.organizations = [{ id: "org-1", settings: { base_de_conhecimento: { familia: "google" } } }];
+    state.organizations = [
+      { id: "org-1", settings: { base_de_conhecimento: { familia: "google" } } },
+    ];
 
     expect(await resolverChaveDeEmbedding("org-1", "embedding_consultar")).toBeNull();
     // A mesma organização, perguntando pela família OpenAI, tem chave: é o que
@@ -394,7 +424,9 @@ describe("a família da base não muda porque uma credencial apareceu ou sumiu",
   it("a leitura de `organizations` falhou: nenhuma chave sai, nem a da outra família", async () => {
     // Escolheu o Google e a base ainda não foi indexada: só a escolha diz a família.
     state.credentials = [google(), openai()];
-    state.organizations = [{ id: "org-1", settings: { base_de_conhecimento: { familia: "google" } } }];
+    state.organizations = [
+      { id: "org-1", settings: { base_de_conhecimento: { familia: "google" } } },
+    ];
     state.falhas.add("organizations");
 
     for (const ponto of ["embedding_indexar", "embedding_consultar"] as const) {
@@ -420,6 +452,42 @@ describe("a família da base não muda porque uma credencial apareceu ou sumiu",
     expect(await resolverChaveDeEmbedding("org-1", "embedding_indexar")).toMatchObject({
       provedor: "google",
     });
+  });
+
+  it("índice Qwen3 ainda não habilitado falha fechado, nunca herda OpenAI", async () => {
+    state.credentials = [openai(), google()];
+    indexou("chutes/Qwen3-Embedding-8B-TEE:mrl1536-l2-v1");
+    for (const ponto of ["embedding_indexar", "embedding_consultar"] as const) {
+      await expect(resolverChaveDeEmbedding("org-1", ponto)).rejects.toBeInstanceOf(
+        FamiliaDaBaseIlegivelError,
+      );
+    }
+    await expect(
+      embedText("qual tinta usar?", { organizationId: "org-1", ponto: "embedding_consultar" }),
+    ).rejects.toBeInstanceOf(FamiliaDaBaseIlegivelError);
+  });
+
+  it("família declarada Qwen3 sem suporte ainda falha fechado, mesmo sem índice", async () => {
+    state.credentials = [openai(), google()];
+    state.organizations = [
+      { id: "org-1", settings: { base_de_conhecimento: { familia: "chutes" } } },
+    ];
+    await expect(resolverChaveDeEmbedding("org-1", "embedding_indexar")).rejects.toBeInstanceOf(
+      FamiliaDaBaseIlegivelError,
+    );
+  });
+
+  it("modelo estranho ou corrupção na família registrada não seleciona credencial por acaso", async () => {
+    state.credentials = [openai(), google()];
+    indexou("modelo/futuro-desconhecido");
+    await expect(resolverChaveDeEmbedding("org-1", "embedding_consultar")).rejects.toBeInstanceOf(
+      FamiliaDaBaseIlegivelError,
+    );
+    state.versions = [];
+    state.organizations = [{ id: "org-1", settings: { base_de_conhecimento: { familia: 17 } } }];
+    await expect(resolverChaveDeEmbedding("org-1", "embedding_indexar")).rejects.toBeInstanceOf(
+      FamiliaDaBaseIlegivelError,
+    );
   });
 
   it("a resposta informativa do cadastro não quebra quando a família não pôde ser lida", async () => {
