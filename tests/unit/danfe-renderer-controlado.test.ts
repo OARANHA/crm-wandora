@@ -168,7 +168,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
         impressaoDireta: true,
         aguardarRecursoDeMontagem: () => true,
       }),
-    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_navegacao" });
+    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_resposta_montagem" });
     expect(env.page.pdf).not.toHaveBeenCalled();
     expect(env.browser.close).toHaveBeenCalledOnce();
     expect(env.fechar).toHaveBeenCalledOnce();
@@ -176,12 +176,14 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
 
   it("não imprime se a SPA não alcançar networkidle", async () => {
     const env = ambientePdf();
-    env.page.waitForLoadState.mockRejectedValueOnce(
-      Object.assign(new Error("rede ocupada"), { name: "TimeoutError" }),
-    );
+    env.page.waitForLoadState.mockImplementation(async (estado: string) => {
+      if (estado === "networkidle") {
+        throw Object.assign(new Error("rede ocupada"), { name: "TimeoutError" });
+      }
+    });
     await expect(
       renderizarUrlParaPdfControlado(danfe, { ...policy, impressaoDireta: true }),
-    ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_navegacao" });
+    ).rejects.toMatchObject({ codigo: "timeout", etapa: "chromium_rede_estabilizacao" });
     expect(env.page.pdf).not.toHaveBeenCalled();
   });
 
@@ -190,10 +192,52 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
     env.page.waitForLoadState.mockRejectedValue(new Error("falha na carga"));
     await expect(
       renderizarUrlParaPdfControlado(danfe, { ...policy, impressaoDireta: true }),
-    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_navegacao" });
+    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_carga_pagina" });
     expect(env.page.pdf).not.toHaveBeenCalled();
     expect(env.browser.close).toHaveBeenCalledOnce();
     expect(env.fechar).toHaveBeenCalledOnce();
+  });
+
+  it("audita bootstrap recusado sem publicar erro/URL ao modelo", async () => {
+    const env = ambientePdf();
+    env.page.goto.mockResolvedValueOnce({ ok: () => false });
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, {
+        ...policy,
+        impressaoDireta: true,
+        recursosBrowser: { hostsAutorizados: [], permiteRecurso: () => false },
+      }),
+    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_bootstrap" });
+    expect(env.page.pdf).not.toHaveBeenCalled();
+    expect(env.browser.close).toHaveBeenCalledOnce();
+  });
+
+  it("distingue falha da resposta pública de montagem sem emitir PDF", async () => {
+    const env = ambientePdf();
+    env.page.waitForResponse.mockRejectedValueOnce(new Error("resposta fiscal não chegou"));
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, {
+        ...policy,
+        impressaoDireta: true,
+        aguardarRecursoDeMontagem: () => true,
+      }),
+    ).rejects.toMatchObject({
+      codigo: "render_falhou",
+      etapa: "chromium_resposta_montagem",
+    });
+    expect(env.page.pdf).not.toHaveBeenCalled();
+  });
+
+  it("distingue falha no preparo de impressão depois do carregamento", async () => {
+    const env = ambientePdf();
+    env.page.evaluate.mockRejectedValueOnce(new Error("frame não executado"));
+    await expect(
+      renderizarUrlParaPdfControlado(danfe, { ...policy, impressaoDireta: true }),
+    ).rejects.toMatchObject({
+      codigo: "render_falhou",
+      etapa: "chromium_preparo_impressao",
+    });
+    expect(env.page.pdf).not.toHaveBeenCalled();
   });
 
   it("aguarda a URL fiscal exata depois do bootstrap HTML interceptado", async () => {
@@ -233,7 +277,7 @@ describe("renderer controlado DANFE — fronteiras seguras", () => {
         impressaoDireta: true,
         recursosBrowser: { hostsAutorizados: [], permiteRecurso: () => false },
       }),
-    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_navegacao" });
+    ).rejects.toMatchObject({ codigo: "render_falhou", etapa: "chromium_destino_fiscal" });
 
     expect(env.page.pdf).not.toHaveBeenCalled();
     expect(env.browser.close).toHaveBeenCalledOnce();
