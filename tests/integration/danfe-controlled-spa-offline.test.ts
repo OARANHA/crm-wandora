@@ -30,7 +30,7 @@ vi.mock("@/lib/documentos/recurso-browser-pdf-pinado", () => ({
     const recurso = recursoSintetico(url.pathname, fixture.mode);
     if (!recurso) throw new Error("fixture_recurso_recusado");
     return {
-      status: 200,
+      status: recurso.status ?? 200,
       headers: {
         "content-type": recurso.tipo,
         "access-control-allow-origin": "https://fiscal.invalid",
@@ -54,7 +54,10 @@ const TEXTO =
   CHAVE +
   " EMITENTE SINTETICO DESTINATARIO SINTETICO PRODUTO FISCAL SINTETICO QUANTIDADE 1 TOTAL R$ 123,45";
 
-function recursoSintetico(path: string, mode: string): { tipo: string; corpo: string } | null {
+function recursoSintetico(
+  path: string,
+  mode: string,
+): { tipo: string; corpo: string; status?: number } | null {
   if (path === "/danfe")
     return {
       tipo: "text/html; charset=utf-8",
@@ -79,12 +82,15 @@ function recursoSintetico(path: string, mode: string): { tipo: string; corpo: st
         "const res=await fetch(" +
         JSON.stringify(mode === "cross-origin" ? "https://api.invalid/data" : "/data") +
         ",{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});" +
-        "const data=await res.json();setTimeout(()=>document.querySelector('#nota').textContent=data.text,150);" +
+        "const data=await res.json();setTimeout(()=>document.querySelector('#nota').textContent=data.text," +
+        (mode === "dom-atrasado" ? "8000" : "150") +
+        ");" +
         "fetch('http://169.254.169.254/latest/meta-data/').catch(()=>{});",
     };
   if (path === "/data")
     return {
       tipo: "application/json",
+      status: mode === "api-503" ? 503 : 200,
       corpo: JSON.stringify({
         text: mode === "wrong-key" ? TEXTO.replace(CHAVE, "1".repeat(44)) : TEXTO,
       }),
@@ -180,6 +186,54 @@ describe.runIf(process.env.ELUS_DANFE_CONTROLLED_SPA_OFFLINE === "1")(
         35_000,
       );
     }
+
+    it("POST público HTTP 503 falha fechado na etapa de resposta, sem PDF", async () => {
+      fixture.mode = "api-503";
+      fixture.hits = [];
+      await expect(
+        renderizarUrlParaPdfControlado("https://fiscal.invalid/danfe", {
+          nome: "fixture-api-erro-sem-documento",
+          permiteUrl: (url) => url === "https://fiscal.invalid/danfe",
+          impressaoDireta: true,
+          chaveFiscalEsperada: CHAVE,
+          aguardarRecursoDeMontagem: (url, metodo) =>
+            url === "https://fiscal.invalid/data" && metodo === "POST",
+          recursosBrowser: {
+            hostsAutorizados: [],
+            permiteRecurso: (url, metodo) =>
+              url === "https://fiscal.invalid/data" && metodo === "POST",
+          },
+        }),
+      ).rejects.toMatchObject({
+        codigo: "render_falhou",
+        etapa: "chromium_resposta_montagem",
+      });
+      expect(fixture.hits).toContain("POST /data");
+    }, 35_000);
+
+    it("POST 200 com montagem fiscal atrasada nao libera PDF incompleto", async () => {
+      fixture.mode = "dom-atrasado";
+      fixture.hits = [];
+      await expect(
+        renderizarUrlParaPdfControlado("https://fiscal.invalid/danfe", {
+          nome: "fixture-dom-atrasado-sem-documento",
+          permiteUrl: (url) => url === "https://fiscal.invalid/danfe",
+          impressaoDireta: true,
+          chaveFiscalEsperada: CHAVE,
+          aguardarRecursoDeMontagem: (url, metodo) =>
+            url === "https://fiscal.invalid/data" && metodo === "POST",
+          recursosBrowser: {
+            hostsAutorizados: [],
+            permiteRecurso: (url, metodo) =>
+              url === "https://fiscal.invalid/data" && metodo === "POST",
+          },
+        }),
+      ).rejects.toMatchObject({
+        codigo: "render_falhou",
+        etapa: "pdf_validacao",
+      });
+      expect(fixture.hits).toContain("POST /data");
+    }, 35_000);
 
     it("impressão direta recusa NFe com chave fiscal divergente", async () => {
       fixture.mode = "wrong-key";
