@@ -69,8 +69,7 @@ export const PROVEDORES = [
   {
     id: "google",
     rotulo: "Google (Gemini)",
-    quandoUsar:
-      "Alternativa com contexto muito longo e custo baixo para tarefas de classificação.",
+    quandoUsar: "Alternativa com contexto muito longo e custo baixo para tarefas de classificação.",
     aceitaEndpointProprio: false,
     catalogoSincronizavel: false,
     ondePegarAChave: "https://aistudio.google.com/apikey",
@@ -185,8 +184,29 @@ export const IDS_DE_PROVEDOR_DE_DECISAO = PROVEDORES_DE_DECISAO.map(
   ...(typeof PROVEDORES_DE_DECISAO)[number]["id"][],
 ];
 
+/**
+ * Embedding-only: credencial cadastrável no cofre existente, mas NUNCA modelo
+ * de conversa. Separação idêntica à de provedores apenas de decisão.
+ */
+export const PROVEDORES_DE_EMBEDDING = [
+  {
+    id: "chutes",
+    rotulo: "Chutes — Qwen3 Embedding 8B (TEE)",
+    quandoUsar:
+      "Somente para pesquisar documentos e catálogos na base de conhecimento. Não conversa com clientes.",
+    aceitaEndpointProprio: false,
+    catalogoSincronizavel: false,
+    ondePegarAChave: "https://chutes.ai/app/api-keys",
+    prefixoDaChave: "chave Chutes",
+  },
+] as const satisfies readonly ProvedorSuportado[];
+
 /** Tudo o que tem chave cadastrável: a tela de Credenciais e a rota dela. */
-export const PROVEDORES_COM_CHAVE = [...PROVEDORES, ...PROVEDORES_DE_DECISAO] as const;
+export const PROVEDORES_COM_CHAVE = [
+  ...PROVEDORES,
+  ...PROVEDORES_DE_DECISAO,
+  ...PROVEDORES_DE_EMBEDDING,
+] as const;
 
 export type ProvedorComChave = (typeof PROVEDORES_COM_CHAVE)[number]["id"];
 

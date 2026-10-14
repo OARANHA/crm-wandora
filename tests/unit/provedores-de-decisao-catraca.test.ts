@@ -30,6 +30,7 @@ import {
   IDS_DE_PROVEDOR_DE_DECISAO,
   PROVEDORES,
   PROVEDORES_DE_DECISAO,
+  PROVEDORES_DE_EMBEDDING,
 } from "@/lib/ai/pontos/provedores";
 import { buildModel } from "@/lib/ai/runtime/agent";
 import { POST as reconciliarAgente } from "@/app/api/v1/ai/agents/[id]/reconcile/route";
@@ -47,7 +48,9 @@ vi.mock("@/lib/auth/require-role", () => ({
 // Agente não encontrado: o corpo que PASSA pela validação chega aqui e volta 404.
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => {
-    const chain: Record<string, unknown> = { maybeSingle: async () => ({ data: null, error: null }) };
+    const chain: Record<string, unknown> = {
+      maybeSingle: async () => ({ data: null, error: null }),
+    };
     for (const m of ["from", "select", "eq"]) chain[m] = () => chain;
     return chain;
   },
@@ -80,10 +83,14 @@ describe("o Jev está declarado como provedor de decisão (controle positivo)", 
     expect(ehProvedorDeDecisao("anthropic")).toBe(false);
   });
 
-  it("a união é exatamente as duas listas, sem sobreposição", () => {
+  it("a união inclui provedores de conversa, decisão e embeddings sem misturar naturezas", () => {
     const linguagem = PROVEDORES.map((p) => p.id as string);
+    const embedding = PROVEDORES_DE_EMBEDDING.map((p) => p.id as string);
     expect(DECISAO.filter((id) => linguagem.includes(id))).toEqual([]);
-    expect([...IDS_COM_CHAVE].sort()).toEqual([...linguagem, ...DECISAO].sort());
+    expect(embedding).toContain("chutes");
+    expect(linguagem).not.toContain("chutes");
+    expect([...IDS_DE_PROVEDOR] as string[]).not.toContain("chutes");
+    expect([...IDS_COM_CHAVE].sort()).toEqual([...linguagem, ...DECISAO, ...embedding].sort());
   });
 });
 
@@ -184,7 +191,9 @@ describe("só as superfícies de CHAVE pedem a união", () => {
     ]) {
       expect(APELIDO.test(apelido), apelido).toBe(true);
     }
-    expect(APELIDO.test("const provedor = PROVEDORES_COM_CHAVE.find((p) => p.id === x);")).toBe(false);
+    expect(APELIDO.test("const provedor = PROVEDORES_COM_CHAVE.find((p) => p.id === x);")).toBe(
+      false,
+    );
     const apelidam = usam.filter(
       (c) => c !== "lib/ai/pontos/provedores.ts" && APELIDO.test(readFileSync(c, "utf8")),
     );

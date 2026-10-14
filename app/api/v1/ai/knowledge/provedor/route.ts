@@ -1,6 +1,6 @@
 import { requireSupportWrite } from "@/lib/impersonate/support";
 /**
- * PUT /api/v1/ai/knowledge/provedor — quem prepara a base: OpenAI ou Google.
+ * PUT /api/v1/ai/knowledge/provedor — quem prepara a base: OpenAI, Google ou Chutes.
  *
  * Contribuição de @vgamkt (#1130): a base de conhecimento exigia uma chave da
  * OpenAI, e quem só tinha a do Google ficava sem base.
@@ -49,7 +49,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-const corpoSchema = z.object({ provedor: z.enum(["openai", "google"]) }).strict();
+const corpoSchema = z.object({ provedor: z.enum(["openai", "google", "chutes"]) }).strict();
 
 export async function PUT(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
@@ -84,7 +84,9 @@ export async function PUT(req: NextRequest): Promise<Response> {
     // Sem saber de onde a base parte, a troca não decide nada nem grava nada.
     return fail(
       "upstream_unavailable",
-      t("Não consegui confirmar agora com que provedor a base é preparada. Tente de novo em instantes."),
+      t(
+        "Não consegui confirmar agora com que provedor a base é preparada. Tente de novo em instantes.",
+      ),
       503,
       { requestId },
     );
@@ -105,9 +107,11 @@ export async function PUT(req: NextRequest): Promise<Response> {
       "sem_chave_do_provedor",
       provedor === "google"
         ? t("Cadastre e valide uma chave do Google em IA › Credenciais antes de trocar.")
-        : t(
-            "Cadastre e valide uma chave da OpenAI ou OpenRouter em IA › Credenciais antes de trocar.",
-          ),
+        : provedor === "chutes"
+          ? t("Cadastre e valide uma chave Chutes Qwen3 em IA › Credenciais antes de trocar.")
+          : t(
+              "Cadastre e valide uma chave da OpenAI ou OpenRouter em IA › Credenciais antes de trocar.",
+            ),
       422,
       { requestId },
     );

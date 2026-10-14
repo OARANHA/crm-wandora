@@ -454,24 +454,76 @@ describe("a família da base não muda porque uma credencial apareceu ou sumiu",
     });
   });
 
-  it("índice Qwen3 ainda não habilitado falha fechado, nunca herda OpenAI", async () => {
+  it("índice Qwen3 sem Chutes nunca herda OpenAI ou Gemini", async () => {
     state.credentials = [openai(), google()];
     indexou("chutes/Qwen3-Embedding-8B-TEE:mrl1536-l2-v1");
     for (const ponto of ["embedding_indexar", "embedding_consultar"] as const) {
-      await expect(resolverChaveDeEmbedding("org-1", ponto)).rejects.toBeInstanceOf(
-        FamiliaDaBaseIlegivelError,
-      );
+      expect(await resolverChaveDeEmbedding("org-1", ponto)).toBeNull();
     }
     await expect(
       embedText("qual tinta usar?", { organizationId: "org-1", ponto: "embedding_consultar" }),
-    ).rejects.toBeInstanceOf(FamiliaDaBaseIlegivelError);
+    ).rejects.toMatchObject({ code: "embedding_sem_chave" });
   });
 
-  it("família declarada Qwen3 sem suporte ainda falha fechado, mesmo sem índice", async () => {
+  it("família Chutes explícita sem chave validada fica parada, sem fallback", async () => {
     state.credentials = [openai(), google()];
     state.organizations = [
       { id: "org-1", settings: { base_de_conhecimento: { familia: "chutes" } } },
     ];
+    expect(await resolverChaveDeEmbedding("org-1", "embedding_indexar")).toBeNull();
+  });
+
+  it("chave Chutes validada é isolada por tenant e usada nos dois pontos com modelo fixo", async () => {
+    const chutes = credential({
+      provider: "chutes",
+      id: "chutes-1",
+      api_key_encrypted: "chave-chutes-sintetica",
+    });
+    state.credentials = [
+      openai(),
+      google(),
+      chutes,
+      credential({ ...chutes, id: "chutes-outro", organization_id: "outra-org" }),
+    ];
+    state.organizations = [
+      { id: "org-1", settings: { base_de_conhecimento: { familia: "chutes" } } },
+    ];
+    for (const ponto of ["embedding_indexar", "embedding_consultar"] as const) {
+      const chave = await resolverChaveDeEmbedding("org-1", ponto);
+      expect(chave).toMatchObject({
+        provedor: "chutes",
+        apiKey: "chave-chutes-sintetica",
+        baseUrl: null,
+      });
+      expect(modeloDeEmbedding(chave!.provedor)).toBe(
+        "chutes/Qwen3-Embedding-8B-TEE:mrl1536-l2-v1",
+      );
+    }
+    state.organizations = [];
+    state.versions = [];
+    expect(await resolverChaveDeEmbedding("org-1")).toMatchObject({ provedor: "openai" });
+  });
+
+  it("binding Chutes com modelo ou destino divergentes falha fechado", async () => {
+    state.organizations = [
+      { id: "org-1", settings: { base_de_conhecimento: { familia: "chutes" } } },
+    ];
+    state.credentials = [credential({ id: "chutes-1", provider: "chutes" })];
+    state.bindings = [
+      {
+        organization_id: "org-1",
+        purpose: "embedding_indexar",
+        is_enabled: true,
+        credential_id: "chutes-1",
+        model_id: "openai/text-embedding-3-small",
+        base_url: null,
+      },
+    ];
+    await expect(resolverChaveDeEmbedding("org-1", "embedding_indexar")).rejects.toBeInstanceOf(
+      FamiliaDaBaseIlegivelError,
+    );
+    state.bindings[0]!.model_id = "chutes/Qwen3-Embedding-8B-TEE:mrl1536-l2-v1";
+    state.bindings[0]!.base_url = "https://example.org/v1";
     await expect(resolverChaveDeEmbedding("org-1", "embedding_indexar")).rejects.toBeInstanceOf(
       FamiliaDaBaseIlegivelError,
     );

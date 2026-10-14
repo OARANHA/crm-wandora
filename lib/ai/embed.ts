@@ -21,6 +21,10 @@ import {
   type PontoDeEmbedding,
 } from "@/lib/ai/embeddings/chave";
 import { gatewayHeaders, type ModelId } from "@/lib/ai/gateway";
+import {
+  CHUTES_QWEN3_VECTOR_MODEL,
+  solicitarEmbeddingQwen3,
+} from "@/lib/ai/embeddings/chutes-qwen3-tee";
 
 export interface EmbedOptions {
   organizationId: string;
@@ -57,17 +61,26 @@ export class SemChaveDeEmbeddingError extends Error {
   }
 }
 
-export async function embedText(
-  content: string,
-  opts: EmbedOptions,
-): Promise<EmbedResult> {
-  const chave =
-    opts.chave ?? (await resolverChaveDeEmbedding(opts.organizationId, opts.ponto));
+export async function embedText(content: string, opts: EmbedOptions): Promise<EmbedResult> {
+  const chave = opts.chave ?? (await resolverChaveDeEmbedding(opts.organizationId, opts.ponto));
   if (!chave) {
     throw new SemChaveDeEmbeddingError(opts.organizationId);
   }
 
   const modelId = String(opts.model ?? modeloDeEmbedding(chave.provedor));
+
+  if (chave.provedor === "chutes") {
+    // A única rota permitida do Qwen3 é o adapter fixo, nunca o gateway ou URL do binding.
+    if (chave.viaGateway || !chave.apiKey || modelId !== CHUTES_QWEN3_VECTOR_MODEL) {
+      throw new Error("embedding_chutes_contrato_ou_chave_invalida");
+    }
+    const result = await solicitarEmbeddingQwen3(
+      content,
+      opts.ponto === "embedding_consultar" ? "consulta" : "documento",
+      chave.apiKey,
+    );
+    return { embedding: result.embedding, promptTokens: 0, model: result.model };
+  }
 
   // COM gateway: a string `openai/text-embedding-3-small` é roteada por ele, que
   // lê `AI_GATEWAY_API_KEY` do process.env. Headers vão junto p/ observabilidade
@@ -85,18 +98,16 @@ export async function embedText(
           modelId.replace(/^google\//, ""),
         )
       : createOpenAI({
-        apiKey: chave.apiKey ?? "",
-        ...(chave.baseUrl ? { baseURL: chave.baseUrl } : {}),
-      }).textEmbeddingModel(
-        chave.provedor === "openrouter" ? modelId : modelId.replace(/^openai\//, ""),
-      );
+          apiKey: chave.apiKey ?? "",
+          ...(chave.baseUrl ? { baseURL: chave.baseUrl } : {}),
+        }).textEmbeddingModel(
+          chave.provedor === "openrouter" ? modelId : modelId.replace(/^openai\//, ""),
+        );
 
   const result = await embed({
     model: resolvido,
     value: content,
-    headers: chave.viaGateway
-      ? gatewayHeaders({ organizationId: opts.organizationId })
-      : undefined,
+    headers: chave.viaGateway ? gatewayHeaders({ organizationId: opts.organizationId }) : undefined,
     // O Gemini devolve 3072 dimensões por padrão; pedir 1536 é o que deixa a
     // coluna `vector(1536)` servir aos dois provedores sem migration. A busca é
     // por cosseno (`<=>`), então o vetor não normalizado dessa dimensão não

@@ -10,6 +10,11 @@
  */
 import { baseDaApiDoJev } from "@/lib/ai/decisao/cliente";
 import type { ProvedorComChave } from "@/lib/ai/pontos/provedores";
+import {
+  CHUTES_QWEN3_VECTOR_MODEL,
+  ErroEmbeddingQwen3,
+  solicitarEmbeddingQwen3,
+} from "@/lib/ai/embeddings/chutes-qwen3-tee";
 import { motivoDaRecusaDeDestino } from "@/lib/automation/destinos-internos-autorizados";
 import { env } from "@/lib/env";
 
@@ -29,7 +34,11 @@ const TIMEOUT_MS = 5000;
 /** Só do provedor personalizado — ver `validateCustomKey`. */
 const TIMEOUT_MS_CUSTOM = 10000;
 
-async function timedFetch(url: string, init: RequestInit, timeoutMs: number = TIMEOUT_MS): Promise<Response> {
+async function timedFetch(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = TIMEOUT_MS,
+): Promise<Response> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -332,13 +341,17 @@ export async function validateCustomKey(
   const recusa = await motivoDaRecusaDeDestino(base, "organizacao");
   if (recusa) return { ok: false, error: recusa };
   try {
-    const res = await timedFetch(`${base}/models`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      // Redirect não é seguido: um endpoint público que responde 3xx para a
-      // rede interna furaria a régua acima.
-      redirect: "manual",
-    }, TIMEOUT_MS_CUSTOM);
+    const res = await timedFetch(
+      `${base}/models`,
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+        // Redirect não é seguido: um endpoint público que responde 3xx para a
+        // rede interna furaria a régua acima.
+        redirect: "manual",
+      },
+      TIMEOUT_MS_CUSTOM,
+    );
     if (res.status >= 300 && res.status < 400) {
       return { ok: false, error: "unsafe_url:redirect_not_followed" };
     }
@@ -357,6 +370,19 @@ export async function validateCustomKey(
     return { ok: true, models };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.name : "network_error" };
+  }
+}
+
+/** Prova a credencial no endpoint usado pela indexação; envia só texto sintético. */
+export async function validateChutesEmbeddingKey(token: string): Promise<ValidationResult> {
+  try {
+    await solicitarEmbeddingQwen3("Teste de indexação de conhecimento", "documento", token);
+    return { ok: true, models: [CHUTES_QWEN3_VECTOR_MODEL] };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof ErroEmbeddingQwen3 ? err.codigo : "provider_unavailable",
+    };
   }
 }
 
@@ -394,6 +420,8 @@ export function validateProviderKey(
       return validateCustomKey(apiKey, baseUrl);
     case "typesafe":
       return validateTypeSafeKey(apiKey);
+    case "chutes":
+      return validateChutesEmbeddingKey(apiKey);
     default: {
       // Sem `never` aqui: o tipo é derivado das listas, e elas
       // crescem sem que este arquivo saiba. Provedor novo cadastrado antes de

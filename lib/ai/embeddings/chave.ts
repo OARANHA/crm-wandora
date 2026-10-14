@@ -92,6 +92,7 @@ import { OPENROUTER_BASE_URL } from "@/lib/ai/gateway";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { CHUTES_QWEN3_VECTOR_MODEL } from "@/lib/ai/embeddings/chutes-qwen3-tee";
 
 /** Os dois pontos de IA que consomem embedding (`lib/ai/pontos/registro.ts`). */
 export type PontoDeEmbedding = "embedding_indexar" | "embedding_consultar";
@@ -102,15 +103,19 @@ export const MODELO_DE_EMBEDDING_DO_GOOGLE = "google/gemini-embedding-001";
 export const DIMENSOES_DO_EMBEDDING = 1536;
 
 /** Quem prepara a base, do ponto de vista de quem escolhe na tela. */
-export type ProvedorDaBase = "openai" | "google";
+export type ProvedorDaBase = "openai" | "google" | "chutes";
 
 /** O modelo é função do provedor: OpenAI direta, gateway e OpenRouter dão o mesmo vetor. */
 export function modeloDeEmbedding(provedor: ChaveDeEmbedding["provedor"]): string {
-  return provedor === "google" ? MODELO_DE_EMBEDDING_DO_GOOGLE : MODELO_DE_EMBEDDING;
+  return provedor === "chutes"
+    ? CHUTES_QWEN3_VECTOR_MODEL
+    : provedor === "google"
+      ? MODELO_DE_EMBEDDING_DO_GOOGLE
+      : MODELO_DE_EMBEDDING;
 }
 
 export function provedorDaBase(chave: Pick<ChaveDeEmbedding, "provedor">): ProvedorDaBase {
-  return chave.provedor === "google" ? "google" : "openai";
+  return chave.provedor === "chutes" ? "chutes" : chave.provedor === "google" ? "google" : "openai";
 }
 
 export interface FamiliaDaBase {
@@ -150,7 +155,8 @@ export async function familiaDaBase(organizationId: string): Promise<FamiliaDaBa
   if (erroDaOrg) throw new FamiliaDaBaseIlegivelError(organizationId, erroDaOrg.message);
   const gravada = (org as { settings?: { base_de_conhecimento?: { familia?: unknown } } } | null)
     ?.settings?.base_de_conhecimento?.familia;
-  if (gravada === "openai" || gravada === "google") return { familia: gravada, origem: "escolha" };
+  if (gravada === "openai" || gravada === "google" || gravada === "chutes")
+    return { familia: gravada, origem: "escolha" };
   // Familia desconhecida NAO significa base sem escolha: Qwen nao herda OpenAI.
   // Uma familia nova exige suporte explicito e selecao governada.
   if (gravada !== null && gravada !== undefined) {
@@ -171,11 +177,16 @@ export async function familiaDaBase(organizationId: string): Promise<FamiliaDaBa
   if (modelo === null || modelo === undefined) return null;
   if (modelo === MODELO_DE_EMBEDDING_DO_GOOGLE) return { familia: "google", origem: "indice" };
   if (modelo === MODELO_DE_EMBEDDING) return { familia: "openai", origem: "indice" };
+  if (modelo === CHUTES_QWEN3_VECTOR_MODEL) return { familia: "chutes", origem: "indice" };
   // Vetores do mesmo tamanho nao tornam modelos diferentes intercambiaveis.
   throw new FamiliaDaBaseIlegivelError(organizationId, "modelo do indice nao suportado");
 }
 
-const NOME_DA_FAMILIA: Record<ProvedorDaBase, string> = { openai: "OpenAI", google: "Google" };
+const NOME_DA_FAMILIA: Record<ProvedorDaBase, string> = {
+  openai: "OpenAI",
+  google: "Google",
+  chutes: "Chutes",
+};
 
 export type OrigemDaChave =
   | "binding_do_ponto"
@@ -195,7 +206,7 @@ export interface ChaveDeEmbedding {
   apiKey: string | null;
   /** `null` = falar direto com a OpenAI, quando não houver gateway. */
   baseUrl: string | null;
-  provedor: "openai" | "openrouter" | "gateway" | "google";
+  provedor: "openai" | "openrouter" | "gateway" | "google" | "chutes";
   /** Quando true, a chamada vai pelo gateway (o SDK lê a chave do process.env). */
   viaGateway: boolean;
   origem: OrigemDaChave;
@@ -234,10 +245,22 @@ export async function resolverChaveDeEmbedding(
   const binding = await lerBindingDeEmbedding(ponto, organizationId);
   if (binding?.credential_id) {
     const credencial = await decifrarCredencial(binding.credential_id, organizationId);
-    if (credencial && familia !== null && provedorDaBase(credencial) !== familia) {
+    if (
+      familia === "chutes" &&
+      credencial?.provedor === "chutes" &&
+      ((binding.model_id && binding.model_id !== CHUTES_QWEN3_VECTOR_MODEL) || binding.base_url)
+    ) {
+      // Nem modelo nem destino de transporte podem vir de um binding customizado.
+      throw new FamiliaDaBaseIlegivelError(organizationId, "binding Chutes fora do contrato");
+    }
+    if (
+      credencial &&
+      ((familia === null && credencial.provedor === "chutes") ||
+        (familia !== null && provedorDaBase(credencial) !== familia))
+    ) {
       avisos.push(
         `O painel de Provedores aponta para este ponto uma chave que a base de conhecimento não usa: ` +
-          `a base é preparada com ${NOME_DA_FAMILIA[familia]}. Para mudar, troque o provedor na tela de Conhecimento.`,
+          `a base é preparada com ${familia === null ? "o provedor padrão" : NOME_DA_FAMILIA[familia]}. Para mudar, troque o provedor na tela de Conhecimento.`,
       );
     } else if (credencial) {
       if (binding.model_id && !/embed/i.test(binding.model_id)) {
@@ -251,7 +274,7 @@ export async function resolverChaveDeEmbedding(
       return {
         apiKey: credencial.apiKey,
         baseUrl:
-          credencial.provedor === "google"
+          credencial.provedor === "google" || credencial.provedor === "chutes"
             ? null
             : (binding.base_url ??
               (credencial.provedor === "openrouter" ? OPENROUTER_BASE_URL : null)),
@@ -288,6 +311,12 @@ export async function resolverChaveDeEmbedding(
       avisos,
     };
   };
+
+  // Chutes so funciona com familia declarada ou indice existente do modelo Qwen.
+  if (familia === "chutes") {
+    const chutesDaOrg = await credencialDaOrganizacao(organizationId, "chutes");
+    return chutesDaOrg ? daOrganizacao(chutesDaOrg) : null;
+  }
 
   if (familia !== "google") {
     // 2 · Credencial OpenAI da organização, sem exigir binding nenhum.
@@ -371,10 +400,10 @@ export async function temChaveDeEmbedding(organizationId: string): Promise<boole
 }
 
 /** As credenciais da organização que sabem gerar embedding. */
-type ProvedorDeCredencial = "openai" | "openrouter" | "google";
+type ProvedorDeCredencial = "openai" | "openrouter" | "google" | "chutes";
 
 function ehProvedorDeCredencial(p: unknown): p is ProvedorDeCredencial {
-  return p === "openai" || p === "openrouter" || p === "google";
+  return p === "openai" || p === "openrouter" || p === "google" || p === "chutes";
 }
 
 // ---------------------------------------------------------------------------
