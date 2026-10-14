@@ -16,12 +16,12 @@ describe("ISIS — gate de recência fiscal comprovada", () => {
   it("distingue nota singular vaga de última, de nota numerada e de dia específico", () => {
     expect(pedidoDeNotaFiscalVaga("ISIS, me traga a nota do cliente Eco Projetos")).toBe(true);
     expect(pedidoDeNotaFiscalVaga("ISIS, me traga a última nota da Eco Projetos")).toBe(false);
-    expect(
-      pedidoDeNotaFiscalVaga("ISIS, me traga a penúltima nota do Cliente Exemplo"),
-    ).toBe(false);
-    expect(
-      pedidoDeNotaFiscalVaga("ISIS, me traga a antepenúltima nota do Cliente Exemplo"),
-    ).toBe(false);
+    expect(pedidoDeNotaFiscalVaga("ISIS, me traga a penúltima nota do Cliente Exemplo")).toBe(
+      false,
+    );
+    expect(pedidoDeNotaFiscalVaga("ISIS, me traga a antepenúltima nota do Cliente Exemplo")).toBe(
+      false,
+    );
     expect(pedidoDeNotaFiscalVaga("Traga a nota de 08/10/2026")).toBe(false);
     expect(pedidoDeNotaFiscalVaga("Traga a nota nº 1234567")).toBe(false);
   });
