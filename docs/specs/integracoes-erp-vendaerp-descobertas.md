@@ -819,3 +819,40 @@ especificamente essa etapa, em vez de falhar antecipadamente no evento `load`.
 CI verde não prova entrega da DANFE: a próxima mensagem real só cabe após
 merge, imagens GHCR app/worker, deploy saudável e versão exata, respeitando o
 limite de não repetir VendaERP exclusivamente para diagnóstico.
+
+## DANFE — falha de identidade no PDF da impressão direta (14/10/2026)
+
+**REAL NOW:** a integração canônica VendaERP usa `impressaoDireta: true`,
+com `chaveFiscalEsperada` derivada da NFe estruturada. O renderer atual
+imprimia e devolvia imediatamente os bytes nessa modalidade, antes de
+`pdf_validacao` e de `diagnosticarTextoPdfFiscal`. O adaptador de materialização
+comprovava somente MIME e assinatura PDF; portanto um PDF com chave de outra
+nota poderia chegar ao sender apesar de sua identidade não coincidir.
+
+**PROVA RED → GREEN offline, sem VendaERP:** checkout isolado do commit
+`79f1c64d84c4e24a2b7a0c7c0e9c3fc1581cca3c`, com os dois arquivos
+de produção intactos no baseline, passou **69/69** testes unitários focalizados.
+Um novo teste unitário sintético exige rejeição de impressão direta com
+`chaveFiscalEsperada` diferente da chave presente no documento: no código
+original, falhou exatamente porque recebeu `Buffer` em vez de rejeição.
+Com a reutilização da validação fiscal canônica na impressão direta quando
+houver chave comprovada, a suíte de quatro arquivos passou **100/100**,
+incluindo proteção de DANFE, materialização e auditoria administrativa.
+O novo teste de integração no worker usa Chromium real, SPA e dados sintéticos,
+`--network none`, e também exige rejeição de chave divergente após POST de
+montagem; ele permanece **pendente da CI do worker**.
+
+**Decisão mínima:** validar os bytes e a identidade fiscal na impressão direta
+SOMENTE quando `chaveFiscalEsperada` estiver preenchida. A impressão genérica
+sem identidade comprovada mantém o fluxo anterior; a preparação administrativa
+continua falhando fechada se a NFe estruturada não fornecer chave. Em caso de
+divergência, `pdf_validacao/chave_divergente` é uma categoria finita, sem
+registrar número, chave, URL, HTML ou PDF. Mantidos o prazo existente, a
+allowlist, DNS/IP pinado e TLS, egress SSRF, leitura ERP, armazenamento
+privado, ledger, `before_send` e sender.
+
+**NÃO COMPROVADO:** que a falha anterior `chromium_navegacao` tenha sido
+resolvida, nem que a DANFE entregue em 14/10 correspondesse à chave fiscal
+esperada. A proteção nova requer CI, merge, publicação de imagens, deploy
+saudável e validação funcional antes do aceite. Não repetir chamadas reais
+ao VendaERP apenas para diagnóstico.
