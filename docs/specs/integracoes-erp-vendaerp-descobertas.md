@@ -904,3 +904,37 @@ de comportamento do renderer, transporte, timeout, egress, controle de
 acesso, sender ou integração ERP. Se a matriz ficar verde, ainda não
 comprova qual das hipóteses causou a falha real de 01h33. Exigir
 nova evidência passiva antes de corrigir comportamento ou repetir canário.
+
+## DANFE — evidência pós-CI Chromium offline da PR #116 (14/10/2026)
+
+**Resultado comprovado:** a PR
+[#116](https://github.com/OARANHA/crm-wandora/pull/116)
+foi retirada de draft, aprovada em CI e integrada à `main` pelo squash
+`e73f12a0e9ba46e65f23bfc21c69709c91a524ce`. O HEAD testado foi
+`de2badf5a2a318cf72779fd95d09274916470a1f`. A execução
+[DANFE worker runtime parity #38527840201](https://github.com/OARANHA/crm-wandora/actions/runs/38527840201)
+concluiu com sucesso. O log do job `115732320986` mostra
+**4 arquivos e 86 testes aprovados (86/86)**, incluindo os
+**10 testes de SPA fiscal sintética** em
+`danfe-controlled-spa-offline.test.ts` e **2 testes** em
+`danfe-chromium-offline.test.ts`.
+
+**Ambiente da prova:** Chromium Alpine da imagem imutável
+`ghcr.io/oaranha/elus-worker@sha256:0f213bea1dfbf561a6c1cddc58ad1d7e96e523a9e04aa79ee00b4e8cbf2a3339`,
+com `APP_VERSION=fc26a2eefce53234dbbb7049f5871de20f91000a`
+confirmado nos logs, fixtures sintéticas e `--network none`,
+sem acesso ao VendaERP. O workflow
+[ERP read verification #38527840797](https://github.com/OARANHA/crm-wandora/actions/runs/38527840797)
+também concluiu com sucesso depois da correção exclusivamente
+de formatação do documento.
+
+**Limites:** os testes validaram a classificação fail-closed da falha
+HTTP 503 na resposta pública de montagem e a recusa de PDF ainda não
+montado após HTTP 200, sem alterar o renderer, transporte ou timeout.
+Não identificam retroativamente a causa exata do erro real
+`chromium_navegacao` de 14/10/2026; não comprovam duas NFes
+distintas e suas respectivas DANFEs entregues e legíveis no WhatsApp.
+Nenhum novo canário, envio WhatsApp ou deploy ocorreu nesta PR.
+A especificação acima registra o estado **antes da CI**; esta seção
+registra a prova posterior. A issue funcional permanece aberta,
+sem autorizar repetir VendaERP exclusivamente para investigação.
