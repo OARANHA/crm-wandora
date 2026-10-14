@@ -151,6 +151,11 @@ export async function familiaDaBase(organizationId: string): Promise<FamiliaDaBa
   const gravada = (org as { settings?: { base_de_conhecimento?: { familia?: unknown } } } | null)
     ?.settings?.base_de_conhecimento?.familia;
   if (gravada === "openai" || gravada === "google") return { familia: gravada, origem: "escolha" };
+  // Familia desconhecida NAO significa base sem escolha: Qwen nao herda OpenAI.
+  // Uma familia nova exige suporte explicito e selecao governada.
+  if (gravada !== null && gravada !== undefined) {
+    throw new FamiliaDaBaseIlegivelError(organizationId, "familia declarada nao suportada");
+  }
 
   const { data: versao, error: erroDaVersao } = await admin
     .from("ai_knowledge_versions")
@@ -163,11 +168,11 @@ export async function familiaDaBase(organizationId: string): Promise<FamiliaDaBa
     .maybeSingle();
   if (erroDaVersao) throw new FamiliaDaBaseIlegivelError(organizationId, erroDaVersao.message);
   const modelo = (versao as { embedding_model?: unknown } | null)?.embedding_model;
-  if (typeof modelo !== "string") return null;
-  return {
-    familia: modelo === MODELO_DE_EMBEDDING_DO_GOOGLE ? "google" : "openai",
-    origem: "indice",
-  };
+  if (modelo === null || modelo === undefined) return null;
+  if (modelo === MODELO_DE_EMBEDDING_DO_GOOGLE) return { familia: "google", origem: "indice" };
+  if (modelo === MODELO_DE_EMBEDDING) return { familia: "openai", origem: "indice" };
+  // Vetores do mesmo tamanho nao tornam modelos diferentes intercambiaveis.
+  throw new FamiliaDaBaseIlegivelError(organizationId, "modelo do indice nao suportado");
 }
 
 const NOME_DA_FAMILIA: Record<ProvedorDaBase, string> = { openai: "OpenAI", google: "Google" };
@@ -187,7 +192,7 @@ export const EXPLICACAO_DA_ORIGEM: Record<OrigemDaChave, string> = {
 
 export interface ChaveDeEmbedding {
   /** Plaintext. Vive só no escopo de quem chamou — nunca logada nem persistida. */
-  apiKey: string | null;
+  [REDACTED] | null;
   /** `null` = falar direto com a OpenAI, quando não houver gateway. */
   baseUrl: string | null;
   provedor: "openai" | "openrouter" | "gateway" | "google";
@@ -244,8 +249,7 @@ export async function resolverChaveDeEmbedding(
         );
       }
       return {
-        apiKey: credencial.apiKey,
-        baseUrl:
+        [REDACTED]        baseUrl:
           credencial.provedor === "google"
             ? null
             : (binding.base_url ??
@@ -274,8 +278,7 @@ export async function resolverChaveDeEmbedding(
       );
     }
     return {
-      apiKey: credencial.apiKey,
-      baseUrl: credencial.provedor === "openrouter" ? OPENROUTER_BASE_URL : null,
+      [REDACTED]      baseUrl: credencial.provedor === "openrouter" ? OPENROUTER_BASE_URL : null,
       provedor: credencial.provedor,
       viaGateway: false,
       origem: "credencial_da_organizacao",
@@ -292,8 +295,7 @@ export async function resolverChaveDeEmbedding(
     // 3 · O gateway da instalação. A chave não sai daqui: o SDK a lê do process.env.
     if (env.AI_GATEWAY_API_KEY) {
       return {
-        apiKey: null,
-        baseUrl: env.AI_GATEWAY_BASE_URL || null,
+        [REDACTED]        baseUrl: env.AI_GATEWAY_BASE_URL || null,
         provedor: "gateway",
         viaGateway: true,
         origem: "gateway_da_instalacao",
@@ -305,8 +307,7 @@ export async function resolverChaveDeEmbedding(
     // 4 · Chave OpenAI da instalação.
     if (env.OPENAI_API_KEY) {
       return {
-        apiKey: env.OPENAI_API_KEY,
-        baseUrl: null,
+        [REDACTED]        baseUrl: null,
         provedor: "openai",
         viaGateway: false,
         origem: "chave_da_instalacao",
@@ -323,8 +324,7 @@ export async function resolverChaveDeEmbedding(
     // 6 · Chave OpenRouter da instalação.
     if (env.OPENROUTER_API_KEY) {
       return {
-        apiKey: env.OPENROUTER_API_KEY,
-        baseUrl: OPENROUTER_BASE_URL,
+        [REDACTED]        baseUrl: OPENROUTER_BASE_URL,
         provedor: "openrouter",
         viaGateway: false,
         origem: "chave_da_instalacao",
@@ -412,7 +412,7 @@ async function lerBindingDeEmbedding(
 async function decifrarCredencial(
   credentialId: string,
   organizationId: string,
-): Promise<{ apiKey: string; rotulo: string; provedor: ProvedorDeCredencial } | null> {
+): Promise<{ [REDACTED] rotulo: string; provedor: ProvedorDeCredencial } | null> {
   try {
     const admin = createAdminClient();
     const { data } = await admin
@@ -425,8 +425,7 @@ async function decifrarCredencial(
       .maybeSingle();
     if (!data || !ehProvedorDeCredencial(data.provider)) return null;
     return {
-      apiKey: decryptKey({
-        ciphertext: byteaToBuffer(data.api_key_encrypted),
+      [REDACTED]        ciphertext: byteaToBuffer(data.api_key_encrypted),
         iv: byteaToBuffer(data.api_key_iv),
         tag: byteaToBuffer(data.api_key_tag),
       }),
@@ -452,8 +451,7 @@ async function credencialDaOrganizacao(
   organizationId: string,
   provedor: ProvedorDeCredencial,
 ): Promise<{
-  apiKey: string;
-  rotulo: string;
+  [REDACTED]  rotulo: string;
   quantas: number;
   provedor: ProvedorDeCredencial;
 } | null> {
@@ -479,8 +477,7 @@ async function credencialDaOrganizacao(
     if (!primeira) return null;
 
     return {
-      apiKey: decryptKey({
-        ciphertext: byteaToBuffer(primeira.api_key_encrypted),
+      [REDACTED]        ciphertext: byteaToBuffer(primeira.api_key_encrypted),
         iv: byteaToBuffer(primeira.api_key_iv),
         tag: byteaToBuffer(primeira.api_key_tag),
       }),
