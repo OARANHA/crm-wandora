@@ -517,7 +517,11 @@ export const renderizarUrlParaPdfControlado: RenderizadorUrlPdf = async (
     };
 
     let pdf = await imprimir();
-    if (politica.impressaoDireta) return pdf;
+    // Impressão direta só dispensa o exame fiscal quando a política NÃO fornece
+    // chave comprovada. Para DANFE administrativa com chave estruturada do ERP,
+    // conferir os bytes impressos com o validador canônico antes da entrega.
+    // Não há nova navegação, consulta ERP ou egress nesta validação.
+    if (politica.impressaoDireta && !politica.chaveFiscalEsperada) return pdf;
     etapa = "pdf_validacao";
     conferirBytes(pdf);
 
