@@ -8,12 +8,20 @@ import {
   mencionaNfeNaoComprovada,
   pedidoDeNotaFiscalVaga,
   periodoDeBuscaFiscalVazia,
+  posicaoOrdinalDeNfePedida,
+  numerosFiscaisPermitidosParaPedido,
 } from "@/lib/agent-engine/agent/recencia-fiscal-gate";
 
 describe("ISIS — gate de recência fiscal comprovada", () => {
   it("distingue nota singular vaga de última, de nota numerada e de dia específico", () => {
     expect(pedidoDeNotaFiscalVaga("ISIS, me traga a nota do cliente Eco Projetos")).toBe(true);
     expect(pedidoDeNotaFiscalVaga("ISIS, me traga a última nota da Eco Projetos")).toBe(false);
+    expect(pedidoDeNotaFiscalVaga("ISIS, me traga a penúltima nota do Cliente Exemplo")).toBe(
+      false,
+    );
+    expect(pedidoDeNotaFiscalVaga("ISIS, me traga a antepenúltima nota do Cliente Exemplo")).toBe(
+      false,
+    );
     expect(pedidoDeNotaFiscalVaga("Traga a nota de 08/10/2026")).toBe(false);
     expect(pedidoDeNotaFiscalVaga("Traga a nota nº 1234567")).toBe(false);
   });
@@ -42,6 +50,10 @@ describe("ISIS — gate de recência fiscal comprovada", () => {
     "Qual a NF-e mais recente?",
     "Quero as notas fiscais mais recentes",
     "Envie a última DANFE e nota fiscal",
+    "Isis me traga a antepenúltima nota da Cliente Exemplo",
+    "Isis me traga a penúltima NFe",
+    "Mostre a segunda nota mais recente",
+    "Mostre a terceira mais recente nota fiscal",
   ])("reconhece pedido real de recência: %s", (texto) => {
     expect(pedidoDeNfeMaisRecente(texto)).toBe(true);
   });
@@ -86,8 +98,81 @@ describe("ISIS — gate de recência fiscal comprovada", () => {
     ["Quais são as notas fiscais mais recentes?", 3],
     ["Qual a NF-e mais recente?", 1],
     ["As últimas cinco notas fiscais", 5],
+    ["A penúltima nota fiscal", 2],
+    ["A antepenúltima nota fiscal", 3],
+    ["A segunda nota mais recente", 2],
+    ["A terceira mais recente NFe", 3],
   ])("limita ranking fiscal ao pedido: %s", (texto, quantidade) => {
     expect(quantidadeDeNotasMaisRecentesPedida(texto)).toBe(quantidade);
+  });
+
+  it.each([
+    ["a penúltima NFe", 2],
+    ["a antepenúltima nota fiscal", 3],
+    ["a segunda mais recente nota", 2],
+    ["a terceira nota fiscal mais recente", 3],
+    ["a 2ª nota mais recente", 2],
+    ["a 3ª nota mais recente", 3],
+  ] as const)("resgata somente a posição ordinal em %s", (texto, posicao) => {
+    expect(posicaoOrdinalDeNfePedida(texto)).toBe(posicao);
+  });
+
+  it("não classifica qualquer terceira menção como ordinal de nota", () => {
+    expect(posicaoOrdinalDeNfePedida("A terceira entrega é amanhã")).toBeNull();
+    expect(pedidoDeNfeMaisRecente("A terceira entrega é amanhã")).toBe(false);
+    expect(posicaoOrdinalDeNfePedida("Compare a penúltima e a antepenúltima nota")).toBeNull();
+  });
+
+  it("autoriza exclusivamente a NFe ranqueada na posição pedida", () => {
+    const completo = {
+      notas: [
+        { numeroNFe: "990", dataEmissao: "2026-10-08T12:00:00" },
+        { numeroNFe: "888", dataEmissao: "2026-10-07T12:00:00" },
+        { numeroNFe: "777", dataEmissao: "2026-10-06T12:00:00" },
+      ],
+      resumo: { consultaCompleta: true },
+    };
+    const segunda = numerosFiscaisPermitidosParaPedido(completo, "a penúltima nota");
+    const terceira = numerosFiscaisPermitidosParaPedido(completo, "a antepenúltima nota");
+    expect(segunda).toEqual(["888"]);
+    expect(terceira).toEqual(["777"]);
+    expect(numerosFiscaisPermitidosParaPedido(completo, "as últimas duas notas")).toEqual([
+      "990",
+      "888",
+    ]);
+    expect(mencionaNfeNaoComprovada("Segue a NFe 990", new Set(terceira))).toBe(true);
+    expect(mencionaNfeNaoComprovada("Segue a NFe 777", new Set(terceira))).toBe(false);
+    expect(
+      numerosFiscaisPermitidosParaPedido(
+        {
+          ...completo,
+          notas: completo.notas.slice(0, 2),
+        },
+        "a antepenúltima nota",
+      ),
+    ).toEqual([]);
+    expect(
+      numerosFiscaisPermitidosParaPedido(
+        {
+          ...completo,
+          resumo: { consultaCompleta: false },
+        },
+        "a penúltima nota",
+      ),
+    ).toEqual([]);
+    expect(
+      numerosFiscaisPermitidosParaPedido(
+        {
+          ...completo,
+          notas: [
+            completo.notas[0],
+            { ...completo.notas[1], dataEmissao: "2026-10-06T12:00:00" },
+            completo.notas[2],
+          ],
+        },
+        "a antepenúltima nota",
+      ),
+    ).toEqual([]);
   });
 
   it("não permite a segunda NFe como 'última' nem reusar número do histórico", () => {

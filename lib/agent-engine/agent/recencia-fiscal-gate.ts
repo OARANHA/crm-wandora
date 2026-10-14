@@ -11,6 +11,36 @@ export const AVISO_SEM_RECENCIA_FISCAL =
   "nem anexar uma DANFE sem confirmar primeiro a recência fiscal. " +
   "É necessário consultar as NFes por período para concluir com segurança.";
 
+/**
+ * Posição singular pedida no ranking de emissão fiscal. Não confundir
+ * "terceira mais recente" com "três últimas" (entrega de uma única DANFE).
+ * A ordenação pertence à capability fiscal, nunca ao número da NFe.
+ */
+export function posicaoOrdinalDeNfePedida(texto: string): 2 | 3 | null {
+  const s = texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (!/\b(?:notas?|nf[\s.-]?es?)\b/.test(s)) return null;
+
+  const segunda =
+    /\bpenultima\b/.test(s) ||
+    /\b(?:segunda|segundo|2a|2o|2ª|2º)\s+(?:(?:nota(?:\s+fiscal)?|nf[\s.-]?e)\s+)?mais\s+recente\b/.test(
+      s,
+    );
+  const terceira =
+    /\bantepenultima\b/.test(s) ||
+    /\b(?:terceira|terceiro|3a|3o|3ª|3º)\s+(?:(?:nota(?:\s+fiscal)?|nf[\s.-]?e)\s+)?mais\s+recente\b/.test(
+      s,
+    );
+
+  // Pedido simultâneo de duas posições não autoriza escolha unilateral.
+  if (segunda && terceira) return null;
+  if (terceira) return 3;
+  if (segunda) return 2;
+  return null;
+}
+
 export function pedidoDeNfeMaisRecente(texto: string): boolean {
   const normalizado = texto
     .normalize("NFD")
@@ -18,7 +48,7 @@ export function pedidoDeNfeMaisRecente(texto: string): boolean {
     .toLowerCase();
   const mencionaNota = /\b(?:notas?|nf-?es?)\b/.test(normalizado);
   const mencionaRecencia = /\bultim[ao]s?\b|\bmais\s+recentes?\b/.test(normalizado);
-  return mencionaNota && mencionaRecencia;
+  return mencionaNota && (mencionaRecencia || posicaoOrdinalDeNfePedida(texto) !== null);
 }
 
 export function recenciaFiscalComprovada(resultado: unknown): boolean {
@@ -57,6 +87,8 @@ export function quantidadeDeNotasMaisRecentesPedida(texto: string): number {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+  const ordinal = posicaoOrdinalDeNfePedida(texto);
+  if (ordinal !== null) return ordinal;
   const quantidadePorPalavra: Record<string, number> = {
     um: 1,
     uma: 1,
@@ -88,6 +120,32 @@ export function quantidadeDeNotasMaisRecentesPedida(texto: string): number {
   // contratual do provider (até três) quando não há N explícito.
   if (/\bultim[ao]\b|\bmais\s+recente\b/.test(normalizado)) return 1;
   return 3;
+}
+
+/**
+ * Para posição ordinal singular, libera SOMENTE a NFe dessa posição fiscal.
+ * Um ranking parcial, posição ausente ou empate fiscal visível não autoriza
+ * escolher pela chave, número ou ordem arbitrária.
+ */
+export function numerosFiscaisPermitidosParaPedido(resultado: unknown, texto: string): string[] {
+  const numeros = numerosDaBuscaFiscalComprovada(resultado);
+  if (numeros.length === 0) return [];
+  const posicao = posicaoOrdinalDeNfePedida(texto);
+  if (posicao === null) return numeros.slice(0, quantidadeDeNotasMaisRecentesPedida(texto));
+  if (numeros.length < posicao) return [];
+  const notas = (resultado as { notas: Array<{ dataEmissao: string }> }).notas;
+  const indice = posicao - 1;
+  const notaSelecionada = notas[indice];
+  const numeroSelecionado = numeros[indice];
+  if (!notaSelecionada || !numeroSelecionado) return [];
+  const notaAnterior = notas[indice - 1];
+  const notaPosterior = notas[indice + 1];
+  if (
+    (notaAnterior && notaSelecionada.dataEmissao === notaAnterior.dataEmissao) ||
+    (notaPosterior && notaSelecionada.dataEmissao === notaPosterior.dataEmissao)
+  )
+    return [];
+  return [numeroSelecionado];
 }
 
 /**
