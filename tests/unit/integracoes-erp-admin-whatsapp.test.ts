@@ -252,6 +252,32 @@ describe("Admin WhatsApp Read-Only V1", () => {
     );
   });
 
+  it("aceita apenas as novas fases de navegação na auditoria sem dados fiscais", async () => {
+    const fases = [
+      "chromium_bootstrap",
+      "chromium_destino_fiscal",
+      "chromium_carga_pagina",
+      "chromium_resposta_montagem",
+      "chromium_rede_estabilizacao",
+      "chromium_preparo_impressao",
+    ] as const;
+    for (const fase of fases) {
+      vi.mocked(audit).mockClear();
+      await auditarConsultaAdminWhatsapp({
+        autoridade: resolver() as AutoridadeAdminWhatsapp,
+        toolName: "crm_erp_prepare_admin_danfe",
+        requestId: "fase-sintetica",
+        success: false,
+        motivo: "danfe_download_failed",
+        etapaRenderizacao: fase,
+      });
+      const metadata = vi.mocked(audit).mock.calls[0]?.[0].metadata;
+      expect(metadata).toHaveProperty("etapa_renderizacao", fase);
+      expect(JSON.stringify(metadata)).not.toContain("http");
+      expect(JSON.stringify(metadata)).not.toContain(telefone);
+    }
+  });
+
   it("descarta etapas de diagnóstico arbitrárias antes de gravar a auditoria", async () => {
     await auditarConsultaAdminWhatsapp({
       autoridade: resolver() as AutoridadeAdminWhatsapp,
