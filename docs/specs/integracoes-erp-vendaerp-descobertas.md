@@ -784,3 +784,38 @@ com uma segunda reprodução real contra o VendaERP.
 pelo SHA → deploy Portainer seguro → saúde/version exatas → **um** canário
 WhatsApp administrativo. Issue #55 não é resolvida até a entrega de
 duas DANFEs corretas e legíveis das duas NFes mais recentes distintas.
+
+## DANFE — observabilidade fina da navegação (14/10/2026)
+
+**Evidência de produção (somente leitura):** no atendimento administrativo
+de 14/10/2026, às 01h32–01h33 (Brasília), a consulta fiscal foi concluída,
+mas a preparação de uma DANFE falhou com `danfe_download_failed`,
+`download_falhou`, `chromium_navegacao` e `autenticacao_same_origin=false`;
+o ledger aceitou somente texto, sem PDF. Em um segundo turno, a mesma capacidade
+de preparação teve sucesso e a mídia `application/pdf` foi registrada como
+enviada, entregue e lida pelo WhatsApp. O segundo sucesso **não prova**
+correção ou estabilidade da primeira falha, nem identidade/legibilidade visual
+do documento.
+
+**Lacuna confirmada no código:** `chromium_navegacao` agrupava falhas de
+bootstrap local, mudança para URL fiscal exata, carregamento `load`,
+montagem da SPA por POST público, `networkidle` e frames de impressão.
+O código técnico `download_falhou` é a projeção genérica de
+`render_falhou`, não uma classificação HTTP.
+
+**Instrumentação proposta nesta branch (não implantada):** classificar essas
+operações em `chromium_bootstrap`, `chromium_destino_fiscal`,
+`chromium_carga_pagina`, `chromium_resposta_montagem`,
+`chromium_rede_estabilizacao` e `chromium_preparo_impressao`. A categoria
+legada permanece reconhecida para eventos antigos. As novas categorias são
+valores fixos auditáveis, sem URL, token, chave fiscal, HTML, dados pessoais ou
+PDF. A instrumentação não muda timeout, retry, rota, transporte pinado,
+DNS/IP/TLS, SSRF, lista de recursos, impressão, sender nem READ-ONLY do ERP.
+
+**Aceite técnico:** conferir com testes unitários que cada falha preserva
+`fail-closed`, não imprime PDF quando a navegação falha, e que a auditoria
+registra apenas a etapa finita. O teste de `networkidle` deve rejeitar
+especificamente essa etapa, em vez de falhar antecipadamente no evento `load`.
+CI verde não prova entrega da DANFE: a próxima mensagem real só cabe após
+merge, imagens GHCR app/worker, deploy saudável e versão exata, respeitando o
+limite de não repetir VendaERP exclusivamente para diagnóstico.
