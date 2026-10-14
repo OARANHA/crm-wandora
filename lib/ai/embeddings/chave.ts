@@ -151,6 +151,11 @@ export async function familiaDaBase(organizationId: string): Promise<FamiliaDaBa
   const gravada = (org as { settings?: { base_de_conhecimento?: { familia?: unknown } } } | null)
     ?.settings?.base_de_conhecimento?.familia;
   if (gravada === "openai" || gravada === "google") return { familia: gravada, origem: "escolha" };
+  // Familia desconhecida NAO significa base sem escolha: Qwen nao herda OpenAI.
+  // Uma familia nova exige suporte explicito e selecao governada.
+  if (gravada !== null && gravada !== undefined) {
+    throw new FamiliaDaBaseIlegivelError(organizationId, "familia declarada nao suportada");
+  }
 
   const { data: versao, error: erroDaVersao } = await admin
     .from("ai_knowledge_versions")
@@ -163,11 +168,11 @@ export async function familiaDaBase(organizationId: string): Promise<FamiliaDaBa
     .maybeSingle();
   if (erroDaVersao) throw new FamiliaDaBaseIlegivelError(organizationId, erroDaVersao.message);
   const modelo = (versao as { embedding_model?: unknown } | null)?.embedding_model;
-  if (typeof modelo !== "string") return null;
-  return {
-    familia: modelo === MODELO_DE_EMBEDDING_DO_GOOGLE ? "google" : "openai",
-    origem: "indice",
-  };
+  if (modelo === null || modelo === undefined) return null;
+  if (modelo === MODELO_DE_EMBEDDING_DO_GOOGLE) return { familia: "google", origem: "indice" };
+  if (modelo === MODELO_DE_EMBEDDING) return { familia: "openai", origem: "indice" };
+  // Vetores do mesmo tamanho nao tornam modelos diferentes intercambiaveis.
+  throw new FamiliaDaBaseIlegivelError(organizationId, "modelo do indice nao suportado");
 }
 
 const NOME_DA_FAMILIA: Record<ProvedorDaBase, string> = { openai: "OpenAI", google: "Google" };

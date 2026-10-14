@@ -8,6 +8,12 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "patches/**"
+      # O build do app compila o adapter e os resolvers de embedding.
+      # PRs que tocam essa area precisam passar pelo mesmo build do publish.
+      - "lib/ai/embeddings/**"
+      - "lib/ai/embed.ts"
+      - "lib/ai/knowledge/**"
+      - "workers/rag-indexer.ts"
       - ".github/workflows/publish-elus-images.yml"
   push:
     branches:

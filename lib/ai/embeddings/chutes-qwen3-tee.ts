@@ -112,14 +112,15 @@ async function lerRespostaLimitada(response: Response): Promise<string> {
 export async function solicitarEmbeddingQwen3(
   texto: string,
   finalidade: FinalidadeEmbeddingQwen3,
-  [REDACTED]  fetchImpl: typeof fetch = fetch,
+  tokenDeAcessoChutes: string,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<ResultadoEmbeddingQwen3> {
   const entrada = prepararEntradaQwen3(texto, finalidade);
   if (
-    typeof apiKey !== "string" ||
-    !apiKey.trim() ||
-    /[\r\n]/.test(apiKey) ||
-    apiKey.length > 8192
+    typeof tokenDeAcessoChutes !== "string" ||
+    !tokenDeAcessoChutes.trim() ||
+    /[\r\n]/.test(tokenDeAcessoChutes) ||
+    tokenDeAcessoChutes.length > 8192
   ) {
     throw new ErroEmbeddingQwen3("credencial_invalida");
   }
@@ -131,7 +132,7 @@ export async function solicitarEmbeddingQwen3(
       redirect: "error",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
-        Authorization: "Bearer " + apiKey,
+        Authorization: "Bearer " + tokenDeAcessoChutes,
         "Content-Type": "application/json",
         Accept: "application/json",
       },
