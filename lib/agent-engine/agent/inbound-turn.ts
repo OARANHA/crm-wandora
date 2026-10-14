@@ -169,6 +169,8 @@ import {
   recenciaFiscalComprovada,
   numerosDaBuscaFiscalComprovada,
   quantidadeDeNotasMaisRecentesPedida,
+  posicaoOrdinalDeNfePedida,
+  numerosFiscaisPermitidosParaPedido,
   mencionaNfeNaoComprovada,
   pedidoDeNotaFiscalVaga,
   periodoDeBuscaFiscalVazia,
@@ -1048,7 +1050,7 @@ export function blocosErpResidentes(toolIds: readonly string[]): string[] {
     "Se já houver um cliente_contact_id resolvido nesta conversa, prefira esse id. ";
 
   if (toolIds.includes(recent)) {
-    bloco += "CONSULTA FISCAL: use crm_erp_search_recent_invoices para nota(s) de cliente, não pedidos comuns. Sem período informado, consulte somente os últimos 30 dias civis. Se notas=[] com consultaCompleta=true, diga que não encontrou no período pesquisado e PERGUNTE qual período deseja; NUNCA retroceda automaticamente. Preserve cliente_contact_id comprovado na continuação da conversa. Para dia exato, passe data_inicio=data_fim=AAAA-MM-DD; para período, ambas as datas (até 30 dias inclusivos); para mês informado, mes_ano. Para pedido singular vago sem data nem número, consulte com quantidade=2 e, se vier mais de uma NFe, pergunte qual número/data deseja, sem preparar DANFE. Para a última nota, use quantidade=1 e apenas a mais recente comprovada. Se vier menos que a quantidade pedida, informe somente o que foi encontrado no período, sem alegar ausência histórica. Nunca trate erro técnico ou consulta parcial como ausência. ";
+    bloco += "CONSULTA FISCAL: use crm_erp_search_recent_invoices para nota(s) de cliente, não pedidos comuns. Sem período informado, consulte somente os últimos 30 dias civis. Se notas=[] com consultaCompleta=true, diga que não encontrou no período pesquisado e PERGUNTE qual período deseja; NUNCA retroceda automaticamente. Preserve cliente_contact_id comprovado na continuação da conversa. Para dia exato, passe data_inicio=data_fim=AAAA-MM-DD; para período, ambas as datas (até 30 dias inclusivos); para mês informado, mes_ano. Para pedido singular vago sem data nem número, consulte com quantidade=2 e, se vier mais de uma NFe, pergunte qual número/data deseja, sem preparar DANFE. Para a última nota, use quantidade=1. Para a penúltima ou segunda mais recente, consulte quantidade=2 e selecione APENAS a segunda; para a antepenúltima ou terceira mais recente, consulte quantidade=3 e selecione APENAS a terceira. Todas exigem ranking fiscal completo e não autorizam envio de outra posição. Se vier menos que a quantidade pedida, informe somente o que foi encontrado no período, sem alegar ausência histórica. Nunca trate erro técnico ou consulta parcial como ausência. ";
   }
 
   if (toolIds.includes(customers)) {
@@ -4065,10 +4067,15 @@ async function executarTurnoDoAgente(
                   // Somente um retorno completo libera afirmação de recência.
                   if (recenciaFiscalComprovada(resultado)) {
                     const limite = quantidadeDeNotasMaisRecentesPedida(mensagemDoJob);
-                    const maisRecentes = numerosDaBuscaFiscalComprovada(resultado).slice(0, limite);
-                    if (maisRecentes.length === limite) {
+                    const notasRanqueadas = numerosDaBuscaFiscalComprovada(resultado);
+                    const permitidas = numerosFiscaisPermitidosParaPedido(resultado, mensagemDoJob);
+                    const ordinal = posicaoOrdinalDeNfePedida(mensagemDoJob);
+                    if (
+                      notasRanqueadas.length >= limite &&
+                      permitidas.length === (ordinal === null ? limite : 1)
+                    ) {
                       recenciaFiscalComprovadaNesteTurno = true;
-                      for (const numero of maisRecentes)
+                      for (const numero of permitidas)
                         numerosNfeFiscaisComprovados.add(numero);
                     }
                   }
