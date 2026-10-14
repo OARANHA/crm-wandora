@@ -151,7 +151,7 @@ describe("ISIS — gate de recência fiscal comprovada", () => {
       ...completo,
       notas: [
         completo.notas[0],
-        { ...completo.notas[1], dataEmissao: completo.notas[2].dataEmissao },
+        { ...completo.notas[1], dataEmissao: "2026-10-06T12:00:00" },
         completo.notas[2],
       ],
     }, "a antepenúltima nota")).toEqual([]);
