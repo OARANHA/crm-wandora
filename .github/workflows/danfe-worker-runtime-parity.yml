@@ -23,8 +23,8 @@ jobs:
     timeout-minutes: 20
     env:
       # Commit já publicado/implantado no Vigia. Não usar :main mutável.
-      WORKER_IMAGE: ghcr.io/oaranha/elus-worker@sha256:11565dda7eebdf730a5015a1d0e2a96a83001afb6814b7640fd12b5be0311503
-      EXPECTED_VERSION: 5aaa69ca017ff5cc412bdd273d7b28bcc7d039db
+      WORKER_IMAGE: ghcr.io/oaranha/elus-worker@sha256:0f213bea1dfbf561a6c1cddc58ad1d7e96e523a9e04aa79ee00b4e8cbf2a3339
+      EXPECTED_VERSION: fc26a2eefce53234dbbb7049f5871de20f91000a
     steps:
       - uses: actions/checkout@v4
 
