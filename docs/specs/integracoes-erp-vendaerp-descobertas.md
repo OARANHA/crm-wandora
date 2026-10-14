@@ -856,3 +856,50 @@ resolvida, nem que a DANFE entregue em 14/10 correspondesse à chave fiscal
 esperada. A proteção nova requer CI, merge, publicação de imagens, deploy
 saudável e validação funcional antes do aceite. Não repetir chamadas reais
 ao VendaERP apenas para diagnóstico.
+
+## DANFE — matriz offline de falhas da navegação Chromium (14/10/2026)
+
+**REAL NOW:** versão publicada/implantada de ELUS
+`fc26a2eefce53234dbbb7049f5871de20f91000a`, com PRs #114 (fases de
+erro auditáveis) e #115 (chave fiscal validada nos bytes do PDF). A auditoria
+READ-ONLY consultada para 14/10/2026 após 06h UTC não encontrou novos
+`crm_erp_prepare_admin_danfe`; portanto **não existe ainda ocorrência
+real nova** que identifique a subetapa do erro histórico
+`chromium_navegacao`. A execução administrativa antiga precedeu a
+instrumentação. O fato de uma NFe ter gerado PDF em turno posterior também
+não identifica a causa da falha anterior.
+
+**Diagnóstico por hipóteses separadas, exclusivamente sintético:**
+- O teste existente de `chromium_destino_fiscal` prova no nível unitário
+  que a navegação não deve aceitar bootstrap local como URL fiscal final.
+- A nova fixture `api-503` deixa a SPA receber o POST público de montagem
+  com status 503, verificando rejeição **`chromium_resposta_montagem`**,
+  sem impressão/entrega de PDF.
+- A nova fixture `dom-atrasado` responde o POST com 200, mas só preenche o
+  conteúdo fiscal após um timer sintético de 8 segundos: distingue uma
+  resposta HTTP concluída da montagem de DOM concluída e exige fail-closed
+  em **`pdf_validacao`** se a impressão for prematura.
+- A fixture de sucesso atual continua exigindo chave fiscal e conteúdo
+  corretos no PDF final; testes de URLs bloqueadas mantêm SSRF e transporte
+  pinado.
+
+**Provas realizadas neste gate:** checkout Git isolado e limpo inicialmente
+no SHA exato, baseline `71/71` testes unitários GREEN; com as novas
+fixtures, `71/71` unitários continuam GREEN e os testes opt-in de navegador
+foram **SKIPPED (10)** no host sem Chromium. Prettier e ESLint do arquivo
+de integração foram executados sem erros; `git diff --check` retornou 0.
+**Ainda não existe resultado executado das duas novas fixtures com Chromium.**
+
+**Próximo gate:** CI `DANFE worker runtime parity` da PR específica,
+utilizando `ghcr.io/oaranha/elus-worker@sha256:0f213bea1dfbf561a6c1cddc58ad1d7e96e523a9e04aa79ee00b4e8cbf2a3339`
+e `APP_VERSION=fc26a2eefce53234dbbb7049f5871de20f91000a`, ambas
+referências correspondentes à produção comprovada. A execução CI roda
+Chromium Alpine com `--network none`, sem sessão do VendaERP nem
+credencial ERP. Até o resultado de CI, nenhum defeito do provider ou
+correção de navegação pode ser afirmado a partir desta matriz.
+
+**Decisão:** somente fixtures, workflow e especificação; nenhuma alteração
+de comportamento do renderer, transporte, timeout, egress, controle de
+acesso, sender ou integração ERP. Se a matriz ficar verde, ainda não
+comprova qual das hipóteses causou a falha real de 01h33. Exigir
+nova evidência passiva antes de corrigir comportamento ou repetir canário.
