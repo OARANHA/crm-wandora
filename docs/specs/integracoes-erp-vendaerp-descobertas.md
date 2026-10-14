@@ -870,6 +870,7 @@ instrumentação. O fato de uma NFe ter gerado PDF em turno posterior também
 não identifica a causa da falha anterior.
 
 **Diagnóstico por hipóteses separadas, exclusivamente sintético:**
+
 - O teste existente de `chromium_destino_fiscal` prova no nível unitário
   que a navegação não deve aceitar bootstrap local como URL fiscal final.
 - A nova fixture `api-503` deixa a SPA receber o POST público de montagem
