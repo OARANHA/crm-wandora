@@ -17,10 +17,7 @@ export const AVISO_SEM_RECENCIA_FISCAL =
  * A ordenação pertence à capability fiscal, nunca ao número da NFe.
  */
 export function posicaoOrdinalDeNfePedida(texto: string): 2 | 3 | null {
-  const s = texto
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+  const s = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if (!/\b(?:notas?|nf[\s.-]?es?)\b/.test(s)) return null;
 
   const segunda =
