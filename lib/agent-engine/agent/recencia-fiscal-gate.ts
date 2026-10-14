@@ -136,7 +136,8 @@ export function numerosFiscaisPermitidosParaPedido(resultado: unknown, texto: st
   if (
     (notaAnterior && notaSelecionada.dataEmissao === notaAnterior.dataEmissao) ||
     (notaPosterior && notaSelecionada.dataEmissao === notaPosterior.dataEmissao)
-  ) return [];
+  )
+    return [];
   return [numeroSelecionado];
 }
 
