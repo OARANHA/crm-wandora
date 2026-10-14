@@ -70,14 +70,14 @@
   improvisar normas ou compatibilidade.
 - `RGB Cores.xlsx` — aba `Plan1`, 1.549 códigos próprios distintos;
   sem duplicação após normalização de espaços e caixa no código:
-  - **943** nomes com HEX válido, para *prévia digital aproximada*;
+  - **943** nomes com HEX válido, para _prévia digital aproximada_;
   - **595** nomes sem HEX, consultáveis por código/nome, mas sem prévia;
   - **1** registro com HEX malformado, a corrigir;
   - **10** registros sem nome, a revisar antes da publicação;
   - **39** nomes repetidos em códigos diferentes (não colapsar códigos).
-  Um CSV de **1.539** cores nomeadas e uma auditoria XLSX foram preparados
-  **fora do repositório e fora da produção**; o CSV não é cadastro de SKU e
-  não deve ser importado como produto vendável.
+    Um CSV de **1.539** cores nomeadas e uma auditoria XLSX foram preparados
+    **fora do repositório e fora da produção**; o CSV não é cadastro de SKU e
+    não deve ser importado como produto vendável.
 - Site e Instagram são canais de comunicação e podem orientar linguagem e
   posicionamento, mas conteúdo dinâmico não substitui ficha técnica. Endereço
   e contatos entre fontes exigem reconciliação com o responsável comercial.
@@ -124,7 +124,7 @@
    reprocessar PDFs em chamadas LLM ad hoc.
 5. **G4, pendente — cores:** confirmar registro sem nome e HEX malformado
    antes de publicar; guardar catálogo completo com identidade estável.
-   O CSV de 1.539 referências serve à preparação e *não* prova
+   O CSV de 1.539 referências serve à preparação e _não_ prova
    disponibilidade. Para busca EXATA por código/nome em escala,
    avaliar primeiro uma capability estruturada já existente; só propor
    schema novo para cores após evidência de lacuna real, sem tabela paralela
