@@ -6,7 +6,10 @@ on:
       - ".github/workflows/elus-ai-agent-editor-verification.yml"
       - "app/app/ai/agents/**"
       - "lib/ai/agents/edicao-nao-tecnica*"
+      - "lib/ai/governanca-da-ia.ts"
+      - "lib/ai/governanca-da-ia-contrato.ts"
       - "tests/unit/ia-edicao-nao-tecnica-autonomia.test.ts"
+      - "tests/unit/ia-agent-editor-client-boundary.test.ts"
   workflow_dispatch:
 
 permissions:
@@ -35,6 +38,10 @@ jobs:
         run: >-
           pnpm exec eslint
           "app/app/ai/agents/[id]/_components/AgentForm.tsx"
+          "app/app/ai/agents/[id]/_components/AgentTabs.tsx"
+          lib/ai/governanca-da-ia.ts
+          lib/ai/governanca-da-ia-contrato.ts
+          tests/unit/ia-agent-editor-client-boundary.test.ts
           lib/ai/agents/edicao-nao-tecnica.ts
           lib/ai/agents/edicao-nao-tecnica.test.ts
           tests/unit/ia-edicao-nao-tecnica-autonomia.test.ts
@@ -42,6 +49,10 @@ jobs:
         run: >-
           pnpm exec prettier --check
           "app/app/ai/agents/[id]/_components/AgentForm.tsx"
+          "app/app/ai/agents/[id]/_components/AgentTabs.tsx"
+          lib/ai/governanca-da-ia.ts
+          lib/ai/governanca-da-ia-contrato.ts
+          tests/unit/ia-agent-editor-client-boundary.test.ts
           lib/ai/agents/edicao-nao-tecnica.ts
           lib/ai/agents/edicao-nao-tecnica.test.ts
           tests/unit/ia-edicao-nao-tecnica-autonomia.test.ts
@@ -51,5 +62,6 @@ jobs:
           lib/ai/agents/edicao-nao-tecnica.test.ts
           tests/unit/ia-edicao-nao-tecnica-autonomia.test.ts
           tests/unit/ia-plataforma-provedor-gates.test.ts
+          tests/unit/ia-agent-editor-client-boundary.test.ts
           lib/ai/governanca-da-ia.test.ts
           --maxWorkers=2
