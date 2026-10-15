@@ -51,6 +51,17 @@ describe("Superadmin configura IA da organização, não do servidor", () => {
     expect(gateway).toContain("llm.credential_id");
     expect(gateway).toContain('query.eq("id", credentialId)');
   });
+  it("modelo custom exige catálogo validado e runtime usa o endpoint da mesma credencial", () => {
+    const route = source("app/api/v1/admin/tenants/[id]/ai-default/route.ts");
+    expect(route).toContain('body.data.provider === "custom" && available.length === 0');
+    expect(route).toContain("!available.includes(body.data.default_model)");
+    const gateway = source("lib/ai/gateway-binding.ts");
+    expect(gateway).toContain('.select("api_key_encrypted, api_key_iv, api_key_tag, base_url")');
+    expect(gateway).toContain("instanciar(daOrg.provider, daOrg.apiKey, idNoProvider, daOrg.baseUrl)");
+    expect(gateway).toContain('llm?.credentialId && llm.provider === "custom"');
+    expect(gateway).toContain('llm.credentialId && llm.provider === "custom"');
+    expect(gateway).toContain("fetchParaDestinoDaOrganizacao()");
+  });
   it("o formulário registra URL, token e modelo no Superadmin, sem env", () => {
     const s = source("components/admin/tenants/TenantAiPlatformDefault.tsx");
     expect(s).toContain("Token/API Key");
