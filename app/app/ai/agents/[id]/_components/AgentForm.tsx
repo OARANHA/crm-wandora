@@ -430,7 +430,8 @@ export function AgentForm(props: Props) {
   // exigindo a chave realmente utilizável (ver publishBlockReason abaixo).
   const manterChaveLegadaAoSalvar = podePreservarChaveLegadaAoSalvar({
     editandoAgente: isEdit,
-    temVersaoPersistida: Boolean(props.base ?? props.draft ?? props.published),
+    temVersaoPersistida:
+      props.mode === "edit" && Boolean(props.base ?? props.draft ?? props.published),
     podeEditarCredencial: autonomia.credentials,
     antes: {
       provider: baseline.provider,

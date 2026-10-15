@@ -12,6 +12,10 @@ describe("salvar rascunho com campos de IA bloqueados", () => {
   it("form permite salvar legado mas publicação mantém validação estrita", () => {
     const s = read("app/app/ai/agents/[id]/_components/AgentForm.tsx");
     expect(s).toContain("podePreservarChaveLegadaAoSalvar");
+    // Props é uma união discriminada: versões só existem em mode edit.
+    expect(s).toContain(
+      'props.mode === "edit" && Boolean(props.base ?? props.draft ?? props.published)',
+    );
     expect(s).toContain("if (faltaChaveInstalacao && !manterChaveLegadaAoSalvar)");
     expect(s).toContain("formularioValido: isValid && !faltaCredencialParaPublicar");
     expect(s).toContain("disabled={disabled || !autonomia.provider}");
