@@ -185,8 +185,7 @@ describe("Isolamento de credenciais entre organizações A e B", () => {
             if (tabela === "ai_models") return { data: null, error: null };
             if (tabela === "ai_provider_credentials_safe") {
               // Existe uma credencial validada, mas SOMENTE na organização B.
-              const pertenceAoAlvo =
-                filtros.organization_id === orgB && filtros.id === CREDENTIAL;
+              const pertenceAoAlvo = filtros.organization_id === orgB && filtros.id === CREDENTIAL;
               return {
                 data: pertenceAoAlvo
                   ? {
