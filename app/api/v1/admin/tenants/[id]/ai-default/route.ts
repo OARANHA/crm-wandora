@@ -107,7 +107,8 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
       disponibilidade: status,
       agentes_publicados: agentsResult.count ?? 0,
       pontos_com_configuracao_propria: bindingsResult.count ?? 0,
-      pode_editar: adminCtx.platformAdmin.scope === "full" && !adminCtx.user.support,
+      pode_editar:
+        adminCtx.platformAdmin.scope === "full" && (await requireSupportWrite(orgId)) === null,
     },
     { requestId },
   );

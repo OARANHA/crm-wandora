@@ -12,6 +12,15 @@ describe("governança central de IA — contrato contra regressões", () => {
     expect(s).toContain("falhaDaEscritaDePlatformAdmin");
     expect(s).toContain("bodySchema.safeParse(await req.json().catch(() => null))");
   });
+  it("consulta não supõe suporte na User do Supabase e reutiliza o guard canônico", () => {
+    const s = source(route);
+    expect(s).not.toContain("adminCtx.user.support");
+    expect(s).toContain("pode_editar:");
+    expect(s).toContain('adminCtx.platformAdmin.scope === "full"');
+    expect(s).toContain("(await requireSupportWrite(orgId)) === null");
+    expect(s).toContain("requirePlatformAdmin()");
+  });
+
   it("consulta e escrita se restringem a um UUID de organização validado", () => {
     const s = source(route);
     expect(s).toContain("z.string().uuid()");
