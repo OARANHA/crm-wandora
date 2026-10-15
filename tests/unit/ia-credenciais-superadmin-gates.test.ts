@@ -57,7 +57,9 @@ describe("Superadmin configura IA da organização, não do servidor", () => {
     expect(route).toContain("!available.includes(body.data.default_model)");
     const gateway = source("lib/ai/gateway-binding.ts");
     expect(gateway).toContain('.select("api_key_encrypted, api_key_iv, api_key_tag, base_url")');
-    expect(gateway).toContain("instanciar(daOrg.provider, daOrg.apiKey, idNoProvider, daOrg.baseUrl)");
+    expect(gateway).toContain(
+      "instanciar(daOrg.provider, daOrg.apiKey, idNoProvider, daOrg.baseUrl)",
+    );
     expect(gateway).toContain('llm?.credentialId && llm.provider === "custom"');
     expect(gateway).toContain('llm.credentialId && llm.provider === "custom"');
     expect(gateway).toContain("fetchParaDestinoDaOrganizacao()");
