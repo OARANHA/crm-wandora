@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 
 type Permissions = {
   provider: boolean;
@@ -100,10 +100,11 @@ export function TenantAiPermissions({ organizationId }: { organizationId: string
           <div className="space-y-3">
             {ITEMS.map((item) => (
               <label key={item.key} className="flex items-start gap-3">
-                <Checkbox
+                <Switch
+                  aria-label={item.label}
                   checked={values[item.key]}
                   disabled={saving}
-                  onCheckedChange={(checked) => {
+                  onCheckedChange={(checked: boolean) => {
                     setValues((old) => (old ? { ...old, [item.key]: checked === true } : old));
                   }}
                 />
