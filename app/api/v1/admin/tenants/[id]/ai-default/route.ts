@@ -215,7 +215,10 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
         { requestId },
       );
     const available = Array.isArray(cred.models_available) ? cred.models_available : [];
-    if (available.length > 0 && !available.includes(body.data.default_model))
+    if (
+      (body.data.provider === "custom" && available.length === 0) ||
+      (available.length > 0 && !available.includes(body.data.default_model))
+    )
       return fail(
         "model_unavailable",
         "O modelo não consta entre os modelos confirmados pela credencial.",
