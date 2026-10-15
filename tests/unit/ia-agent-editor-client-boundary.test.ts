@@ -2,10 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  AUTONOMIA_IA_PADRAO,
-  CHAVES_AUTONOMIA_IA,
-} from "@/lib/ai/governanca-da-ia-contrato";
+import { AUTONOMIA_IA_PADRAO, CHAVES_AUTONOMIA_IA } from "@/lib/ai/governanca-da-ia-contrato";
 
 const arquivo = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
