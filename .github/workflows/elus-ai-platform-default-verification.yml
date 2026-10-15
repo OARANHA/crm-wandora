@@ -1,0 +1,62 @@
+name: ELUS AI platform default verification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/elus-ai-platform-default-verification.yml"
+      - "app/admin/(protected)/tenants/**"
+      - "app/api/v1/admin/tenants/**/ai-default/**"
+      - "components/admin/tenants/TenantAiPlatformDefault.tsx"
+      - "lib/ai/padrao-llm-da-organizacao*"
+      - "tests/unit/ia-padrao-central-superadmin-gates.test.ts"
+      - "lib/audit/actions.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck and AI platform defaults
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: >-
+          pnpm exec eslint
+          "app/admin/(protected)/tenants/[id]/_client.tsx"
+          "app/api/v1/admin/tenants/[id]/ai-default/route.ts"
+          components/admin/tenants/TenantAiPlatformDefault.tsx
+          lib/ai/padrao-llm-da-organizacao.ts
+          lib/ai/padrao-llm-da-organizacao.test.ts
+          tests/unit/ia-padrao-central-superadmin-gates.test.ts
+      - name: Formatting
+        run: >-
+          pnpm exec prettier --check
+          "app/admin/(protected)/tenants/[id]/_client.tsx"
+          "app/api/v1/admin/tenants/[id]/ai-default/route.ts"
+          components/admin/tenants/TenantAiPlatformDefault.tsx
+          lib/ai/padrao-llm-da-organizacao.ts
+          lib/ai/padrao-llm-da-organizacao.test.ts
+          tests/unit/ia-padrao-central-superadmin-gates.test.ts
+      - name: Governed defaults and admin regression
+        run: >-
+          pnpm exec vitest run
+          lib/ai/padrao-llm-da-organizacao.test.ts
+          tests/unit/ia-padrao-central-superadmin-gates.test.ts
+          tests/unit/admin-escrita-exige-scope-full.test.ts
+          tests/unit/ia-plataforma-provedor-gates.test.ts
+          --maxWorkers=2

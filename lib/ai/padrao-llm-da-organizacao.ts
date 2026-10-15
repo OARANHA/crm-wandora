@@ -31,8 +31,13 @@ export function mesclarPadraoLlmDaOrganizacao(
   novo: { provider: string; default_model: string },
 ): Record<string, unknown> {
   const current = lerPadraoLlmDaOrganizacao(settings);
+  const llmAnterior = current.settings.llm;
+  const camposAnteriores =
+    llmAnterior && typeof llmAnterior === "object" && !Array.isArray(llmAnterior)
+      ? (llmAnterior as Record<string, unknown>)
+      : {};
   return {
     ...current.settings,
-    llm: { provider: novo.provider, default_model: novo.default_model },
+    llm: { ...camposAnteriores, provider: novo.provider, default_model: novo.default_model },
   };
 }
