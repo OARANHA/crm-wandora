@@ -40,7 +40,7 @@ import { PROVEDORES } from "@/lib/ai/pontos/provedores";
 
 import { ModelPicker, useModelMeta } from "./ModelPicker";
 import { podePreservarChaveLegadaAoSalvar } from "@/lib/ai/agents/edicao-nao-tecnica";
-import { AUTONOMIA_IA_PADRAO, type AutonomiaIa } from "@/lib/ai/governanca-da-ia";
+import { AUTONOMIA_IA_PADRAO, type AutonomiaIa } from "@/lib/ai/governanca-da-ia-contrato";
 import {
   CHAVE_DA_INSTALACAO,
   CredentialPicker,

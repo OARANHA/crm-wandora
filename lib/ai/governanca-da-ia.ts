@@ -8,15 +8,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * Coluna isolada organizations.ai_autonomy: salvar settings não reabre acesso revogado.
  * Ausência/corrupção/erro de leitura: nenhum poder técnico é concedido ao tenant.
  */
-export const CHAVES_AUTONOMIA_IA = ["provider", "model", "credentials", "operator_model"] as const;
-export type ChaveAutonomiaIa = (typeof CHAVES_AUTONOMIA_IA)[number];
-export type AutonomiaIa = Record<ChaveAutonomiaIa, boolean>;
-export const AUTONOMIA_IA_PADRAO: Readonly<AutonomiaIa> = Object.freeze({
-  provider: false,
-  model: false,
-  credentials: false,
-  operator_model: false,
-});
+import {
+  AUTONOMIA_IA_PADRAO,
+  type AutonomiaIa,
+  type ChaveAutonomiaIa,
+} from "./governanca-da-ia-contrato";
+
+export { AUTONOMIA_IA_PADRAO, CHAVES_AUTONOMIA_IA } from "./governanca-da-ia-contrato";
+export type { AutonomiaIa, ChaveAutonomiaIa } from "./governanca-da-ia-contrato";
 
 type Ator = Pick<AuthUser, "is_platform_admin" | "platform_admin_scope" | "support">;
 
