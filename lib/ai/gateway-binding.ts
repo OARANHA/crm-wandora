@@ -321,6 +321,8 @@ async function padraoDaOrganizacao(
     const model = id === null ? null : instanciar(llm.provider, daOrg.apiKey, id, daOrg.baseUrl);
     if (model !== null) return { model, modelId, origem: "credencial_da_organizacao" };
   }
+  // Credencial custom pinada sem URL utilizável não cai em chave da instalação.
+  if (llm.credentialId && llm.provider === "custom") return null;
   const model = await padraoDaInstalacao(() => Promise.resolve(llm.provider), modelId as ModelId);
   return model === null ? null : { model, modelId, origem: "padrao" };
 }
