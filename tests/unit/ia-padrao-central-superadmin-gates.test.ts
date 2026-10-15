@@ -44,6 +44,19 @@ describe("governança central de IA — contrato contra regressões", () => {
       "<TenantAiPlatformDefault organizationId={organization.id} />",
     );
   });
+  it("identifica a organização e explica custom sem duplicar credenciais", () => {
+    const routeSource = source(route);
+    const uiSource = source("components/admin/tenants/TenantAiPlatformDefault.tsx");
+    expect(routeSource).toContain('select("id, display_name, settings")');
+    expect(routeSource).toContain("organization_name: orgResult.data.display_name");
+    expect(uiSource).toContain("Organização selecionada: {data.organization_name}");
+    expect(uiSource).toContain("PROVEDOR_POR_ID.get(id)?.rotulo ?? id");
+    expect(uiSource).toContain('provider === "custom"');
+    expect(uiSource).toMatch(/IA → Chaves de\s+acesso à IA/);
+    expect(uiSource).toContain("com esta organização ativa");
+    expect(routeSource).not.toMatch(/api_key_encrypted|api_key_iv|api_key_tag/);
+  });
+
   it("sempre usa catálogo de providers canônico e valida modelo no servidor", () => {
     const s = source(route);
     expect(s).toContain("ehProvedorSuportado");

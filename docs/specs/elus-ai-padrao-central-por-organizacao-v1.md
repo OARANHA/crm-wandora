@@ -46,3 +46,22 @@ Não fazer merge nem deploy nesta rodada. O proprietário informa GREEN/RED.
 
 Fora do escopo: cadastrar chaves em texto, faturamento/quotas por tenant,
 catálogo global de pacotes de modelos e mudança automática de agentes publicados.
+
+## Esclarecimento de UX após deploy (15/10/2026)
+
+O seletor da V1 exibia apenas ids técnicos, inclusive custom, sem explicar
+a diferença entre registrar padrão e provisionar a credencial. A correção
+mostra o nome da organização selecionada, usa o rótulo do registry único e
+explica que um gateway personalizado requer Base URL HTTPS e token em
+IA > Chaves de acesso à IA, com a organização ativa correta. Esta tela
+não grava tokens nem endpoints e não habilita por si só modelos inexistentes.
+Quando a empresa não tem credencial validada, salvar um modelo não a cria.
+
+A administração delegada de credenciais por organização a partir do
+Superadmin permanece fora do escopo deste ajuste de copy: deverá reutilizar
+o mecanismo existente de credenciais com autorização full/MFA e proteção
+contra suporte, jamais duplicar armazenamento de segredos.
+
+A falha de abertura do editor de agentes reportada por evento Sentry
+não está atribuída a esta interface; requer stack trace de telemetria ou
+erro reproduzível em navegador autenticado antes de corrigir a causa.
