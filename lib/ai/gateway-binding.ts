@@ -501,7 +501,10 @@ async function credencialDaOrganizacao(
 
     return {
       provider,
-      baseUrl: typeof data.base_url === "string" && data.base_url.trim() !== "" ? data.base_url : null,
+      baseUrl:
+        typeof data.base_url === "string" && data.base_url.trim() !== ""
+          ? data.base_url
+          : null,
       apiKey: decryptKey({
         ciphertext: byteaToBuffer(data.api_key_encrypted),
         iv: byteaToBuffer(data.api_key_iv),
