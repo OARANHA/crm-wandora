@@ -39,7 +39,7 @@ describe("Editor de agentes — fronteira entre cliente e servidor", () => {
   it("preserva as mesmas exportações canônicas aos consumidores do servidor", () => {
     const servidor = arquivo("lib/ai/governanca-da-ia.ts");
     expect(servidor).toContain('from "./governanca-da-ia-contrato"');
-    expect(servidor).toContain('export { AUTONOMIA_IA_PADRAO, CHAVES_AUTONOMIA_IA }');
-    expect(servidor).toContain('export type { AutonomiaIa, ChaveAutonomiaIa }');
+    expect(servidor).toContain("export { AUTONOMIA_IA_PADRAO, CHAVES_AUTONOMIA_IA }");
+    expect(servidor).toContain("export type { AutonomiaIa, ChaveAutonomiaIa }");
   });
 });
