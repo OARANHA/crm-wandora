@@ -115,6 +115,8 @@ interface BaseProps {
    */
   provedorPadrao?: string;
   modeloPadrao?: string;
+  /** ID canônico escolhido pela plataforma (apenas novos agentes). */
+  credencialPadrao?: string | null;
   autonomiaTecnica?: AutonomiaIa;
   channelSessions: ChannelSessionLite[];
   routerMembership?: { routerId: string; routerName: string } | null;
@@ -254,8 +256,9 @@ export function buildState(args: {
    */
   provedorPadrao?: string;
   modeloPadrao?: string;
+  credencialPadrao?: string | null;
 }): FormState {
-  const { agent, version, t, provedorPadrao, modeloPadrao } = args;
+  const { agent, version, t, provedorPadrao, modeloPadrao, credencialPadrao } = args;
   return {
     name: agent?.name ?? "",
     description: agent?.description ?? "",
@@ -264,7 +267,9 @@ export function buildState(args: {
     model: version?.model ?? modeloPadrao ?? "",
     // `null` gravado = a versão usa a chave da instalação. Sem esta tradução,
     // reabrir o agente mostraria o campo em branco e pediria para escolher de novo.
-    credential_id: version ? (version.credential_id ?? CHAVE_DA_INSTALACAO) : CHAVE_DA_INSTALACAO,
+    credential_id: version
+      ? (version.credential_id ?? CHAVE_DA_INSTALACAO)
+      : (credencialPadrao ?? CHAVE_DA_INSTALACAO),
     channel_session_id: version?.channel_session_id ?? "",
     // O DEFAULT vira o prompt real do agente se ninguém editar — por isso é
     // traduzido de verdade (não só a interface): em espanhol ele instrui a IA
@@ -383,6 +388,7 @@ export function AgentForm(props: Props) {
       t,
       provedorPadrao: props.provedorPadrao,
       modeloPadrao: props.modeloPadrao,
+      credencialPadrao: props.credencialPadrao,
     });
   }, [isEdit, props, t]);
 

@@ -25,6 +25,7 @@ const bodySchema = z
   .object({
     provider: z.string().min(1).max(80).refine(ehProvedorSuportado),
     default_model: z.string().trim().min(1).max(120),
+    credential_id: z.string().uuid().nullable().optional(),
   })
   .strict();
 type Ctx = { params: Promise<{ id: string }> };
@@ -52,9 +53,12 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
         .order("display_name")
         .limit(1000),
       db
-        .from("ai_provider_credentials")
-        .select("provider, is_active, validated_at")
-        .eq("organization_id", orgId),
+        .from("ai_provider_credentials_safe")
+        .select(
+          "id, organization_id, provider, label, base_url, api_key_last4, is_active, validated_at, models_available",
+        )
+        .eq("organization_id", orgId)
+        .limit(100),
       db
         .from("ai_agents")
         .select("id", { count: "exact", head: true })
@@ -97,9 +101,20 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
       padrao: {
         provider: current.provider,
         default_model: current.default_model,
+        credential_id: current.credential_id,
         configured: current.configured,
       },
       provedores: supported,
+      credenciais: (credentialsResult.data ?? []).map((c) => ({
+        id: c.id,
+        provider: c.provider,
+        label: c.label,
+        base_url: c.base_url,
+        api_key_last4: c.api_key_last4,
+        is_active: c.is_active,
+        validated_at: c.validated_at,
+        models_available: c.models_available ?? [],
+      })),
       modelos: (modelsResult.data ?? []).map((x) => ({
         provider: x.provider,
         model_id: x.model_id,
@@ -161,7 +176,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
       .maybeSingle();
     if (anyError)
       return fail("internal_error", "Catálogo de modelos indisponível", 500, { requestId });
-    if (anyModel) {
+    // O catálogo custom é por credencial; o global pode ser de outro gateway.
+    // A validação verdadeira de modelos customizados ocorre via models_available.
+    if (anyModel && body.data.provider !== "custom") {
       return fail("modelo_desconhecido", "Modelo não encontrado no catálogo do provedor", 422, {
         requestId,
       });
@@ -169,16 +186,60 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     catalogoIncompleto = true;
   }
   const previous = lerPadraoLlmDaOrganizacao(org.settings);
+  const credentialId =
+    body.data.credential_id !== undefined
+      ? body.data.credential_id
+      : body.data.provider === previous.provider
+        ? previous.credential_id
+        : null;
+
+  // Custom não tem chave de instalação. Exigir credencial correta e validada.
+  if (body.data.provider === "custom" && !credentialId)
+    return fail("credential_required", "Escolha uma credencial personalizada validada.", 422, {
+      requestId,
+    });
+  if (credentialId) {
+    const { data: cred, error: credError } = await db
+      .from("ai_provider_credentials_safe")
+      .select("id, provider, is_active, validated_at, models_available")
+      .eq("organization_id", orgId)
+      .eq("id", credentialId)
+      .maybeSingle();
+    if (credError)
+      return fail("internal_error", "Falha ao consultar credencial.", 500, { requestId });
+    if (!cred || cred.provider !== body.data.provider || !cred.is_active || !cred.validated_at)
+      return fail(
+        "credential_unavailable",
+        "A credencial escolhida não está validada para esta empresa e provedor.",
+        422,
+        { requestId },
+      );
+    const available = Array.isArray(cred.models_available) ? cred.models_available : [];
+    if (
+      (body.data.provider === "custom" && available.length === 0) ||
+      (available.length > 0 && !available.includes(body.data.default_model))
+    )
+      return fail(
+        "model_unavailable",
+        "O modelo não consta entre os modelos confirmados pela credencial.",
+        422,
+        { requestId },
+      );
+  }
   if (
     previous.configured &&
     previous.provider === body.data.provider &&
-    previous.default_model === body.data.default_model
+    previous.default_model === body.data.default_model &&
+    previous.credential_id === credentialId
   )
     return ok({ organization_id: orgId, padrao: body.data, changed: false }, { requestId });
 
   // CAS no JSONB: não substituir branding/security nem sobrescrever settings alteradas
   // desde a leitura. Em conflito o operador recarrega; nunca simular sucesso.
-  const updatedSettings = mesclarPadraoLlmDaOrganizacao(org.settings, body.data);
+  const updatedSettings = mesclarPadraoLlmDaOrganizacao(org.settings, {
+    ...body.data,
+    credential_id: credentialId,
+  });
   const { data: updated, error } = await db
     .from("organizations")
     .update({ settings: updatedSettings })

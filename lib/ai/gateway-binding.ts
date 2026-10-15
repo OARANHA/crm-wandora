@@ -84,22 +84,27 @@ export async function resolverModeloDoPonto(
     // Antes da chave da instalação vem a credencial da PRÓPRIA organização —
     // o degrau do meio de `resolveOrgLlmConfig`, que esta pilha pulava.
     const daOrg = await credencialDaOrganizacao(organizationId);
-    const idNoProvider =
-      daOrg === null ? null : idParaOProvider(daOrg.provider, String(padrao));
+    const llm = await llmDaOrganizacao(organizationId);
+    // Default pinado e revogado não cai na chave da instalação.
+    if (llm?.credentialId && daOrg === null) return null;
+    const idNoProvider = daOrg === null ? null : idParaOProvider(daOrg.provider, String(padrao));
     if (daOrg !== null && idNoProvider !== null) {
-      const model = instanciar(daOrg.provider, daOrg.apiKey, idNoProvider, null);
+      const model = instanciar(daOrg.provider, daOrg.apiKey, idNoProvider, daOrg.baseUrl);
       if (model !== null) {
         // `modelId` continua sendo o id CANÔNICO, não o traduzido: é ele que
         // casa com o catálogo de preço no log de custo.
         return { model, modelId: String(padrao), origem: "credencial_da_organizacao" };
       }
     }
+    // Se o custom foi pinado, jamais substituir seu endpoint pela chave da instalação.
+    if (llm?.credentialId && llm.provider === "custom") return null;
     // Sem credencial cadastrada sobra a chave da INSTALAÇÃO, e quem diz de QUEM
     // é essa chave é o provedor que a organização escolheu (issue #1181). A
     // leitura desse provedor é preguiçosa: id que já traz rota resolve sem ela,
     // e é esse o caminho de toda instalação padrão.
     const model = await padraoDaInstalacao(
-      () => (daOrg !== null ? Promise.resolve(daOrg.provider) : providerDaOrganizacao(organizationId)),
+      () =>
+        daOrg !== null ? Promise.resolve(daOrg.provider) : providerDaOrganizacao(organizationId),
       padrao,
     );
     if (model !== null) return { model, modelId: String(padrao), origem: "padrao" };
@@ -129,7 +134,9 @@ export async function resolverModeloDoPonto(
       provider: binding.provider,
     });
     const fallback = await padraoDaInstalacao(() => Promise.resolve(binding.provider), padrao);
-    return fallback === null ? null : { model: fallback, modelId: String(padrao), origem: "padrao" };
+    return fallback === null
+      ? null
+      : { model: fallback, modelId: String(padrao), origem: "padrao" };
   }
 
   return { model, modelId: binding.model_id, origem: "binding" };
@@ -142,10 +149,7 @@ interface LinhaBinding {
   base_url: string | null;
 }
 
-async function lerBinding(
-  purpose: string,
-  organizationId: string,
-): Promise<LinhaBinding | null> {
+async function lerBinding(purpose: string, organizationId: string): Promise<LinhaBinding | null> {
   try {
     const admin = createAdminClient();
     // Admin client bypassa RLS, então o filtro por organização é PROGRAMÁTICO e
@@ -187,8 +191,7 @@ async function lerBinding(
 function idParaOProvider(provider: string, id: string): string | null {
   // Os roteadores levam o prefixo inteiro — inclusive o provedor personalizado
   // (#1642), que serve id de QUALQUER fabricante atrás do próprio endpoint.
-  if (provider === "openrouter" || provider === "requesty" || provider === "custom")
-    return id;
+  if (provider === "openrouter" || provider === "requesty" || provider === "custom") return id;
   if (!id.includes("/")) return id;
   if (id.startsWith(`${provider}/`)) return id.slice(provider.length + 1);
   return null;
@@ -300,10 +303,11 @@ async function provedorDoModeloNoCatalogo(modelId: string): Promise<string | nul
  */
 async function padraoDaOrganizacao(
   organizationId: string,
-  daOrg: { provider: string; apiKey: string } | null,
+  daOrg: { provider: string; apiKey: string; baseUrl: string | null } | null,
 ): Promise<ModeloResolvido | null> {
   const llm = await llmDaOrganizacao(organizationId);
   if (llm === null || llm.defaultModel === null) return null;
+  if (llm.credentialId && daOrg === null) return null;
   const defaultModel = await modeloDoProvedor(organizationId, llm.provider, llm.defaultModel);
   const modelId =
     llm.provider === "openrouter" ||
@@ -314,9 +318,13 @@ async function padraoDaOrganizacao(
       : `${llm.provider}/${defaultModel}`;
   if (daOrg !== null && daOrg.provider === llm.provider) {
     const id = idParaOProvider(llm.provider, modelId);
-    const model = id === null ? null : instanciar(llm.provider, daOrg.apiKey, id, null);
-    if (model !== null) return { model, modelId, origem: "credencial_da_organizacao" };
+    if (id !== null) {
+      const model = instanciar(llm.provider, daOrg.apiKey, id, daOrg.baseUrl);
+      if (model !== null) return { model, modelId, origem: "credencial_da_organizacao" };
+    }
   }
+  // Credencial custom pinada sem URL utilizável não cai em chave da instalação.
+  if (llm.credentialId && llm.provider === "custom") return null;
   const model = await padraoDaInstalacao(() => Promise.resolve(llm.provider), modelId as ModelId);
   return model === null ? null : { model, modelId, origem: "padrao" };
 }
@@ -348,11 +356,14 @@ async function modeloDoProvedor(
       ? defaultModel.slice(provider.length + 1)
       : defaultModel;
   const oGravado = (motivo: string): string => {
-    logger.warn("[gateway-binding] não consegui conferir o modelo padrão no catálogo — usando o gravado", {
-      organization_id: organizationId,
-      provider,
-      motivo,
-    });
+    logger.warn(
+      "[gateway-binding] não consegui conferir o modelo padrão no catálogo — usando o gravado",
+      {
+        organization_id: organizationId,
+        provider,
+        motivo,
+      },
+    );
     return defaultModel;
   };
   try {
@@ -372,12 +383,15 @@ async function modeloDoProvedor(
     const escolha = await escolherModeloNoCatalogo(admin, provider);
     if (escolha === null) return oGravado("catálogo ilegível");
     if (!escolha.escolhido) return defaultModel;
-    logger.warn("[gateway-binding] o modelo padrão da organização não é do provedor dela — usando o do catálogo", {
-      organization_id: organizationId,
-      provider,
-      gravado: defaultModel,
-      usado: escolha.modelId,
-    });
+    logger.warn(
+      "[gateway-binding] o modelo padrão da organização não é do provedor dela — usando o do catálogo",
+      {
+        organization_id: organizationId,
+        provider,
+        gravado: defaultModel,
+        usado: escolha.modelId,
+      },
+    );
     return escolha.modelId;
   } catch (erro) {
     return oGravado(erro instanceof Error ? erro.name : typeof erro);
@@ -398,7 +412,7 @@ async function providerDaOrganizacao(organizationId: string): Promise<string | n
 
 async function llmDaOrganizacao(
   organizationId: string,
-): Promise<{ provider: string; defaultModel: string | null } | null> {
+): Promise<{ provider: string; defaultModel: string | null; credentialId: string | null } | null> {
   try {
     const admin = createAdminClient();
     // Admin client bypassa RLS: filtro por organização é PROGRAMÁTICO e
@@ -408,12 +422,20 @@ async function llmDaOrganizacao(
       .select("settings")
       .eq("id", organizationId)
       .maybeSingle();
-    const llm = (data?.settings as { llm?: { provider?: unknown; default_model?: unknown } } | null)
-      ?.llm;
+    const llm = (
+      data?.settings as {
+        llm?: { provider?: unknown; default_model?: unknown; credential_id?: unknown };
+      } | null
+    )?.llm;
     if (typeof llm?.provider !== "string" || llm.provider === "") return null;
     const defaultModel =
       typeof llm.default_model === "string" && llm.default_model !== "" ? llm.default_model : null;
-    return { provider: llm.provider, defaultModel };
+    return {
+      provider: llm.provider,
+      defaultModel,
+      credentialId:
+        typeof llm.credential_id === "string" && llm.credential_id ? llm.credential_id : null,
+    };
   } catch (erro) {
     logger.warn("[gateway-binding] não consegui ler o provedor da organização", {
       organization_id: organizationId,
@@ -447,7 +469,7 @@ async function llmDaOrganizacao(
  */
 async function credencialDaOrganizacao(
   organizationId: string,
-): Promise<{ provider: string; apiKey: string } | null> {
+): Promise<{ provider: string; apiKey: string; baseUrl: string | null } | null> {
   try {
     const admin = createAdminClient();
     const { data: org } = await admin
@@ -455,25 +477,33 @@ async function credencialDaOrganizacao(
       .select("settings")
       .eq("id", organizationId)
       .maybeSingle();
-    const provider = (org?.settings as { llm?: { provider?: string } } | null)?.llm?.provider;
+    const llm = (
+      org?.settings as {
+        llm?: { provider?: string; credential_id?: unknown };
+      } | null
+    )?.llm;
+    const provider = llm?.provider;
     if (typeof provider !== "string" || provider === "") return null;
+    const credentialId =
+      typeof llm?.credential_id === "string" && llm.credential_id ? llm.credential_id : null;
 
     // Admin client bypassa RLS: filtro por organização é PROGRAMÁTICO e
     // obrigatório (CLAUDE.md, anti-pattern 10).
-    const { data } = await admin
+    let query = admin
       .from("ai_provider_credentials")
-      .select("api_key_encrypted, api_key_iv, api_key_tag")
+      .select("api_key_encrypted, api_key_iv, api_key_tag, base_url")
       .eq("organization_id", organizationId)
       .eq("provider", provider)
       .eq("is_active", true)
-      .not("validated_at", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .not("validated_at", "is", null);
+    if (credentialId) query = query.eq("id", credentialId);
+    else query = query.order("created_at", { ascending: false });
+    const { data } = await query.limit(1).maybeSingle();
     if (!data) return null;
 
     return {
       provider,
+      baseUrl: typeof data.base_url === "string" ? data.base_url.trim() || null : null,
       apiKey: decryptKey({
         ciphertext: byteaToBuffer(data.api_key_encrypted),
         iv: byteaToBuffer(data.api_key_iv),
@@ -487,10 +517,13 @@ async function credencialDaOrganizacao(
     // cadastrou credencial", e o operador vê a conta do `.env` sendo debitada
     // sem nunca saber por quê. Vai só a CLASSE do erro: a mensagem pode
     // carregar material da credencial, o nome do erro não.
-    logger.warn("credencial da organização não pôde ser lida; seguindo para a chave da instalação", {
-      organizationId,
-      erro: erro instanceof Error ? erro.name : typeof erro,
-    });
+    logger.warn(
+      "credencial da organização não pôde ser lida; seguindo para a chave da instalação",
+      {
+        organizationId,
+        erro: erro instanceof Error ? erro.name : typeof erro,
+      },
+    );
     return null;
   }
 }
@@ -563,7 +596,9 @@ function instanciar(
     // gateway para outro lugar.
     case "custom":
       return baseUrl
-        ? createOpenAI({ apiKey, baseURL: baseUrl, fetch: fetchParaDestinoDaOrganizacao() }).chat(modelId)
+        ? createOpenAI({ apiKey, baseURL: baseUrl, fetch: fetchParaDestinoDaOrganizacao() }).chat(
+            modelId,
+          )
         : null;
     default:
       return null;

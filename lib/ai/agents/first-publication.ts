@@ -128,6 +128,13 @@ export async function publishFirstVersion(
   // publicação não move mais o provedor — o que ela escolhe é por onde publica,
   // e por isso `const` (o `let` era de quando este passo adotava outra chave).
   const provider = selection?.provider ?? provedorDaInstalacao(org?.settings);
+  const llmConfigurado = (
+    org?.settings as {
+      llm?: { provider?: string; default_model?: string; credential_id?: string };
+    } | null
+  )?.llm;
+  const pinDaPlataforma =
+    !selection && llmConfigurado?.provider === provider ? llmConfigurado?.credential_id : undefined;
 
   /*
    * ⚠️ QUAL CHAVE ESTA VERSÃO USA — e por que o provedor NÃO muda mais aqui.
@@ -157,26 +164,39 @@ export async function publishFirstVersion(
    * saindo da mesma origem, e a leitura do catálogo abaixo é a do provedor lido.
    */
   let credentialId: string | null = selection ? selection.credentialId : null;
+  let modeloProvisionado: string | null = null;
   /** Provedor cuja credencial colada ainda não foi confirmada pelo provedor. */
   let chaveEmVerificacao: string | undefined;
 
   if (!selection) {
-    const { data: credencialDoProvedor } = await admin
+    let consultaCredencial = admin
       .from("ai_provider_credentials")
-      .select("id")
+      .select("id, models_available")
       .eq("organization_id", orgId)
       .eq("provider", provider)
       .eq("is_active", true)
       // `validated_at` não nulo é exigência de `loadCredential`, não capricho:
       // uma credencial que o provedor ainda não confirmou não é utilizável no
       // turno — publicar com ela entrega um agente que erra em toda mensagem.
-      .not("validated_at", "is", null)
-      .limit(1)
-      .maybeSingle();
+      .not("validated_at", "is", null);
+    if (pinDaPlataforma) consultaCredencial = consultaCredencial.eq("id", pinDaPlataforma);
+    const { data: credencialDoProvedor } = await consultaCredencial.limit(1).maybeSingle();
 
     credentialId = (credencialDoProvedor?.id as string | undefined) ?? null;
+    const modelosDaCredencial = Array.isArray(credencialDoProvedor?.models_available)
+      ? (credencialDoProvedor.models_available as string[])
+      : [];
+    if (
+      provider === "custom" &&
+      pinDaPlataforma &&
+      credentialId &&
+      typeof llmConfigurado?.default_model === "string" &&
+      modelosDaCredencial.includes(llmConfigurado.default_model)
+    ) {
+      modeloProvisionado = llmConfigurado.default_model;
+    }
 
-    if (!credentialId && !chaveDePlataforma(provider)) {
+    if (!credentialId && (pinDaPlataforma || !chaveDePlataforma(provider))) {
       // Nada utilizável — mas pode haver uma chave colada esperando o provedor
       // confirmar. Nomear isso é o que separa "cole a chave" de "espere um
       // instante": são causas e conselhos diferentes, e sem o nome do provedor
@@ -198,7 +218,6 @@ export async function publishFirstVersion(
     }
   }
 
-
   // O modelo daquele provedor. Não existe fallback literal: um id de outro
   // provedor (ou inventado) produz o pior desfecho do produto — o agente
   // responde texto plausível e nunca cria o lead nem move o card.
@@ -219,10 +238,12 @@ export async function publishFirstVersion(
   const escolha = escolherModeloDoProvedor(
     (modelos ?? []) as Parameters<typeof escolherModeloDoProvedor>[0],
   );
-  if (!escolha.escolhido) {
+  if (!escolha.escolhido && !modeloProvisionado) {
     return { published: false, reason: "no_model", provider, motivo: escolha.motivo };
   }
-  const modelId = selection?.model ?? escolha.modelId;
+  const modelId =
+    selection?.model ?? modeloProvisionado ?? (escolha.escolhido ? escolha.modelId : null);
+  if (!modelId) return { published: false, reason: "no_model", provider, motivo: "catalogo_vazio" };
   if (selection && !(modelos ?? []).some((m) => m.model_id === modelId && m.supports_tools))
     return { published: false, reason: "failed", message: "model_not_found" };
 
@@ -252,7 +273,7 @@ export async function publishFirstVersion(
   // nenhum modelo utilizável é defeito de instalação que se resolve antes da
   // chave, e inverter isso mudaria a causa que a tela recebe para quem tem os
   // dois problemas — sem necessidade nenhuma para a #1007.
-  if (!credentialId && !chaveDePlataforma(provider)) {
+  if (!credentialId && (pinDaPlataforma || !chaveDePlataforma(provider))) {
     return {
       published: false,
       reason: "sem_chave",

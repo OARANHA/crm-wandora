@@ -16,14 +16,14 @@
  * antes desta frente. Uma tabela indisponível deixando o cliente sem resposta
  * seria trocar um problema de configuração por um de disponibilidade.
  */
-import type pg from 'pg';
+import type pg from "pg";
 
 import {
   decidirBinding,
   type AgentePublicado,
   type DecisaoDeBinding,
   type LinhaDeBinding,
-} from '../../../ai/pontos/resolver';
+} from "../../../ai/pontos/resolver";
 
 /** Lê o binding de um ponto. `null` = o operador não configurou este ponto. */
 export async function carregarBinding(
@@ -53,7 +53,11 @@ export interface EntradaDoSeam {
   modeloDoCallSite: string | undefined;
   /** Preenchido apenas quando a origem é a versão publicada do agente. */
   overrideDoAgente: AgentePublicado | null;
-  padraoDaOrganizacao: { provider: string; defaultModel: string | null };
+  padraoDaOrganizacao: {
+    provider: string;
+    defaultModel: string | null;
+    credentialId?: string | null;
+  };
 }
 
 /**
@@ -80,7 +84,7 @@ export async function decidirParaOSeam(
     // criada por ela. O aviso é por chamada e barato; quem o consome é o log
     // estruturado, e na frente de logs vira aviso na Central.
     binding = null;
-    deps.log?.warn('llm: não consegui ler o binding do ponto — usando o padrão', {
+    deps.log?.warn("llm: não consegui ler o binding do ponto — usando o padrão", {
       organization_id: entrada.organizationId,
       purpose: entrada.purpose,
       motivo: err instanceof Error ? err.message : String(err),

@@ -290,6 +290,74 @@ describe("sem binding, a credencial da organização manda", () => {
  * em 2026-08-25. Quando o id não serve ao provider da organização, o certo é
  * seguir para `resolveLanguageModel`, que sabe rotear pelo prefixo.
  */
+describe("provider custom pinado no padrão do tenant", () => {
+  async function resolverComBaseUrl(baseUrl: string | null) {
+    const filtros: string[] = [];
+    const pin = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa11";
+    vi.doMock("@/lib/supabase/admin", () => ({
+      createAdminClient: () => ({
+        from: (tabela: string) => {
+          const chain = {
+            select: () => chain,
+            eq: (coluna: string, valor: unknown) => {
+              filtros.push(`${coluna}=${String(valor)}`);
+              return chain;
+            },
+            not: () => chain,
+            order: () => chain,
+            limit: () => chain,
+            maybeSingle: async () => ({
+              data:
+                tabela === "ai_purpose_bindings"
+                  ? null
+                  : tabela === "organizations"
+                    ? {
+                        settings: {
+                          llm: {
+                            provider: "custom",
+                            credential_id: pin,
+                            default_model: "gateway-model",
+                          },
+                        },
+                      }
+                    : {
+                        api_key_encrypted: "x",
+                        api_key_iv: "y",
+                        api_key_tag: "z",
+                        base_url: baseUrl,
+                      },
+            }),
+          };
+          return chain;
+        },
+      }),
+    }));
+    vi.doMock("@/lib/ai/gateway", async (orig) => ({
+      ...((await orig()) as Record<string, unknown>),
+      resolveLanguageModel: (id: string) => ({ __padrao: true, modelId: id }),
+    }));
+    vi.resetModules();
+    const { resolverModeloDoPonto } = await import("@/lib/ai/gateway-binding");
+    const result = await resolverModeloDoPonto("sentiment_classify", ORG, "gateway-model");
+    return { result, filtros, pin };
+  }
+
+  it("usa a URL e a chave da mesma credencial custom da organização", async () => {
+    const { result, filtros, pin } = await resolverComBaseUrl("https://gateway.example.test/v1");
+    expect(filtros).toContain(`organization_id=${ORG}`);
+    expect(filtros).toContain("provider=custom");
+    expect(filtros).toContain(`id=${pin}`);
+    expect(result?.origem).toBe("credencial_da_organizacao");
+    expect(result?.modelId).toBe("gateway-model");
+    expect((result?.model as { modelId?: string }).modelId).toBe("gateway-model");
+  });
+
+  it("sem URL válida da credencial pinada não recorre à chave da instalação", async () => {
+    const { result } = await resolverComBaseUrl(null);
+    expect(result).toBeNull();
+  });
+});
+
 describe("a credencial da organização só vale para modelo que o provider dela executa", () => {
   function adminComOrg(provider: string) {
     return () => ({

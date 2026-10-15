@@ -15,19 +15,19 @@
  * A config é lida do DB A CADA chamada (resolveOrgLlmConfig) — trocar modelo/
  * provider/teto é UPDATE na config, sem restart nem deploy.
  */
-import type pg from 'pg';
-import { z } from 'zod';
+import type pg from "pg";
+import { z } from "zod";
 
-import { byteaToBuffer, decryptKey } from '@/lib/crypto/aes_gcm';
+import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
 import {
   LIMIAR_PADRAO_PCT,
   normalizarChaveDeOrcamento,
   normalizarModoDeOrcamento,
   type ChaveDeOrcamento,
   type ModoDeOrcamento,
-} from './orcamento';
-import type { RaciocinioDeepseek } from './providers';
-import type { CacheTtl } from './stable-prefix';
+} from "./orcamento";
+import type { RaciocinioDeepseek } from "./providers";
+import type { CacheTtl } from "./stable-prefix";
 
 /** Config da camada LLM montada do env validado (padrão crmEdgeConfigFromEnv). */
 export interface LlmEdgeConfig {
@@ -94,12 +94,12 @@ export function llmEdgeConfigFromEnv(env: {
   AI_BUDGET_ENFORCEMENT?: string;
   DEEPSEEK_THINKING?: string;
 }): LlmEdgeConfig {
-  const ttl = env.LLM_CACHE_TTL ?? '1h';
-  if (ttl !== '5m' && ttl !== '1h') {
+  const ttl = env.LLM_CACHE_TTL ?? "1h";
+  if (ttl !== "5m" && ttl !== "1h") {
     throw new Error("LLM_CACHE_TTL inválido — use '5m' ou '1h' (default 1h)");
   }
-  const raciocinio = env.DEEPSEEK_THINKING ?? 'provider';
-  if (raciocinio !== 'provider' && raciocinio !== 'disabled') {
+  const raciocinio = env.DEEPSEEK_THINKING ?? "provider";
+  if (raciocinio !== "provider" && raciocinio !== "disabled") {
     throw new Error("DEEPSEEK_THINKING inválido — use 'provider' ou 'disabled' (default provider)");
   }
   return {
@@ -118,10 +118,10 @@ export function llmEdgeConfigFromEnv(env: {
 
 /** Org sem credencial LLM utilizável — erro tipado, mensagem sem valores (credencial fora). */
 export class LlmNotConfiguredError extends Error {
-  override readonly name = 'llm_not_configured';
+  override readonly name = "llm_not_configured";
   constructor() {
     super(
-      'org sem credencial LLM utilizável — cadastre uma chave BYOK ativa/validada em ai_provider_credentials ou defina ANTHROPIC_API_KEY / OPENAI_API_KEY (fallback de plataforma, conforme o provider do modelo)',
+      "org sem credencial LLM utilizável — cadastre uma chave BYOK ativa/validada em ai_provider_credentials ou defina ANTHROPIC_API_KEY / OPENAI_API_KEY (fallback de plataforma, conforme o provider do modelo)",
     );
   }
 }
@@ -149,7 +149,7 @@ export interface OrcamentoDaOrg {
  * De QUEM é a chave que o resolvedor devolveu. Mesmo vocabulário de
  * `lib/ai/embeddings/chave.ts`, que responde a mesma pergunta para embedding.
  */
-export type OrigemDaChaveLlm = 'credencial_da_organizacao' | 'chave_da_instalacao';
+export type OrigemDaChaveLlm = "credencial_da_organizacao" | "chave_da_instalacao";
 
 export interface OrgLlmConfig {
   provider: string;
@@ -168,6 +168,7 @@ export interface OrgLlmConfig {
    */
   origemDaChave: OrigemDaChaveLlm;
   defaultModel: string | null;
+  credentialId: string | null;
   params: Record<string, unknown>;
   enabledModels: string[];
   orcamento: OrcamentoDaOrg;
@@ -204,15 +205,17 @@ export interface OrgLlmConfig {
 // que continua sendo jsonb livre.
 const llmSettingsSchema = z
   .object({
-    provider: z.string().min(1).catch('anthropic'),
+    provider: z.string().min(1).catch("anthropic"),
     default_model: z.string().min(1).nullable().catch(null),
+    credential_id: z.string().uuid().nullable().catch(null),
     params: z.record(z.string(), z.unknown()).catch({}),
     enabled_models: z.array(z.string()).catch([]),
   })
   .passthrough()
   .catch({
-    provider: 'anthropic',
+    provider: "anthropic",
     default_model: null,
+    credential_id: null,
     params: {},
     enabled_models: [],
   });
@@ -250,7 +253,7 @@ interface LinhaDeConfig {
 }
 
 const ORCAMENTO_DESLIGADO: OrcamentoDaOrg = {
-  modo: 'off',
+  modo: "off",
   tetoCents: 0,
   efetivoEm: null,
   limiarPct: LIMIAR_PADRAO_PCT,
@@ -265,7 +268,7 @@ const ORCAMENTO_DESLIGADO: OrcamentoDaOrg = {
 function causaDoBanco(err: unknown): string {
   const codigo = (err as { code?: unknown } | null)?.code;
   const texto = err instanceof Error ? err.message : String(err);
-  return `${typeof codigo === 'string' ? codigo : 'sem_sqlstate'}: ${texto}`.slice(0, 300);
+  return `${typeof codigo === "string" ? codigo : "sem_sqlstate"}: ${texto}`.slice(0, 300);
 }
 
 /**
@@ -313,11 +316,16 @@ export async function resolveOrgLlmConfig(
     ({ rows } = await db.query<LinhaDeConfig>(SQL_CONFIG_LEGADO, [organizationId]));
   }
   if (rows.length === 0) {
-    throw new Error('organização inexistente ao resolver config LLM');
+    throw new Error("organização inexistente ao resolver config LLM");
   }
   const linha = rows[0];
   const settings = llmSettingsSchema.parse(linha?.llm ?? {});
   const provider = override?.provider ?? settings.provider;
+  // Só o default sem override herda o ID fixado pelo Superadmin.
+  // Versão publicada e binding continuam com precedência superior.
+  const credentialIdEscolhida =
+    override?.credentialId ||
+    (override === undefined && provider === settings.provider ? settings.credential_id : null);
 
   // Organização sem linha em `ai_budgets` cai aqui com tudo nulo, e o
   // normalizador resolve `modo` para 'off'. NULO É SEMPRE A RESPOSTA MAIS
@@ -335,7 +343,7 @@ export async function resolveOrgLlmConfig(
   // Credencial: a ESCOLHIDA na versão publicada quando houver (ainda exigindo
   // ativa+validada — publish valida, mas a credencial pode ser revogada depois);
   // senão a mais recente ativa/validada do provider. Sempre escopada pela org.
-  const { rows: credRows } = override?.credentialId
+  const { rows: credRows } = credentialIdEscolhida
     ? await db.query<{
         id: string;
         api_key_encrypted: unknown;
@@ -344,10 +352,10 @@ export async function resolveOrgLlmConfig(
       }>(
         `select id, api_key_encrypted, api_key_iv, api_key_tag
          from ai_provider_credentials
-         where organization_id = $1 and id = $2
+         where organization_id = $1 and id = $2 and provider = $3
            and is_active and validated_at is not null
          limit 1`,
-        [organizationId, override.credentialId],
+        [organizationId, credentialIdEscolhida, provider],
       )
     : await db.query<{
         id: string;
@@ -369,22 +377,26 @@ export async function resolveOrgLlmConfig(
   // ramo escolheu a chave, e só este ponto sabe isso sem adivinhar.
   let origemDaChave: OrigemDaChaveLlm;
   const cred = credRows[0];
+  // Se o ID escolhido foi revogado, não substituir silenciosamente por
+  // chave da instalação ou outra credencial mais recente.
+  if (override === undefined && settings.credential_id && cred === undefined)
+    throw new LlmNotConfiguredError();
   if (cred !== undefined) {
     apiKey = decryptKey({
       ciphertext: byteaToBuffer(cred.api_key_encrypted),
       iv: byteaToBuffer(cred.api_key_iv),
       tag: byteaToBuffer(cred.api_key_tag),
     });
-    origemDaChave = 'credencial_da_organizacao';
-  } else if (provider === 'anthropic' && cfg.anthropicApiKey) {
+    origemDaChave = "credencial_da_organizacao";
+  } else if (provider === "anthropic" && cfg.anthropicApiKey) {
     apiKey = cfg.anthropicApiKey;
-    origemDaChave = 'chave_da_instalacao';
-  } else if (provider === 'openai' && cfg.openaiApiKey) {
+    origemDaChave = "chave_da_instalacao";
+  } else if (provider === "openai" && cfg.openaiApiKey) {
     apiKey = cfg.openaiApiKey;
-    origemDaChave = 'chave_da_instalacao';
-  } else if (provider === 'openrouter' && cfg.openrouterApiKey) {
+    origemDaChave = "chave_da_instalacao";
+  } else if (provider === "openrouter" && cfg.openrouterApiKey) {
     apiKey = cfg.openrouterApiKey;
-    origemDaChave = 'chave_da_instalacao';
+    origemDaChave = "chave_da_instalacao";
   } else {
     throw new LlmNotConfiguredError();
   }
@@ -413,6 +425,7 @@ export async function resolveOrgLlmConfig(
     baseUrl,
     origemDaChave,
     defaultModel: settings.default_model ?? null,
+    credentialId: cred?.id ?? null,
     params: settings.params,
     enabledModels: settings.enabled_models,
     orcamento,

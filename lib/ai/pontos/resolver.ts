@@ -80,7 +80,8 @@ export const EXPLICACAO_DA_ORIGEM: Record<OrigemDaEscolha, string> = {
   // Não "quem decidiu foi a IA de sempre": a mesma origem vale quando ela
   // falhou (valeu a regra de antes). O que é verdade nas duas é que ele não
   // decidiu. O clique de teste, que não entra na comparação, tem a sua.
-  jev_observacao: "O Jev observou: a resposta dele ficou registrada para comparar, e não decidiu nada.",
+  jev_observacao:
+    "O Jev observou: a resposta dele ficou registrada para comparar, e não decidiu nada.",
   jev_teste: "Teste na tela do roteador — não entra na comparação.",
   reserva_do_jev: "O Jev não respondeu; a IA de sempre mediu no lugar dele.",
   jev_cobriu: "A IA de sempre falhou, mas o Jev já tinha medido esta mensagem: nada se perdeu.",
@@ -107,6 +108,8 @@ export interface AgentePublicado {
 export interface PadraoDaOrganizacao {
   provider: string;
   defaultModel: string | null;
+  /** Credencial explicitamente escolhida pelo Superadmin, quando existir. */
+  credentialId?: string | null;
 }
 
 export interface EntradaDaDecisao {
@@ -228,7 +231,7 @@ export function decidirBinding(entrada: EntradaDaDecisao): DecisaoDeBinding {
       return {
         provider: entrada.padraoDaOrganizacao.provider,
         modelId: entrada.padraoDaOrganizacao.defaultModel,
-        credentialId: null,
+        credentialId: entrada.padraoDaOrganizacao.credentialId ?? null,
         baseUrl: null,
         origem: "padrao_da_organizacao",
         avisos,
@@ -269,7 +272,7 @@ export function decidirBinding(entrada: EntradaDaDecisao): DecisaoDeBinding {
     return {
       provider: entrada.padraoDaOrganizacao.provider,
       modelId: entrada.modeloDeAmbiente,
-      credentialId: null,
+      credentialId: entrada.padraoDaOrganizacao.credentialId ?? null,
       baseUrl: null,
       origem: "variavel_de_ambiente",
       avisos,
@@ -306,7 +309,7 @@ export function decidirBinding(entrada: EntradaDaDecisao): DecisaoDeBinding {
   return {
     provider: entrada.padraoDaOrganizacao.provider,
     modelId: entrada.padraoDaOrganizacao.defaultModel,
-    credentialId: null,
+    credentialId: entrada.padraoDaOrganizacao.credentialId ?? null,
     baseUrl: null,
     origem: "padrao_da_organizacao",
     avisos,

@@ -32,7 +32,7 @@ describe("governança central de IA — contrato contra regressões", () => {
     expect(s).toContain('.eq("settings", JSON.stringify(org.settings ?? {}))');
     expect(s).toContain('fail("conflict"');
     expect(s).toContain("if (!updated)");
-    expect(s).toContain("mesclarPadraoLlmDaOrganizacao(org.settings, body.data)");
+    expect(s).toContain("mesclarPadraoLlmDaOrganizacao(org.settings, {");
   });
   it("não atualiza versões publicadas ou bindings e não transporta secrets", () => {
     const s = source(route);
@@ -52,8 +52,10 @@ describe("governança central de IA — contrato contra regressões", () => {
     expect(uiSource).toContain("Organização selecionada: {data.organization_name}");
     expect(uiSource).toContain("PROVEDOR_POR_ID.get(id)?.rotulo ?? id");
     expect(uiSource).toContain('provider === "custom"');
-    expect(uiSource).toMatch(/IA → Chaves de\s+acesso à IA/);
-    expect(uiSource).toContain("com esta organização ativa");
+    expect(uiSource).toContain("Base URL HTTPS");
+    expect(uiSource).toContain("Token/API Key");
+    expect(uiSource).toContain("Cadastrar IA personalizada para");
+    expect(uiSource).toMatch(/credential_id:\s+credentialId\s*\|\|\s*null/);
     expect(routeSource).not.toMatch(/api_key_encrypted|api_key_iv|api_key_tag/);
   });
 

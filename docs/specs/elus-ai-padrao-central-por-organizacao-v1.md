@@ -65,3 +65,12 @@ contra suporte, jamais duplicar armazenamento de segredos.
 A falha de abertura do editor de agentes reportada por evento Sentry
 não está atribuída a esta interface; requer stack trace de telemetria ou
 erro reproduzível em navegador autenticado antes de corrigir a causa.
+
+## Evolução V2 — credenciais no Superadmin
+
+A V1 original excluía cadastrar chaves e endpoints no Superadmin.
+Essa limitação gerou uma tela incapaz de provisionar o tenant sem entrar
+na conta da empresa. O contrato governado posterior está em
+[elus-credenciais-plataforma-superadmin-v1.md](elus-credenciais-plataforma-superadmin-v1.md).
+Ele reutiliza ai_provider_credentials/AES-GCM, valida antes de ativar
+e acrescenta credential_id explícito ao settings.llm do tenant.

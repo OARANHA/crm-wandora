@@ -8,6 +8,18 @@ on:
       - "app/api/v1/admin/tenants/**/ai-default/**"
       - "components/admin/tenants/TenantAiPlatformDefault.tsx"
       - "lib/ai/padrao-llm-da-organizacao*"
+      - "app/api/v1/admin/tenants/**/ai-credentials/**"
+      - "lib/ai/credenciais/guardar.ts"
+      - "lib/ai/credenciais/guardar-validada-superadmin.test.ts"
+      - "tests/unit/ia-credenciais-superadmin.test.ts"
+      - "lib/agent-engine/edge/llm/**"
+      - "lib/ai/gateway-binding.ts"
+      - "lib/ai/pontos/resolver.ts"
+      - "lib/ai/agents/first-publication.ts"
+      - "app/app/ai/agents/new/page.tsx"
+      - "app/app/ai/agents/[id]/_components/AgentForm.tsx"
+      - "tests/unit/ia-credenciais-superadmin-gates.test.ts"
+      - "docs/specs/elus-credenciais-plataforma-superadmin-v1.md"
       - "tests/unit/ia-padrao-central-superadmin-gates.test.ts"
       - "lib/audit/actions.ts"
   workflow_dispatch:
@@ -42,6 +54,20 @@ jobs:
           components/admin/tenants/TenantAiPlatformDefault.tsx
           lib/ai/padrao-llm-da-organizacao.ts
           lib/ai/padrao-llm-da-organizacao.test.ts
+          "app/api/v1/admin/tenants/[id]/ai-credentials/route.ts"
+          "app/api/v1/admin/tenants/[id]/ai-credentials/test/route.ts"
+          lib/ai/credenciais/guardar.ts
+          lib/ai/credenciais/guardar-validada-superadmin.test.ts
+          tests/unit/ia-credenciais-superadmin.test.ts
+          lib/ai/pontos/resolver.ts
+          lib/ai/gateway-binding.ts
+          lib/agent-engine/edge/llm/credentials.ts
+          lib/agent-engine/edge/llm/run-model-call.ts
+          lib/agent-engine/edge/llm/binding-do-ponto.ts
+          lib/ai/agents/first-publication.ts
+          "app/app/ai/agents/new/page.tsx"
+          "app/app/ai/agents/[id]/_components/AgentForm.tsx"
+          tests/unit/ia-credenciais-superadmin-gates.test.ts
           tests/unit/ia-padrao-central-superadmin-gates.test.ts
       - name: Formatting
         run: >-
@@ -51,12 +77,35 @@ jobs:
           components/admin/tenants/TenantAiPlatformDefault.tsx
           lib/ai/padrao-llm-da-organizacao.ts
           lib/ai/padrao-llm-da-organizacao.test.ts
+          "app/api/v1/admin/tenants/[id]/ai-credentials/route.ts"
+          "app/api/v1/admin/tenants/[id]/ai-credentials/test/route.ts"
+          lib/ai/credenciais/guardar.ts
+          lib/ai/credenciais/guardar-validada-superadmin.test.ts
+          tests/unit/ia-credenciais-superadmin.test.ts
+          lib/ai/pontos/resolver.ts
+          lib/ai/gateway-binding.ts
+          lib/agent-engine/edge/llm/credentials.ts
+          lib/agent-engine/edge/llm/run-model-call.ts
+          lib/agent-engine/edge/llm/binding-do-ponto.ts
+          lib/ai/agents/first-publication.ts
+          "app/app/ai/agents/new/page.tsx"
+          "app/app/ai/agents/[id]/_components/AgentForm.tsx"
+          tests/unit/ia-credenciais-superadmin-gates.test.ts
           tests/unit/ia-padrao-central-superadmin-gates.test.ts
       - name: Governed defaults and admin regression
         run: >-
           pnpm exec vitest run
           lib/ai/padrao-llm-da-organizacao.test.ts
           tests/unit/ia-padrao-central-superadmin-gates.test.ts
+          tests/unit/ia-credenciais-superadmin-gates.test.ts
+          tests/unit/ia-credenciais-superadmin.test.ts
+          lib/ai/credenciais/guardar-validada-superadmin.test.ts
+          tests/unit/pontos-de-ia-resolver.test.ts
+          lib/agent-engine/edge/llm/credentials.test.ts
+          tests/unit/gateway-binding.test.ts
+          tests/unit/seam-respeita-o-binding.test.ts
+          tests/unit/onboarding-agente-nao-publicado.test.ts
+          tests/unit/agente-novo-herda-o-provedor-da-organizacao.test.ts
           tests/unit/admin-escrita-exige-scope-full.test.ts
           tests/unit/ia-plataforma-provedor-gates.test.ts
           --maxWorkers=2
