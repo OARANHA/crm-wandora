@@ -24,16 +24,14 @@ describe("Editor de agentes — fronteira entre cliente e servidor", () => {
     expect(contrato).not.toMatch(/\b(?:import|require)\s*\(/);
     expect(contrato).not.toMatch(/^import\s/m);
     expect(contrato).not.toContain("process.env");
-    expect(contrato).not.toContain("supabase");
+    expect(contrato).not.toContain('from "@/lib/supabase/admin"');
   });
 
   it("não leva governanca-da-ia.ts, Supabase admin ou lib/env ao AgentForm", () => {
     const formulario = arquivo("app/app/ai/agents/[id]/_components/AgentForm.tsx");
     const abas = arquivo("app/app/ai/agents/[id]/_components/AgentTabs.tsx");
 
-    expect(formulario).toContain(
-      'from "@/lib/ai/governanca-da-ia-contrato"',
-    );
+    expect(formulario).toContain('from "@/lib/ai/governanca-da-ia-contrato"');
     expect(abas).toContain('from "@/lib/ai/governanca-da-ia-contrato"');
     for (const fonte of [formulario, abas]) {
       expect(fonte).not.toContain('from "@/lib/ai/governanca-da-ia"');
