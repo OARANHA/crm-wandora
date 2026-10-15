@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { podeConfigurarIa, podeGerenciarIaDaPlataforma } from "@/lib/ai/governanca-da-ia";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -39,35 +40,35 @@ export default async function AcervoPage() {
     redirect("/403");
   }
 
-
   const supabase = await createClient();
 
-  const [{ data: sourcesRaw }, { data: agentesRaw }, estadoDaChave] =
-    await Promise.all([
-      supabase
-        .from("ai_knowledge_sources")
-        .select("*")
-        .eq("organization_id", activeOrg.orgId)
-        .order("created_at", { ascending: false }),
-      // Quem consulta o quê. A tela precisa disto para responder "se eu arquivar
-      // este material, quem para de saber dele?" — sem essa resposta, arquivar é
-      // um tiro no escuro.
-      supabase
-        .from("ai_agents")
-        .select("id, name, published_version_id, ai_agent_versions!inner(id, knowledge_source_ids)")
-        .eq("organization_id", activeOrg.orgId)
-        .is("archived_at", null),
-      montarEstadoDaChave(supabase, activeOrg.orgId),
-    ]);
+  const [{ data: sourcesRaw }, { data: agentesRaw }, estadoDaChave] = await Promise.all([
+    supabase
+      .from("ai_knowledge_sources")
+      .select("*")
+      .eq("organization_id", activeOrg.orgId)
+      .order("created_at", { ascending: false }),
+    // Quem consulta o quê. A tela precisa disto para responder "se eu arquivar
+    // este material, quem para de saber dele?" — sem essa resposta, arquivar é
+    // um tiro no escuro.
+    supabase
+      .from("ai_agents")
+      .select("id, name, published_version_id, ai_agent_versions!inner(id, knowledge_source_ids)")
+      .eq("organization_id", activeOrg.orgId)
+      .is("archived_at", null),
+    montarEstadoDaChave(supabase, activeOrg.orgId),
+  ]);
 
   const initialSources = (sourcesRaw ?? []) as unknown as SourceRow[];
 
-  const agentes: AgenteQueUsa[] = ((agentesRaw ?? []) as unknown as Array<{
-    id: string;
-    name: string;
-    published_version_id: string | null;
-    ai_agent_versions: Array<{ id: string; knowledge_source_ids: string[] | null }>;
-  }>)
+  const agentes: AgenteQueUsa[] = (
+    (agentesRaw ?? []) as unknown as Array<{
+      id: string;
+      name: string;
+      published_version_id: string | null;
+      ai_agent_versions: Array<{ id: string; knowledge_source_ids: string[] | null }>;
+    }>
+  )
     .map((a) => {
       const publicada = a.ai_agent_versions.find((v) => v.id === a.published_version_id);
       return {
@@ -93,6 +94,10 @@ export default async function AcervoPage() {
         initialSources={initialSources}
         initialChave={estadoDaChave}
         agentes={agentes}
+        podeGerenciarIa={
+          (await podeConfigurarIa(user, activeOrg.orgId, "provider")) &&
+          (activeOrg.role === "admin" || podeGerenciarIaDaPlataforma(user))
+        }
       />
     </div>
   );

@@ -36,6 +36,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { recusaConfiguracaoDeIa } from "@/lib/ai/governanca-da-ia";
 import type { ProvedorComChave } from "@/lib/ai/pontos/provedores";
 import { rotacionarCredencial } from "@/lib/ai/credenciais/guardar";
 import { gravarConfigDoJev, lerConfigDoJev } from "@/lib/ai/decisao/config";
@@ -119,7 +120,9 @@ function descreverBloqueio(versoes: VersaoQueBloqueia[]): string {
     `${abertura} ${quantas}${recorte}: versão fora de rascunho é congelada — o banco recusa ` +
     `até trocar a chave dela (trigger de imutabilidade), então não há como repontá-la nem ` +
     `apagá-la sem perder o histórico. Esta credencial não pode ser excluída enquanto esse ` +
-    (congeladas.length < n ? "histórico existir. Repontar a versão em rascunho não desbloqueia a exclusão. " : "histórico existir. ") +
+    (congeladas.length < n
+      ? "histórico existir. Repontar a versão em rascunho não desbloqueia a exclusão. "
+      : "histórico existir. ") +
     `A saída é "Editar credencial": a chave nova (ou só o rótulo) entra na MESMA credencial, ` +
     `o vínculo das versões continua válido e o próximo atendimento já usa a chave nova. ` +
     `Se a chave vazou, revogue-a no painel do provedor.`
@@ -136,8 +139,19 @@ export async function PATCH(
   const requestId = randomUUID();
   const { id } = await ctx.params;
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_credentials" });
+  const authz = await requireRole("admin", {
+    requestId,
+    resource: "ai_credentials",
+    allowPlatformAdmin: true,
+  });
   if (!authz.ok) return authz.response;
+  const platformDenied = await recusaConfiguracaoDeIa(
+    authz.user,
+    authz.org.orgId,
+    "credentials",
+    requestId,
+  );
+  if (platformDenied) return platformDenied;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
 
@@ -220,8 +234,19 @@ export async function DELETE(
   const requestId = randomUUID();
   const { id } = await ctx.params;
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_credentials" });
+  const authz = await requireRole("admin", {
+    requestId,
+    resource: "ai_credentials",
+    allowPlatformAdmin: true,
+  });
   if (!authz.ok) return authz.response;
+  const platformDenied = await recusaConfiguracaoDeIa(
+    authz.user,
+    authz.org.orgId,
+    "credentials",
+    requestId,
+  );
+  if (platformDenied) return platformDenied;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
 

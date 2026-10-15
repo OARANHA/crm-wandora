@@ -25,6 +25,8 @@
  * item dessa lista tem consequência de segurança se as duas cópias divergirem.
  */
 import { revalidatePath } from "next/cache";
+import { loadAuthUser, mfaEmDivida } from "@/lib/auth/server";
+import { podeConfigurarIa } from "@/lib/ai/governanca-da-ia";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guardarCredencial } from "@/lib/ai/credenciais/guardar";
@@ -59,14 +61,29 @@ export async function salvarChaveDaIa(formData: FormData): Promise<ResultadoDaCh
   try {
     ctx = await requireOnboardingCtx();
   } catch (err) {
-    if (err instanceof OnboardingError) return { ok: false, erro: "Sua sessão expirou. Entre de novo." };
+    if (err instanceof OnboardingError)
+      return { ok: false, erro: "Sua sessão expirou. Entre de novo." };
     throw err;
   }
+
+  const operador = await loadAuthUser();
+  if (
+    !operador ||
+    operador.id !== ctx.userId ||
+    !(await podeConfigurarIa(operador, ctx.orgId, "credentials"))
+  ) {
+    return { ok: false, erro: "Somente a administracao da plataforma ELUS gerencia chaves de IA." };
+  }
+
+  if (await mfaEmDivida()) return { ok: false, erro: "Verificacao em duas etapas obrigatoria." };
 
   // Guardar chave de provedor é ação de administrador, igual à rota REST. Quem
   // faz o onboarding é o dono, mas o papel é verificado e não presumido.
   if (ctx.role !== "admin") {
-    return { ok: false, erro: "Só um administrador pode cadastrar a chave da inteligência artificial." };
+    return {
+      ok: false,
+      erro: "Só um administrador pode cadastrar a chave da inteligência artificial.",
+    };
   }
 
   const provider = String(formData.get("provider") ?? "");
@@ -76,7 +93,10 @@ export async function salvarChaveDaIa(formData: FormData): Promise<ResultadoDaCh
 
   const apiKey = String(formData.get("api_key") ?? "").trim();
   if (apiKey.length < 8) {
-    return { ok: false, erro: "Essa chave parece incompleta. Cole a chave inteira, do começo ao fim." };
+    return {
+      ok: false,
+      erro: "Essa chave parece incompleta. Cole a chave inteira, do começo ao fim.",
+    };
   }
 
   // Um cliente só para as duas escritas. As duas são service role (a policy de
@@ -128,7 +148,11 @@ export async function salvarChaveDaIa(formData: FormData): Promise<ResultadoDaCh
   // padrão da empresa: quem colou a chave tem uma credencial utilizável, e
   // mandá-la colar de novo por um segundo problema seria perder as duas.
   if (padrao.ok) {
-    return { ok: true, final: r.last4, padrao: { provider: padrao.provider, modelo: padrao.modelo } };
+    return {
+      ok: true,
+      final: r.last4,
+      padrao: { provider: padrao.provider, modelo: padrao.modelo },
+    };
   }
   return {
     ok: true,

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
+import { podeConfigurarIa } from "@/lib/ai/governanca-da-ia";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
-import { ROLE_RANK } from "@/lib/auth/types";
 
 import { PainelDeProvedores } from "./_components/PainelDeProvedores";
 
@@ -24,7 +24,11 @@ export default async function ProvedoresPage() {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
-  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.manager) redirect("/403");
+  if (
+    !(await podeConfigurarIa(user, activeOrg.orgId, "provider")) ||
+    !(await podeConfigurarIa(user, activeOrg.orgId, "model"))
+  )
+    redirect("/403");
 
   return <PainelDeProvedores />;
 }

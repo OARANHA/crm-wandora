@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
     OPENAI_API_KEY: "",
     OPENROUTER_API_KEY: "",
     OPENROUTER_BASE_URL: "",
+    CHUTES_API_KEY: "",
+    ELUS_EMBEDDING_DEFAULT: "",
   },
 }));
 
@@ -105,6 +107,8 @@ beforeEach(() => {
   state.env.AI_GATEWAY_API_KEY = "";
   state.env.OPENAI_API_KEY = "";
   state.env.OPENROUTER_API_KEY = "";
+  state.env.CHUTES_API_KEY = "";
+  state.env.ELUS_EMBEDDING_DEFAULT = "";
 });
 
 describe("resolverChaveDeEmbedding", () => {
@@ -473,6 +477,59 @@ describe("a família da base não muda porque uma credencial apareceu ou sumiu",
     expect(await resolverChaveDeEmbedding("org-1", "embedding_indexar")).toBeNull();
   });
 
+  it("chave Chutes da plataforma atende somente bases Chutes e ambos os pontos", async () => {
+    state.env.CHUTES_API_KEY = "chave-sintetica-plataforma";
+    state.organizations = [
+      { id: "org-1", settings: { base_de_conhecimento: { familia: "chutes" } } },
+      { id: "org-2", settings: { base_de_conhecimento: { familia: "google" } } },
+    ];
+    for (const ponto of ["embedding_indexar", "embedding_consultar"] as const) {
+      expect(await resolverChaveDeEmbedding("org-1", ponto)).toMatchObject({
+        apiKey: "chave-sintetica-plataforma",
+        provedor: "chutes",
+        origem: "chave_da_instalacao",
+      });
+      expect(await resolverChaveDeEmbedding("org-2", ponto)).toBeNull();
+    }
+  });
+
+  it("credencial Chutes validada da org vence a da plataforma", async () => {
+    state.env.CHUTES_API_KEY = "chave-sintetica-plataforma";
+    state.organizations = [
+      { id: "org-1", settings: { base_de_conhecimento: { familia: "chutes" } } },
+    ];
+    state.credentials = [
+      credential({ provider: "chutes", api_key_encrypted: "chave-sintetica-org" }),
+    ];
+    expect(await resolverChaveDeEmbedding("org-1")).toMatchObject({
+      apiKey: "chave-sintetica-org",
+      origem: "credencial_da_organizacao",
+    });
+  });
+
+  it("padrao Chutes so atua quando ainda nao existe familia ou indice", async () => {
+    state.env.CHUTES_API_KEY = "chave-sintetica-plataforma";
+    state.env.ELUS_EMBEDDING_DEFAULT = "chutes";
+    for (const ponto of ["embedding_indexar", "embedding_consultar"] as const) {
+      expect(await resolverChaveDeEmbedding("org-1", ponto)).toMatchObject({
+        provedor: "chutes",
+        apiKey: "chave-sintetica-plataforma",
+      });
+    }
+    state.versions = [
+      {
+        organization_id: "org-1",
+        is_active: true,
+        embedding_model: "openai/text-embedding-3-small",
+        activated_at: "2026-10-14T00:00:00Z",
+      },
+    ];
+    state.env.OPENAI_API_KEY = "chave-sintetica-openai";
+    expect(await resolverChaveDeEmbedding("org-1")).toMatchObject({
+      provedor: "openai",
+      apiKey: "chave-sintetica-openai",
+    });
+  });
   it("chave Chutes validada é isolada por tenant e usada nos dois pontos com modelo fixo", async () => {
     const chutes = credential({
       provider: "chutes",

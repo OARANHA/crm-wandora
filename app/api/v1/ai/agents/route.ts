@@ -24,6 +24,7 @@ import { mcpAgentDraftRecords } from "@/lib/ai/agents/create-draft";
 import { mensagemDoEscopo, validarEscopoDaVersao } from "@/lib/ai/agents/escopo";
 import { agentCreateSchema } from "@/lib/ai/guardrails-schema";
 import { agentMcpCreateSchema } from "@/lib/ai/agents/validation";
+import { motivoDaRecusaTecnica } from "@/lib/ai/governanca-da-ia";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -89,7 +90,11 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_agents" });
+  const authz = await requireRole("admin", {
+    requestId,
+    resource: "ai_agents",
+    allowPlatformAdmin: true,
+  });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
@@ -117,6 +122,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       });
     }
     const input = parsed.data;
+    const denied = await motivoDaRecusaTecnica(authUser, activeOrg.orgId, null, input.version);
+    if (denied) return fail(denied, "Escolha tecnica de IA nao autorizada.", 403, { requestId });
 
     // Validate scope before the first write; a rejected form leaves no orphan.
     const escopo = await validarEscopoDaVersao(admin, activeOrg.orgId, input.version);
@@ -165,6 +172,10 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
   const input = parsed.data;
+  const deniedLegacy = await motivoDaRecusaTecnica(authUser, activeOrg.orgId, null, {
+    model: input.model ?? "anthropic/claude-sonnet-5",
+  });
+  if (deniedLegacy) return fail(deniedLegacy, "Modelo de IA nao autorizado.", 403, { requestId });
 
   const { data, error } = await admin
     .from("ai_agents")

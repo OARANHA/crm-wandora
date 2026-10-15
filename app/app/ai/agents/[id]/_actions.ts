@@ -20,8 +20,9 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { audit } from "@/lib/audit";
-import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
+import { loadAuthUser, resolveActiveOrg, mfaEmDivida } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { motivoDaRecusaTecnica, podeGerenciarIaDaPlataforma } from "@/lib/ai/governanca-da-ia";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mensagemDoEscopo, validarEscopoDaVersao } from "@/lib/ai/agents/escopo";
 import {
@@ -41,16 +42,18 @@ const VERSION_COLUMNS =
   "id, organization_id, agent_id, version_number, system_prompt, provider, model, credential_id, tool_ids, trigger_config, channel_session_id, max_steps, token_budget, cost_budget_cents, history_message_window, history_token_window, handoff_keywords, handoff_tool_enabled, proposal_ai_draft_enabled, cases_enabled, split_messages, split_max_chars, followup, operator_enabled, operator_model, operator_tool_ids, status, published_at, superseded_at, created_at, created_by,pipeline_ids,knowledge_source_ids,provisioning_origin,inbound_debounce_ms";
 
 type ActionResult<T = void> =
-  | { ok: true; data?: T }
-  | { ok: false; error: string; message?: string; details?: unknown };
+  { ok: true; data?: T } | { ok: false; error: string; message?: string; details?: unknown };
 
 async function ensureAdmin() {
   const authUser = await loadAuthUser();
   if (!authUser) return { ok: false as const, error: "unauthenticated" };
   const activeOrg = await resolveActiveOrg(authUser);
   if (!activeOrg) return { ok: false as const, error: "forbidden_tenant" };
-  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) {
+  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.admin && !podeGerenciarIaDaPlataforma(authUser)) {
     return { ok: false as const, error: "forbidden_role" };
+  }
+  if (await mfaEmDivida()) {
+    return { ok: false as const, error: "mfa_required" };
   }
   return { ok: true as const, authUser, activeOrg };
 }
@@ -143,8 +146,7 @@ export async function saveAgentDraftAction(
   // propósito com `agentMcpCreateSchema`, para criar e editar terem a mesma régua.
   // A afirmação de equivalência com o REST era falsa e ficou parada aqui até o
   // achado #532 medir a divergência.
-  const cadastroParsed =
-    cadastro === undefined ? null : agentMcpPatchSchema.safeParse(cadastro);
+  const cadastroParsed = cadastro === undefined ? null : agentMcpPatchSchema.safeParse(cadastro);
   if (cadastroParsed && !cadastroParsed.success) {
     return { ok: false, error: "validation_failed", details: cadastroParsed.error.flatten() };
   }
@@ -218,6 +220,14 @@ export async function saveAgentDraftAction(
     // cada salvamento nasceria uma versão nova.
     agent.published_version_id ?? null,
   );
+
+  const denied = await motivoDaRecusaTecnica(
+    authUser,
+    activeOrg.orgId,
+    existingDraft?.id ?? agent.published_version_id ?? null,
+    v,
+  );
+  if (denied) return { ok: false, error: denied, message: "Escolha técnica de IA não autorizada." };
 
   if (existingDraft) {
     // PATCH na draft existente — não infla a sequência de versions.
@@ -389,13 +399,27 @@ export async function publishAgentAction(
   const valid = new Set<string>(VALID_TOOL_IDS as readonly string[]);
   const { data: targetV } = await admin
     .from("ai_agent_versions")
-    .select("id, agent_id, tool_ids")
+    .select("id, agent_id, tool_ids, provider, model, credential_id, operator_model")
     .eq("id", versionId)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
   if (!targetV || targetV.agent_id !== agentId) {
     return { ok: false, error: "version_not_found" };
   }
+  const { data: publishingAgent } = await admin
+    .from("ai_agents")
+    .select("published_version_id")
+    .eq("id", agentId)
+    .eq("organization_id", activeOrg.orgId)
+    .maybeSingle();
+  if (!publishingAgent) return { ok: false, error: "not_found" };
+  const denied = await motivoDaRecusaTecnica(
+    authUser,
+    activeOrg.orgId,
+    publishingAgent.published_version_id ?? null,
+    targetV,
+  );
+  if (denied) return { ok: false, error: denied };
   const tools = (targetV.tool_ids ?? []) as string[];
   const invalid = tools.filter((t) => !valid.has(t));
   if (invalid.length > 0) {
@@ -487,7 +511,7 @@ export async function revertToVersionAction(
 
   const { data: agent } = await admin
     .from("ai_agents")
-    .select("id, archived_at")
+    .select("id, archived_at, published_version_id")
     .eq("id", agentId)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
@@ -502,6 +526,13 @@ export async function revertToVersionAction(
     .eq("agent_id", agentId)
     .maybeSingle();
   if (!source) return { ok: false, error: "version_not_found" };
+  const denied = await motivoDaRecusaTecnica(
+    authUser,
+    activeOrg.orgId,
+    agent.published_version_id ?? null,
+    source,
+  );
+  if (denied) return { ok: false, error: denied };
 
   // Espelha tool_id check do publish.
   const tools = ((source as { tool_ids: string[] | null }).tool_ids ?? []) as string[];
@@ -694,6 +725,8 @@ export async function createMcpAgentAction(
     return { ok: false, error: "validation_failed", details: parsed.error.flatten() };
   }
 
+  const denied = await motivoDaRecusaTecnica(authUser, activeOrg.orgId, null, parsed.data.version);
+  if (denied) return { ok: false, error: denied };
   const requestId = randomUUID();
   const admin = createAdminClient();
 

@@ -10,6 +10,7 @@ import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { fusoUtilizavel } from "@/lib/tempo/fusos";
 
 import { AgentForm } from "../[id]/_components/AgentForm";
+import { autonomiaEfetiva } from "@/lib/ai/governanca-da-ia";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,7 @@ export default async function NewAgentPage() {
 
   const credentials = (credentialsRes.data ?? []) as CredentialRow[];
   const llmDaOrg = (
-    orgRes.data?.settings as { llm?: { provider?: string } } | null
+    orgRes.data?.settings as { llm?: { provider?: string; default_model?: string } } | null
   )?.llm;
 
   return (
@@ -64,6 +65,8 @@ export default async function NewAgentPage() {
         credentials={credentials}
         provedoresDaInstalacao={provedoresDaInstalacao()}
         provedorPadrao={llmDaOrg?.provider}
+        modeloPadrao={llmDaOrg?.default_model ?? "anthropic/claude-sonnet-5"}
+        autonomiaTecnica={await autonomiaEfetiva(user, activeOrg.orgId)}
         channelSessions={channelSessions}
         organizationTimezone={fusoUtilizavel(activeOrg.timezone)}
       />

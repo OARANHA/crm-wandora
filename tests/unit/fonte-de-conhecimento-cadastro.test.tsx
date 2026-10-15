@@ -95,6 +95,7 @@ const CHAVE_OK: EstadoDaChave = {
   provedor: "openai",
   familia_sem_chave: null,
   pode_trocar_para: null,
+  opcoes_de_troca: [],
   credenciais_embedding: [],
 };
 
@@ -383,7 +384,7 @@ describe("ChaveDeConhecimento — quem prepara a base", () => {
     const recarregar = vi.fn();
     render(
       <ChaveDeConhecimento
-        estado={{ ...CHAVE_OK, pode_trocar_para: "google" }}
+        estado={{ ...CHAVE_OK, pode_trocar_para: "google", opcoes_de_troca: ["google"] }}
         onChaveCadastrada={recarregar}
       />,
     );
@@ -418,6 +419,7 @@ describe("ChaveDeConhecimento — quem prepara a base", () => {
           provedor: "google",
           familia_sem_chave: "google",
           pode_trocar_para: "openai",
+          opcoes_de_troca: ["openai"],
         }}
         onChaveCadastrada={() => {}}
       />,
@@ -426,7 +428,7 @@ describe("ChaveDeConhecimento — quem prepara a base", () => {
       "A base é preparada pelo Google, e a chave do Google não está mais utilizável",
     );
     expect(screen.getByTestId("conhecimento-trocar-provedor")).toHaveTextContent(
-      "Trocar para a OpenAI",
+      "Trocar para OpenAI",
     );
     fireEvent.click(screen.getByTestId("conhecimento-cadastrar-chave"));
     expect(screen.getByTestId("conhecimento-provedor-google")).toBeChecked();
@@ -436,7 +438,7 @@ describe("ChaveDeConhecimento — quem prepara a base", () => {
     render(<ChaveDeConhecimento estado={CHAVE_OK} onChaveCadastrada={() => {}} />);
     expect(screen.queryByTestId("conhecimento-trocar-provedor")).toBeNull();
     expect(screen.getByTestId("conhecimento-provedor")).toHaveTextContent(
-      "Para usar o Google, cadastre a chave dele em",
+      "OpenAI",
     );
   });
 });

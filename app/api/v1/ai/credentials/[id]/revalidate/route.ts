@@ -12,6 +12,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { recusaConfiguracaoDeIa } from "@/lib/ai/governanca-da-ia";
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
 import { validateProviderKey } from "@/lib/ai/provider-validators";
 import { lerBaseUrlDaCredencial } from "@/lib/ai/credenciais/guardar";
@@ -34,8 +35,19 @@ export async function POST(
   const requestId = randomUUID();
   const { id } = await ctx.params;
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_credentials" });
+  const authz = await requireRole("admin", {
+    requestId,
+    resource: "ai_credentials",
+    allowPlatformAdmin: true,
+  });
   if (!authz.ok) return authz.response;
+  const platformDenied = await recusaConfiguracaoDeIa(
+    authz.user,
+    authz.org.orgId,
+    "credentials",
+    requestId,
+  );
+  if (platformDenied) return platformDenied;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
 

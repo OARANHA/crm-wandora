@@ -21,6 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { publishSchema, PUBLISH_ERROR_CODES } from "@/lib/ai/agents/validation";
 import { VALID_TOOL_IDS } from "@/lib/mcp/tools";
 import { publishAgentVersion } from "@/lib/ai/agents/publish";
+import { motivoDaRecusaTecnica } from "@/lib/ai/governanca-da-ia";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 const VALID_TOOL_IDS_RUNTIME = new Set<string>(VALID_TOOL_IDS as readonly string[]);
@@ -41,7 +42,11 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_agents" });
+  const authz = await requireRole("admin", {
+    requestId,
+    resource: "ai_agents",
+    allowPlatformAdmin: true,
+  });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
@@ -67,7 +72,9 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   // (catálogo evolui — validar à hora do publish, fora da transação SQL.)
   const { data: targetV } = await admin
     .from("ai_agent_versions")
-    .select("id, agent_id, organization_id, tool_ids, status")
+    .select(
+      "id, agent_id, organization_id, tool_ids, status, provider, model, credential_id, operator_model",
+    )
     .eq("id", parsed.data.version_id)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
@@ -75,6 +82,21 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   if (!targetV || targetV.agent_id !== id) {
     return fail("version_not_found", t("Version não encontrada."), 404, { requestId });
   }
+
+  const { data: agent } = await admin
+    .from("ai_agents")
+    .select("published_version_id")
+    .eq("id", id)
+    .eq("organization_id", activeOrg.orgId)
+    .maybeSingle();
+  if (!agent) return fail("not_found", "Agent nao encontrado", 404, { requestId });
+  const denied = await motivoDaRecusaTecnica(
+    authUser,
+    activeOrg.orgId,
+    agent.published_version_id ?? null,
+    targetV,
+  );
+  if (denied) return fail(denied, "Escolha tecnica de IA nao autorizada.", 403, { requestId });
 
   const tools = (targetV.tool_ids ?? []) as string[];
   const invalid = tools.filter((t) => !VALID_TOOL_IDS_RUNTIME.has(t));
@@ -93,9 +115,8 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
 
   if (!result.ok) {
     if (PUBLISH_ERROR_CODES.has(result.code as string)) {
-      const status = result.code === "agent_not_found" || result.code === "version_not_found"
-        ? 404
-        : 422;
+      const status =
+        result.code === "agent_not_found" || result.code === "version_not_found" ? 404 : 422;
       return fail(result.code, t("Validação de publish falhou."), status, { requestId });
     }
     return fail("internal_error", "Erro ao publicar.", 500, { requestId });

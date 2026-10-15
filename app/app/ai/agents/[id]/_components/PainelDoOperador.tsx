@@ -41,6 +41,7 @@ interface Props {
   /** O agente desta página. A medida do papel é DELE — ver `ComoOPapelEstaIndo`. */
   agentId: string | null;
   disabled?: boolean;
+  bloquearModelo?: boolean;
 }
 
 /**
@@ -69,7 +70,9 @@ function ComoOPapelEstaIndo({ agentId }: { agentId: string | null }) {
       <Card className="p-4" data-testid="operador-como-esta-indo">
         <p className="text-xs text-muted-foreground">
           {t("Nenhuma conversa passou por aqui nos últimos")} {dias}{" "}
-          {t("dias. Assim que o assistente atender alguém, o que ele organizar aparece nesta área.")}
+          {t(
+            "dias. Assim que o assistente atender alguém, o que ele organizar aparece nesta área.",
+          )}
         </p>
       </Card>
     );
@@ -168,7 +171,9 @@ export function PainelDoOperador(props: Props) {
       {props.enabled ? (
         <>
           <Card className="space-y-2 p-4">
-            <h3 className="text-sm font-medium">{t("A inteligência que ele usa para organizar")}</h3>
+            <h3 className="text-sm font-medium">
+              {t("A inteligência que ele usa para organizar")}
+            </h3>
             <p className="text-xs text-muted-foreground">
               {t(
                 "Pode ser diferente da que conversa. Organizar o sistema é uma tarefa mais mecânica que atender uma pessoa — costuma sair bem com um modelo mais barato.",
@@ -178,7 +183,7 @@ export function PainelDoOperador(props: Props) {
               provider={props.provider}
               value={props.model}
               onChange={props.onModelChange}
-              disabled={desabilitado}
+              disabled={desabilitado || props.bloquearModelo}
               // O estado vazio é legítimo aqui e precisa ter NOME: chamá-lo de
               // "Selecione um modelo" faria parecer pendência o que é escolha.
               placeholder={
@@ -199,7 +204,7 @@ export function PainelDoOperador(props: Props) {
                 data-testid="operador-modelo-herdar"
                 className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                 onClick={() => props.onModelChange("")}
-                disabled={desabilitado}
+                disabled={desabilitado || props.bloquearModelo}
               >
                 {t("Usar a mesma que conversa")}
               </button>

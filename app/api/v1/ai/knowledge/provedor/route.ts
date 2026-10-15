@@ -42,6 +42,7 @@ import { enfileirarTodosOsMateriais } from "@/lib/ai/knowledge/reprepara-tudo";
 import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { recusaConfiguracaoDeIa } from "@/lib/ai/governanca-da-ia";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -56,8 +57,19 @@ export async function PUT(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("admin", { requestId, resource: "ai_knowledge" });
+  const authz = await requireRole("admin", {
+    requestId,
+    resource: "ai_knowledge",
+    allowPlatformAdmin: true,
+  });
   if (!authz.ok) return authz.response;
+  const platformDenied = await recusaConfiguracaoDeIa(
+    authz.user,
+    authz.org.orgId,
+    "provider",
+    requestId,
+  );
+  if (platformDenied) return platformDenied;
   const { org, user } = authz;
   const t = (texto: string) => traduzir(texto, user.idioma);
 

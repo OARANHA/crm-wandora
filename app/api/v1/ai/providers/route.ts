@@ -19,6 +19,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { recusaConfiguracaoDeIa } from "@/lib/ai/governanca-da-ia";
 import { roleAtLeast } from "@/lib/auth/types";
 import {
   decidirBinding,
@@ -50,7 +51,10 @@ interface ModeloDoCatalogo {
 }
 
 export async function GET(): Promise<Response> {
-  const authz = await requireRole("manager", { resource: "ai_providers" });
+  const authz = await requireRole("manager", {
+    resource: "ai_providers",
+    allowPlatformAdmin: "leitura",
+  });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;
@@ -92,15 +96,20 @@ export async function GET(): Promise<Response> {
     ((bindingsRes.data ?? []) as LinhaDeBinding[]).map((b) => [b.purpose, b]),
   );
 
-  const llm = ((orgRes.data?.settings as { llm?: Record<string, unknown> } | null)?.llm ??
-    {}) as { provider?: string; default_model?: string | null };
+  const llm = ((orgRes.data?.settings as { llm?: Record<string, unknown> } | null)?.llm ?? {}) as {
+    provider?: string;
+    default_model?: string | null;
+  };
   const padraoDaOrganizacao = {
     provider: typeof llm.provider === "string" ? llm.provider : "anthropic",
     defaultModel: typeof llm.default_model === "string" ? llm.default_model : null,
   };
 
-  const versao = (agenteRes.data as { versao?: { provider: string; model: string; credential_id: string | null } } | null)
-    ?.versao;
+  const versao = (
+    agenteRes.data as {
+      versao?: { provider: string; model: string; credential_id: string | null };
+    } | null
+  )?.versao;
   const agentePublicado = versao
     ? { provider: versao.provider, credentialId: versao.credential_id, model: versao.model }
     : null;
@@ -190,7 +199,9 @@ export async function GET(): Promise<Response> {
         // catálogo; o resolvedor puro não consulta banco.
         ...(capacidade && ponto.exige.tools === true && !capacidade.supports_tools
           ? [
-              t(`O modelo em uso não sabe usar as ferramentas do CRM — o agente conversa, mas não registra nada no funil.`),
+              t(
+                `O modelo em uso não sabe usar as ferramentas do CRM — o agente conversa, mas não registra nada no funil.`,
+              ),
             ]
           : []),
       ],
@@ -227,13 +238,10 @@ const corpoDoPut = z.object({
   // API é pública) gravava `provider: "foobar"`, a rota respondia 200, e todo
   // uso daquele ponto morria em produção com provedor desconhecido. Metade da
   // defesa transferida e nunca instalada.
-  provider: z
-    .string()
-    .min(1)
-    .refine(ehProvedorSuportado, {
-      message:
-        "provedor não suportado por esta instalação — escolha um da lista em Agente de IA → Provedores",
-    }),
+  provider: z.string().min(1).refine(ehProvedorSuportado, {
+    message:
+      "provedor não suportado por esta instalação — escolha um da lista em Agente de IA → Provedores",
+  }),
   model_id: z.string().min(1),
   credential_id: z.string().uuid().nullable().optional(),
   base_url: z.string().url().nullable().optional(),
@@ -244,8 +252,12 @@ export async function PUT(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("admin", { resource: "ai_providers" });
+  const authz = await requireRole("admin", { resource: "ai_providers", allowPlatformAdmin: true });
   if (!authz.ok) return authz.response;
+  const providerDenied = await recusaConfiguracaoDeIa(authz.user, authz.org.orgId, "provider");
+  if (providerDenied) return providerDenied;
+  const modelDenied = await recusaConfiguracaoDeIa(authz.user, authz.org.orgId, "model");
+  if (modelDenied) return modelDenied;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;
 
@@ -256,7 +268,8 @@ export async function PUT(req: NextRequest): Promise<Response> {
   const corpo = parsed.data;
 
   const ponto = PONTO_POR_ID.get(corpo.purpose);
-  if (!ponto) return fail("ponto_desconhecido", `"${corpo.purpose}" não é um ponto do sistema`, 404);
+  if (!ponto)
+    return fail("ponto_desconhecido", `"${corpo.purpose}" não é um ponto do sistema`, 404);
 
   const db = await createClient();
 
@@ -362,15 +375,11 @@ export async function PUT(req: NextRequest): Promise<Response> {
   return ok({ binding: gravado, avisos: validacao.avisos });
 }
 
-
 const corpoDoPatch = z.object({
-  provider: z
-    .string()
-    .min(1)
-    .refine(ehProvedorSuportado, {
-      message:
-        "provedor não suportado por esta instalação — escolha um da lista em Agente de IA → Provedores",
-    }),
+  provider: z.string().min(1).refine(ehProvedorSuportado, {
+    message:
+      "provedor não suportado por esta instalação — escolha um da lista em Agente de IA → Provedores",
+  }),
   default_model: z.string().min(1),
 });
 
@@ -386,8 +395,12 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("admin", { resource: "ai_providers" });
+  const authz = await requireRole("admin", { resource: "ai_providers", allowPlatformAdmin: true });
   if (!authz.ok) return authz.response;
+  const providerDenied = await recusaConfiguracaoDeIa(authz.user, authz.org.orgId, "provider");
+  if (providerDenied) return providerDenied;
+  const modelDenied = await recusaConfiguracaoDeIa(authz.user, authz.org.orgId, "model");
+  if (modelDenied) return modelDenied;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;
 

@@ -39,7 +39,13 @@ import { TETO_TOOLS_POR_AGENTE } from "@/lib/mcp/tools/selecao-por-pacote";
 import { PROVEDORES } from "@/lib/ai/pontos/provedores";
 
 import { ModelPicker, useModelMeta } from "./ModelPicker";
-import { CHAVE_DA_INSTALACAO, CredentialPicker, STATUS_LABEL, findCredential } from "./CredentialPicker";
+import { AUTONOMIA_IA_PADRAO, type AutonomiaIa } from "@/lib/ai/governanca-da-ia";
+import {
+  CHAVE_DA_INSTALACAO,
+  CredentialPicker,
+  STATUS_LABEL,
+  findCredential,
+} from "./CredentialPicker";
 import { rotuloDoEstadoDoCanal } from "@/lib/channels/estado";
 import { bloqueioDePublicacao } from "@/lib/ai/agents/bloqueio-de-publicacao";
 import { mesmoRascunho } from "@/lib/ai/agents/mesmo-rascunho";
@@ -47,21 +53,14 @@ import { ToolPicker } from "./ToolPicker";
 import { TriggerEditor, type TriggerValue } from "./TriggerEditor";
 import { HandoffKeywordsInput } from "./HandoffKeywordsInput";
 import { FollowupFlowPicker } from "./FollowupFlowPicker";
-import {
-  FollowupWindowEditor,
-  type FollowupWindowValue,
-} from "./FollowupWindowEditor";
+import { FollowupWindowEditor, type FollowupWindowValue } from "./FollowupWindowEditor";
 import { PainelDoOperador } from "./PainelDoOperador";
 import { PainelDeSeguranca } from "./PainelDeSeguranca";
 import { BasesDoAgente, type MaterialDoAcervo } from "./BasesDoAgente";
 import { FunisDoAgente, type CoberturaPorFunil } from "./FunisDoAgente";
 import { PublishConfirmDialog } from "./PublishConfirmDialog";
 import { ComandosDoCelular } from "./ComandosDoCelular";
-import {
-  saveAgentDraftAction,
-  publishAgentAction,
-  createMcpAgentAction,
-} from "../_actions";
+import { saveAgentDraftAction, publishAgentAction, createMcpAgentAction } from "../_actions";
 
 import {
   versionCreateSchema,
@@ -114,6 +113,8 @@ interface BaseProps {
    * página server component, do mesmo jeito que as credenciais.
    */
   provedorPadrao?: string;
+  modeloPadrao?: string;
+  autonomiaTecnica?: AutonomiaIa;
   channelSessions: ChannelSessionLite[];
   routerMembership?: { routerId: string; routerName: string } | null;
   readOnly?: boolean;
@@ -251,17 +252,18 @@ export function buildState(args: {
    * continua sendo o último degrau, para instalação que ainda não escolheu nada.
    */
   provedorPadrao?: string;
+  modeloPadrao?: string;
 }): FormState {
-  const { agent, version, t, provedorPadrao } = args;
+  const { agent, version, t, provedorPadrao, modeloPadrao } = args;
   return {
     name: agent?.name ?? "",
     description: agent?.description ?? "",
     priority: agent?.priority ?? 0,
     provider: (version?.provider as Provider) ?? provedorInicial(provedorPadrao),
-    model: version?.model ?? "",
+    model: version?.model ?? modeloPadrao ?? "",
     // `null` gravado = a versão usa a chave da instalação. Sem esta tradução,
     // reabrir o agente mostraria o campo em branco e pediria para escolher de novo.
-    credential_id: version ? (version.credential_id ?? CHAVE_DA_INSTALACAO) : "",
+    credential_id: version ? (version.credential_id ?? CHAVE_DA_INSTALACAO) : CHAVE_DA_INSTALACAO,
     channel_session_id: version?.channel_session_id ?? "",
     // O DEFAULT vira o prompt real do agente se ninguém editar — por isso é
     // traduzido de verdade (não só a interface): em espanhol ele instrui a IA
@@ -276,11 +278,7 @@ export function buildState(args: {
     cost_budget_cents: version?.cost_budget_cents ?? 50,
     history_message_window: version?.history_message_window ?? 20,
     history_token_window: version?.history_token_window ?? 8_000,
-    handoff_keywords: version?.handoff_keywords ?? [
-      "falar com humano",
-      "atendente",
-      "pessoa real",
-    ],
+    handoff_keywords: version?.handoff_keywords ?? ["falar com humano", "atendente", "pessoa real"],
     handoff_tool_enabled: version?.handoff_tool_enabled ?? true,
     proposal_ai_draft_enabled: version?.proposal_ai_draft_enabled ?? true,
     cases_enabled: version?.cases_enabled ?? false,
@@ -369,6 +367,7 @@ export function AgentForm(props: Props) {
   const router = useRouter();
   const isEdit = props.mode === "edit";
   const readOnly = props.readOnly ?? false;
+  const autonomia = props.autonomiaTecnica ?? AUTONOMIA_IA_PADRAO;
 
   const baseline = React.useMemo(() => {
     if (isEdit) {
@@ -378,7 +377,12 @@ export function AgentForm(props: Props) {
       const ref = props.base ?? props.draft ?? props.published;
       return buildState({ agent: props.agent, version: ref, t });
     }
-    return buildState({ version: null, t, provedorPadrao: props.provedorPadrao });
+    return buildState({
+      version: null,
+      t,
+      provedorPadrao: props.provedorPadrao,
+      modeloPadrao: props.modeloPadrao,
+    });
   }, [isEdit, props, t]);
 
   const [form, setForm] = React.useState<FormState>(baseline);
@@ -481,7 +485,7 @@ export function AgentForm(props: Props) {
       }
     }
     return errors;
-  }, [form, t]);
+  }, [form, t, props.provedoresDaInstalacao]);
 
   const isValid = Object.keys(validation).length === 0;
 
@@ -504,9 +508,7 @@ export function AgentForm(props: Props) {
       provedor: form.provider,
       chave: {
         daInstalacao: form.credential_id === CHAVE_DA_INSTALACAO,
-        instalacaoTemChaveDoProvedor: (props.provedoresDaInstalacao ?? []).includes(
-          form.provider,
-        ),
+        instalacaoTemChaveDoProvedor: (props.provedoresDaInstalacao ?? []).includes(form.provider),
         estadoDaCredencialDaOrg: credSt,
       },
       numero: { estado: channelSession?.status ?? null },
@@ -647,14 +649,20 @@ export function AgentForm(props: Props) {
         </Badge>
       );
     }
-    if (draftN) return <Badge variant="outline">{t("Rascunho")} v{draftN}</Badge>;
+    if (draftN)
+      return (
+        <Badge variant="outline">
+          {t("Rascunho")} v{draftN}
+        </Badge>
+      );
     // Sem rascunho e sem publicada: o formulário abriu da última versão que
     // existiu (props.base), e não do texto padrão. Dizer isso é o que impede o
     // autor de achar que o prompt sumiu — e de salvar por cima achando que não.
     if (props.base) {
       return (
         <Badge variant="outline">
-          {t("Pausado")} {t("· editando a v")}{props.base.version_number}
+          {t("Pausado")} {t("· editando a v")}
+          {props.base.version_number}
         </Badge>
       );
     }
@@ -679,11 +687,7 @@ export function AgentForm(props: Props) {
 
         <div className="flex flex-wrap items-center gap-2">
           {isEdit ? (
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              disabled={!dirty || disabled}
-            >
+            <Button variant="outline" onClick={handleReset} disabled={!dirty || disabled}>
               {t("Descartar alterações")}
             </Button>
           ) : null}
@@ -740,7 +744,11 @@ export function AgentForm(props: Props) {
         vocabulário interno; quem configura pensa em "quem fala com meu cliente" e
         "quem organiza minha casa".
       */}
-      <div className="flex flex-wrap gap-1 border-b" role="tablist" aria-label={t("Papéis do agente")}>
+      <div
+        className="flex flex-wrap gap-1 border-b"
+        role="tablist"
+        aria-label={t("Papéis do agente")}
+      >
         {(
           [
             ["conversa", t("Conversa com o cliente")],
@@ -777,6 +785,7 @@ export function AgentForm(props: Props) {
           onEnabledChange={(v) => patch({ operator_enabled: v })}
           model={form.operator_model}
           onModelChange={(v) => patch({ operator_model: v })}
+          bloquearModelo={!autonomia.operator_model}
           provider={form.provider}
           toolIds={form.operator_tool_ids}
           onToolIdsChange={(ids) => patch({ operator_tool_ids: ids })}
@@ -858,12 +867,27 @@ export function AgentForm(props: Props) {
           {/* Provider + credential + model */}
           <Card className="space-y-3 p-4">
             <h3 className="text-sm font-medium">{t("A inteligência que ele usa")}</h3>
+            {autonomia.credentials || (autonomia.provider && autonomia.model) ? (
+              <div className="flex flex-wrap gap-4 text-xs underline underline-offset-2">
+                {autonomia.credentials ? (
+                  <a href="/app/ai/credentials">Gerenciar credenciais</a>
+                ) : null}
+                {autonomia.provider && autonomia.model ? (
+                  <a href="/app/ai/providers">Configurar provedores</a>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                A plataforma administra as escolhas técnicas. Você pode editar as instruções e o
+                conhecimento do agente.
+              </p>
+            )}
             <div className="space-y-1">
               <Label htmlFor="provider">{t("Empresa de inteligência artificial")}</Label>
               <Select
                 value={form.provider}
                 onValueChange={(v) => changeProvider(v as Provider)}
-                disabled={disabled}
+                disabled={disabled || !autonomia.provider}
               >
                 <SelectTrigger id="provider">
                   <SelectValue />
@@ -890,7 +914,7 @@ export function AgentForm(props: Props) {
               provider={form.provider}
               value={form.model}
               onChange={(modelId) => patch({ model: modelId })}
-              disabled={disabled}
+              disabled={disabled || !autonomia.model}
               id="model"
             />
             {validation.model ? (
@@ -902,7 +926,7 @@ export function AgentForm(props: Props) {
               credentials={props.credentials}
               value={form.credential_id}
               onChange={(id) => patch({ credential_id: id })}
-              disabled={disabled}
+              disabled={disabled || !autonomia.credentials}
               id="credential_id"
               instalacaoTemChave={(props.provedoresDaInstalacao ?? []).includes(form.provider)}
             />
@@ -987,7 +1011,9 @@ export function AgentForm(props: Props) {
                       {t("para poder publicar.")}
                     </>
                   ) : (
-                    t("Escolha o número para poder publicar. Sem ele, o rascunho salva mas não atende.")
+                    t(
+                      "Escolha o número para poder publicar. Sem ele, o rascunho salva mas não atende.",
+                    )
                   )}
                 </p>
               ) : null}
@@ -1024,7 +1050,9 @@ export function AgentForm(props: Props) {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="cost_budget_cents">{t("Custo máximo por atendimento (centavos)")}</Label>
+                <Label htmlFor="cost_budget_cents">
+                  {t("Custo máximo por atendimento (centavos)")}
+                </Label>
                 <Input
                   id="cost_budget_cents"
                   type="number"
@@ -1036,16 +1064,16 @@ export function AgentForm(props: Props) {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="history_message_window">{t("Mensagens anteriores que ele lê")}</Label>
+                <Label htmlFor="history_message_window">
+                  {t("Mensagens anteriores que ele lê")}
+                </Label>
                 <Input
                   id="history_message_window"
                   type="number"
                   min={0}
                   max={200}
                   value={form.history_message_window}
-                  onChange={(e) =>
-                    patch({ history_message_window: Number(e.target.value) })
-                  }
+                  onChange={(e) => patch({ history_message_window: Number(e.target.value) })}
                   disabled={disabled}
                 />
               </div>
@@ -1058,9 +1086,7 @@ export function AgentForm(props: Props) {
                   max={50000}
                   step={500}
                   value={form.history_token_window}
-                  onChange={(e) =>
-                    patch({ history_token_window: Number(e.target.value) })
-                  }
+                  onChange={(e) => patch({ history_token_window: Number(e.target.value) })}
                   disabled={disabled}
                 />
               </div>
@@ -1324,9 +1350,7 @@ export function AgentForm(props: Props) {
               <Switch
                 id="followup_enabled"
                 checked={form.followup.enabled}
-                onCheckedChange={(v) =>
-                  patch({ followup: { ...form.followup, enabled: v } })
-                }
+                onCheckedChange={(v) => patch({ followup: { ...form.followup, enabled: v } })}
                 disabled={disabled}
               />
               <Label htmlFor="followup_enabled">
@@ -1340,16 +1364,12 @@ export function AgentForm(props: Props) {
             </p>
             <FollowupWindowEditor
               value={form.followup.send_window ?? null}
-              onChange={(send_window) =>
-                patch({ followup: { ...form.followup, send_window } })
-              }
+              onChange={(send_window) => patch({ followup: { ...form.followup, send_window } })}
               disabled={disabled || !form.followup.enabled}
             />
             <FollowupFlowPicker
               value={form.followup.flow_pointer_ids}
-              onChange={(ids) =>
-                patch({ followup: { ...form.followup, flow_pointer_ids: ids } })
-              }
+              onChange={(ids) => patch({ followup: { ...form.followup, flow_pointer_ids: ids } })}
               disabled={disabled}
             />
           </Card>

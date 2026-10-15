@@ -14,6 +14,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { versionPatchSchema } from "@/lib/ai/agents/validation";
+import { validarMudancasTecnicas } from "@/lib/ai/governanca-da-ia";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +62,11 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     return fail("invalid_request", "ids inválidos.", 400, { requestId });
   }
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_agents" });
+  const authz = await requireRole("admin", {
+    requestId,
+    resource: "ai_agents",
+    allowPlatformAdmin: true,
+  });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
@@ -87,7 +92,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from("ai_agent_versions")
-    .select("id, status, agent_id, organization_id, followup")
+    .select(
+      "id, status, agent_id, organization_id, followup, provider, model, credential_id, operator_model",
+    )
     .eq("id", vid)
     .eq("organization_id", activeOrg.orgId)
     .eq("agent_id", id)
@@ -101,11 +108,18 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     });
   }
 
+  const negadas = await validarMudancasTecnicas(authUser, activeOrg.orgId, existing, patch);
+  if (negadas.length)
+    return fail("forbidden_platform_ai", "Escolha tecnica de IA nao autorizada.", 403, {
+      requestId,
+    });
+
   const update: Record<string, unknown> = {};
   if (patch.system_prompt !== undefined) update.system_prompt = patch.system_prompt;
   if (patch.provider !== undefined) update.provider = patch.provider;
   if (patch.model !== undefined) update.model = patch.model;
   if (patch.credential_id !== undefined) update.credential_id = patch.credential_id;
+  if (patch.operator_model !== undefined) update.operator_model = patch.operator_model;
   if (patch.tool_ids !== undefined) update.tool_ids = patch.tool_ids;
   if (patch.trigger_config !== undefined) update.trigger_config = patch.trigger_config;
   if (patch.channel_session_id !== undefined) update.channel_session_id = patch.channel_session_id;
@@ -124,7 +138,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
   if (patch.cases_enabled !== undefined) update.cases_enabled = patch.cases_enabled;
   if (patch.split_messages !== undefined) update.split_messages = patch.split_messages;
   if (patch.split_max_chars !== undefined) update.split_max_chars = patch.split_max_chars;
-  if (patch.inbound_debounce_ms !== undefined) update.inbound_debounce_ms = patch.inbound_debounce_ms;
+  if (patch.inbound_debounce_ms !== undefined)
+    update.inbound_debounce_ms = patch.inbound_debounce_ms;
   if (patch.followup !== undefined) {
     const existingFollowup =
       existing.followup !== null &&

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { recusaConfiguracaoDeIa } from "@/lib/ai/governanca-da-ia";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { validateProviderKey } from "@/lib/ai/provider-validators";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -34,8 +35,19 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("admin", { requestId, resource: "ai_credentials" });
+  const authz = await requireRole("admin", {
+    requestId,
+    resource: "ai_credentials",
+    allowPlatformAdmin: true,
+  });
   if (!authz.ok) return authz.response;
+  const platformDenied = await recusaConfiguracaoDeIa(
+    authz.user,
+    authz.org.orgId,
+    "credentials",
+    requestId,
+  );
+  if (platformDenied) return platformDenied;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
   let rawBody: unknown;

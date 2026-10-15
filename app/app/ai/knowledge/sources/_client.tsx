@@ -19,10 +19,7 @@ import {
 } from "@/hooks/ai/useKnowledgeSources";
 import { KnowledgeSourceCard } from "@/components/ai/KnowledgeSourceCard";
 import { NovoMaterialDialog } from "@/components/ai/NovoMaterialDialog";
-import {
-  ChaveDeConhecimento,
-  type EstadoDaChave,
-} from "@/components/ai/ChaveDeConhecimento";
+import { ChaveDeConhecimento, type EstadoDaChave } from "@/components/ai/ChaveDeConhecimento";
 import { StatusDaBase } from "@/components/ai/StatusDaBase";
 
 export interface AgenteQueUsa {
@@ -35,9 +32,15 @@ interface Props {
   initialSources: SourceRow[];
   initialChave: EstadoDaChave;
   agentes: AgenteQueUsa[];
+  podeGerenciarIa?: boolean;
 }
 
-export function AcervoClient({ initialSources, initialChave, agentes }: Props) {
+export function AcervoClient({
+  initialSources,
+  initialChave,
+  agentes,
+  podeGerenciarIa = false,
+}: Props) {
   const t = useT();
   const qc = useQueryClient();
   const [novoAberto, setNovoAberto] = useState(false);
@@ -73,7 +76,13 @@ export function AcervoClient({ initialSources, initialChave, agentes }: Props) {
 
   return (
     <div className="space-y-5">
-      <ChaveDeConhecimento estado={estado} onChaveCadastrada={recarregar} />
+      {podeGerenciarIa ? (
+        <ChaveDeConhecimento estado={estado} onChaveCadastrada={recarregar} />
+      ) : (
+        <p className="text-xs text-text-muted">
+          A configuracao de inteligencia artificial e gerenciada pela plataforma ELUS.
+        </p>
+      )}
       <StatusDaBase materiais={lista} podeIndexar={estado.pode_indexar} />
 
       <div className="flex items-center justify-between gap-3">
@@ -142,8 +151,7 @@ export function AcervoClient({ initialSources, initialChave, agentes }: Props) {
       {arquivados.length > 0 ? (
         <details className="rounded-lg border border-border p-4" data-testid="acervo-arquivados">
           <summary className="cursor-pointer text-sm font-medium">
-            {arquivados.length}{" "}
-            {arquivados.length === 1 ? t("arquivado") : t("arquivados")}
+            {arquivados.length} {arquivados.length === 1 ? t("arquivado") : t("arquivados")}
           </summary>
           <p className="mt-2 text-xs text-text-muted">
             {t(
