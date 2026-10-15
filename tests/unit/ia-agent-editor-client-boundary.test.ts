@@ -7,8 +7,7 @@ import {
   CHAVES_AUTONOMIA_IA,
 } from "@/lib/ai/governanca-da-ia-contrato";
 
-const arquivo = (path: string) =>
-  readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+const arquivo = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
 describe("Editor de agentes — fronteira entre cliente e servidor", () => {
   it("expõe permissões de autonomia pelo contrato puro, sem acesso ao ambiente", () => {
@@ -43,9 +42,7 @@ describe("Editor de agentes — fronteira entre cliente e servidor", () => {
   it("preserva as mesmas exportações canônicas aos consumidores do servidor", () => {
     const servidor = arquivo("lib/ai/governanca-da-ia.ts");
     expect(servidor).toContain('from "./governanca-da-ia-contrato"');
-    expect(servidor).toContain(
-      'export { AUTONOMIA_IA_PADRAO, CHAVES_AUTONOMIA_IA }',
-    );
+    expect(servidor).toContain('export { AUTONOMIA_IA_PADRAO, CHAVES_AUTONOMIA_IA }');
     expect(servidor).toContain('export type { AutonomiaIa, ChaveAutonomiaIa }');
   });
 });
