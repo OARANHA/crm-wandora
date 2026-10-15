@@ -5,6 +5,7 @@
 export interface PadraoDaOrganizacao {
   provider: string;
   default_model: string | null;
+  credential_id: string | null;
   configured: boolean;
 }
 export function lerPadraoLlmDaOrganizacao(settings: unknown): PadraoDaOrganizacao & {
@@ -23,12 +24,14 @@ export function lerPadraoLlmDaOrganizacao(settings: unknown): PadraoDaOrganizaca
     provider: typeof llm.provider === "string" && llm.provider ? llm.provider : "anthropic",
     default_model:
       typeof llm.default_model === "string" && llm.default_model ? llm.default_model : null,
+    credential_id:
+      typeof llm.credential_id === "string" && llm.credential_id ? llm.credential_id : null,
     configured: typeof llm.provider === "string" && typeof llm.default_model === "string",
   };
 }
 export function mesclarPadraoLlmDaOrganizacao(
   settings: unknown,
-  novo: { provider: string; default_model: string },
+  novo: { provider: string; default_model: string; credential_id?: string | null },
 ): Record<string, unknown> {
   const current = lerPadraoLlmDaOrganizacao(settings);
   const llmAnterior = current.settings.llm;
@@ -38,6 +41,16 @@ export function mesclarPadraoLlmDaOrganizacao(
       : {};
   return {
     ...current.settings,
-    llm: { ...camposAnteriores, provider: novo.provider, default_model: novo.default_model },
+    llm: {
+      ...camposAnteriores,
+      provider: novo.provider,
+      default_model: novo.default_model,
+      credential_id:
+        novo.credential_id !== undefined
+          ? novo.credential_id
+          : novo.provider === current.provider
+            ? current.credential_id
+            : null,
+    },
   };
 }

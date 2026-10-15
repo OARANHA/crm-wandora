@@ -32,7 +32,10 @@ describe("resolveOrgLlmConfig — chave de plataforma por provider", () => {
     // Anthropic no chat isso lançava LlmNotConfiguredError — ou, pior, o
     // chamador mandava a chave da Anthropic para a OpenAI e levava 401. A
     // OPENAI_API_KEY que o instalador coleta não chegava a lugar nenhum.
-    const cfg: LlmEdgeConfig = { anthropicApiKey: "sk-ant-plataforma", openaiApiKey: "sk-proj-plataforma" };
+    const cfg: LlmEdgeConfig = {
+      anthropicApiKey: "sk-ant-plataforma",
+      openaiApiKey: "sk-proj-plataforma",
+    };
     const out = await resolveOrgLlmConfig(
       poolFake({ provider: "anthropic", default_model: "claude-sonnet-4-6" }, SEM_BYOK),
       cfg,
@@ -96,10 +99,13 @@ describe("resolveOrgLlmConfig — a origem da chave acompanha o degrau", () => {
     ["anthropic", { anthropicApiKey: "sk-ant-plataforma" }],
     ["openai", { openaiApiKey: "sk-proj-plataforma" }],
     ["openrouter", { openrouterApiKey: "sk-or-plataforma" }],
-  ] as const)("sem credencial da org, a chave de %s do .env → chave_da_instalacao", async (provider, cfg) => {
-    const out = await resolveOrgLlmConfig(poolFake({ provider }, SEM_BYOK), cfg, "org-1");
-    expect(out.origemDaChave).toBe("chave_da_instalacao");
-  });
+  ] as const)(
+    "sem credencial da org, a chave de %s do .env → chave_da_instalacao",
+    async (provider, cfg) => {
+      const out = await resolveOrgLlmConfig(poolFake({ provider }, SEM_BYOK), cfg, "org-1");
+      expect(out.origemDaChave).toBe("chave_da_instalacao");
+    },
+  );
 
   it("credencial ESCOLHIDA e revogada cai no .env — e o rótulo diz que a chave é da instalação", async () => {
     // O degrau menos óbvio: quem configurou escolheu uma credencial da empresa,
@@ -127,6 +133,35 @@ describe("resolveOrgLlmConfig — a origem da chave acompanha o degrau", () => {
  * no `.env`, o teste do consumidor estava verde, e o agente OpenAI morria com
  * "org sem credencial LLM utilizável".
  */
+describe("padrão da plataforma com credencial fixada por organização", () => {
+  const pinnedId = "b62d1077-4910-4482-898a-e53e2b95f6a9";
+  it("usa exatamente a credencial explicitamente fixada", async () => {
+    const out = await resolveOrgLlmConfig(
+      poolFake({ provider: "openai", credential_id: pinnedId, default_model: "gpt-x" }, [
+        {
+          id: pinnedId,
+          api_key_encrypted: "",
+          api_key_iv: "",
+          api_key_tag: "",
+        },
+      ]),
+      { openaiApiKey: "chave-global-sintetica" },
+      "org-isolada",
+    );
+    expect(out.credentialId).toBe(pinnedId);
+    expect(out.origemDaChave).toBe("credencial_da_organizacao");
+  });
+  it("se a credencial pinada for revogada, NÃO usa a chave global", async () => {
+    await expect(
+      resolveOrgLlmConfig(
+        poolFake({ provider: "openai", credential_id: pinnedId }, []),
+        { openaiApiKey: "chave-global-sintetica" },
+        "org-isolada",
+      ),
+    ).rejects.toBeInstanceOf(LlmNotConfiguredError);
+  });
+});
+
 describe("llmEdgeConfigFromEnv — o que sai do .env chega ao turno", () => {
   it("leva a chave da OpenAI, não só a da Anthropic", () => {
     const cfg = llmEdgeConfigFromEnv({

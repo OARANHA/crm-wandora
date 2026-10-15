@@ -65,6 +65,13 @@ export interface PedidoDeGuardar {
    */
   baseUrl?: string;
   requestId?: string;
+  /**
+   * Prova síncrona feita pelo próprio servidor via validateProviderKey, não pelo
+   * corpo do cliente. Permite provisionamento atômico de uma credencial já
+   * confirmada, sem depender de um callback fire-and-forget do route handler.
+   * Os demais chamadores continuam com validação assíncrona como antes.
+   */
+  validacaoConfirmada?: { models: string[] };
 }
 
 /**
@@ -90,7 +97,11 @@ export async function guardarCredencial(p: PedidoDeGuardar): Promise<ResultadoDe
     cifrada = colunasCifradas(p.apiKey);
   } catch (err) {
     // Sem `console.error` com a chave por perto: o que interessa é que falhou.
-    return { ok: false, motivo: "cifragem", detalhe: err instanceof Error ? err.message : undefined };
+    return {
+      ok: false,
+      motivo: "cifragem",
+      detalhe: err instanceof Error ? err.message : undefined,
+    };
   }
 
   const { data: created, error } = await p.admin
@@ -106,6 +117,13 @@ export async function guardarCredencial(p: PedidoDeGuardar): Promise<ResultadoDe
       ...(p.baseUrl !== undefined ? { base_url: p.baseUrl } : {}),
       is_active: true,
       created_by: p.userId,
+      ...(p.validacaoConfirmada
+        ? {
+            validated_at: new Date().toISOString(),
+            validation_error: null,
+            models_available: p.validacaoConfirmada.models,
+          }
+        : {}),
     })
     .select("id")
     .single();
@@ -127,11 +145,12 @@ export async function guardarCredencial(p: PedidoDeGuardar): Promise<ResultadoDe
     metadata: { provider: p.provider, label: p.label, last4: cifrada.last4 },
   });
 
-  // Fire-and-forget: o plaintext vive até o callback resolver, e a resposta não
-  // espera uma ida ao provedor. Guardar a chave e validá-la são coisas
-  // diferentes — a segunda pode falhar por rede sem que a primeira precise ser
-  // desfeita.
-  void validarEmSegundoPlano(p.admin, id, p.orgId, p.provider, p.apiKey);
+  // O cadastro comum mantém validação assíncrona. O Superadmin com prova
+  // síncrona do servidor já grava validated_at/models_available e não
+  // depende de callback que possa morrer após a resposta HTTP.
+  if (!p.validacaoConfirmada) {
+    void validarEmSegundoPlano(p.admin, id, p.orgId, p.provider, p.apiKey);
+  }
 
   return { ok: true, id, last4: cifrada.last4 };
 }
@@ -163,9 +182,7 @@ export interface PedidoDeRotacionar {
   requestId?: string;
 }
 
-export async function rotacionarCredencial(
-  p: PedidoDeRotacionar,
-): Promise<ResultadoDeRotacionar> {
+export async function rotacionarCredencial(p: PedidoDeRotacionar): Promise<ResultadoDeRotacionar> {
   const patch: Record<string, unknown> = {};
   let last4: string | null = null;
 
@@ -174,7 +191,11 @@ export async function rotacionarCredencial(
     try {
       cifrada = colunasCifradas(p.apiKey);
     } catch (err) {
-      return { ok: false, motivo: "cifragem", detalhe: err instanceof Error ? err.message : undefined };
+      return {
+        ok: false,
+        motivo: "cifragem",
+        detalhe: err instanceof Error ? err.message : undefined,
+      };
     }
     last4 = cifrada.last4;
     patch.api_key_encrypted = cifrada.api_key_encrypted;

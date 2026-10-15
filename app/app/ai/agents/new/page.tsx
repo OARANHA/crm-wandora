@@ -55,7 +55,9 @@ export default async function NewAgentPage() {
 
   const credentials = (credentialsRes.data ?? []) as CredentialRow[];
   const llmDaOrg = (
-    orgRes.data?.settings as { llm?: { provider?: string; default_model?: string } } | null
+    orgRes.data?.settings as {
+      llm?: { provider?: string; default_model?: string; credential_id?: string };
+    } | null
   )?.llm;
 
   return (
@@ -66,6 +68,7 @@ export default async function NewAgentPage() {
         provedoresDaInstalacao={provedoresDaInstalacao()}
         provedorPadrao={llmDaOrg?.provider}
         modeloPadrao={llmDaOrg?.default_model ?? "anthropic/claude-sonnet-5"}
+        credencialPadrao={llmDaOrg?.credential_id ?? null}
         autonomiaTecnica={await autonomiaEfetiva(user, activeOrg.orgId)}
         channelSessions={channelSessions}
         organizationTimezone={fusoUtilizavel(activeOrg.timezone)}
