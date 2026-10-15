@@ -215,6 +215,7 @@ const llmSettingsSchema = z
   .catch({
     provider: "anthropic",
     default_model: null,
+    credential_id: null,
     params: {},
     enabled_models: [],
   });
