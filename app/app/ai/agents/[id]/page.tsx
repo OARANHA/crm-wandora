@@ -6,6 +6,7 @@ import { listSelectableChannels } from "@/lib/channels/selectable";
 import { createClient } from "@/lib/supabase/server";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import type { AgentVersionRow } from "@/hooks/ai/useAgentVersions";
+import { autonomiaEfetiva } from "@/lib/ai/governanca-da-ia";
 import type { CredentialRow } from "@/hooks/ai/useCredentials";
 
 import { LegacyRecovery } from "./_components/LegacyRecovery";
@@ -216,7 +217,14 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
           agent={agent}
           channels={channelSessions}
           credentials={credentials}
-          hasVersion={versions.length > 0 && !(versions.length===1 && (versions[0] as AgentVersionRow & {provisioning_origin?:string}).provisioning_origin==="legacy_reconciliation")}
+          hasVersion={
+            versions.length > 0 &&
+            !(
+              versions.length === 1 &&
+              (versions[0] as AgentVersionRow & { provisioning_origin?: string })
+                .provisioning_origin === "legacy_reconciliation"
+            )
+          }
           readOnly={readOnly}
         />
       )}
@@ -229,6 +237,7 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
         versions={versions}
         credentials={credentials}
         provedoresDaInstalacao={provedoresDaInstalacao()}
+        autonomiaTecnica={await autonomiaEfetiva(user, activeOrg.orgId)}
         channelSessions={channelSessions}
         funis={funis}
         cobertura={cobertura}

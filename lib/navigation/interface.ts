@@ -63,6 +63,10 @@ export function canSee(
   platform: boolean,
   role: Role | null,
 ): boolean {
+  // A vitrine nao oferece controles de fornecedor ao admin do tenant.
+  // A API e as paginas repetem esta cerca no servidor.
+  if ((d.href === "/app/ai/credentials" || d.href === "/app/ai/providers") && !platform)
+    return false;
   return platform || (!!role && ROLE_RANK[role] >= ROLE_RANK[d.minRole ?? "viewer"]);
 }
 /**
@@ -178,7 +182,8 @@ export function combinarInterfaces(daEmpresa: unknown, doVinculo: unknown): Inte
   const vinculo = conjuntoEscolhido(lerInterface(doVinculo).settings);
   if (!empresa && !vinculo) return INTERFACE_COMPLETA;
   const soUm = empresa ?? vinculo;
-  if (!empresa || !vinculo) return { preset: "completa", destinos: [...(soUm as readonly NavDestinationId[])] };
+  if (!empresa || !vinculo)
+    return { preset: "completa", destinos: [...(soUm as readonly NavDestinationId[])] };
   const comuns = empresa.filter((id) => vinculo.includes(id));
   return { preset: "completa", destinos: [...(comuns.length > 0 ? comuns : SO_O_ESSENCIAL)] };
 }

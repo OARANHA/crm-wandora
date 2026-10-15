@@ -239,7 +239,8 @@ export async function resolverChaveDeEmbedding(
   const familia =
     opcoes.familia !== undefined
       ? opcoes.familia
-      : ((await familiaDaBase(organizationId))?.familia ?? null);
+      : ((await familiaDaBase(organizationId))?.familia ??
+        (env.ELUS_EMBEDDING_DEFAULT === "chutes" && env.CHUTES_API_KEY ? "chutes" : null));
 
   // 1 · A escolha explícita do painel — se for da família da base.
   const binding = await lerBindingDeEmbedding(ponto, organizationId);
@@ -312,10 +313,21 @@ export async function resolverChaveDeEmbedding(
     };
   };
 
-  // Chutes so funciona com familia declarada ou indice existente do modelo Qwen.
+  // Familia Qwen: credencial da propria org vence a chave da instalacao.
+  // Nenhuma outra familia herda Chutes, mesmo com vetores de 1536 dimensoes.
   if (familia === "chutes") {
     const chutesDaOrg = await credencialDaOrganizacao(organizationId, "chutes");
-    return chutesDaOrg ? daOrganizacao(chutesDaOrg) : null;
+    if (chutesDaOrg) return daOrganizacao(chutesDaOrg);
+    if (!env.CHUTES_API_KEY) return null;
+    return {
+      apiKey: env.CHUTES_API_KEY,
+      baseUrl: null,
+      provedor: "chutes",
+      viaGateway: false,
+      origem: "chave_da_instalacao",
+      rotulo: null,
+      avisos,
+    };
   }
 
   if (familia !== "google") {

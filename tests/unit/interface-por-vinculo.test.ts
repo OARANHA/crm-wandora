@@ -16,8 +16,18 @@ const hrefs = (settings: unknown, role: "agent" | "admin" = "admin", platform = 
   destinosDaInterface(settings, platform, role).map((d) => d.href);
 describe("interface por vínculo é apresentação", () => {
   it("legado completa acompanha catálogo e não duplica IDs", () => {
-    expect(hrefs(null)).toEqual(NAV_CATALOG.map((d) => d.href));
+    expect(hrefs(null)).toEqual(
+      NAV_CATALOG.map((d) => d.href).filter(
+        (href) => !["/app/ai/credentials", "/app/ai/providers"].includes(href),
+      ),
+    );
     expect(new Set(NAV_CATALOG.map((d) => d.href)).size).toBe(NAV_CATALOG.length);
+  });
+  it("admin do tenant nao ve chaves nem provedores; dono da plataforma ve ambos", () => {
+    for (const href of ["/app/ai/credentials", "/app/ai/providers"]) {
+      expect(hrefs(complete, "admin", false)).not.toContain(href);
+      expect(hrefs(complete, "admin", true)).toContain(href);
+    }
   });
   it("simplificada tem operação e Conexões somente quando papel permite", () => {
     expect(hrefs(simplified)).toContain("/app/connections");

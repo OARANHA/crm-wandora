@@ -217,3 +217,11 @@ deploy seguro, validação de contrato Chutes com chave inserida pelo operador
 no ELUS e reindexação governada das 16 FAQs. Os catálogos PDF e o cadastro
 estruturado das cores continuam gates separados; o deploy deste código por
 si só **não prova** atendimento comercial.
+
+## 9. Chutes como servico gerenciado pelo ELUS — gate de implementacao
+
+- A chave `CHUTES_API_KEY` e de **instalacao** (app e worker), protegida em ambiente de servidor. Nao e cadastrada por cliente, nao e enviada ao navegador e nao cruza o limite do tenant como registro de credencial.
+- Uma base previamente vinculada a `chutes` usa primeiro a credencial Chutes ativa e validada da propria organizacao (compatibilidade com legado), depois a chave da instalacao. Nunca usa outra familia como fallback de vetores.
+- `ELUS_EMBEDDING_DEFAULT=chutes` e uma **escolha explicita da plataforma** para tenants sem familia fixada nem versao de base ativa; material ja indexado continua com o mesmo modelo ate troca governada.
+- A configuração técnica de IA é gerenciada pela plataforma por padrão. Somente Superadmin full sem suporte e com MFA aplicável libera, por tenant, os controles provider, model, credentials (BYOK opt-in) e operator_model no painel administrativo. API REST, editor e onboarding exigem a mesma autorização no servidor. Prompts, fontes e treinamento permanecem editáveis nas permissões normais. Revogar autonomia não remove chaves nem despublica agentes.\n- Isso habilita **Qwen3 Embedding**, nao modelos de conversa do Chutes. O runtime conversacional continua exigindo configuracao de plataforma independente. Se nao houver chave da instalacao, nada e ativado em producao; nao cadastrar segredo por SQL ou chat.
+- Gate: CI app+worker verde, merge, imagens GHCR por SHA, deploy Portainer Vigia com rollback e `prune:false`, health/version exatos; somente depois configurar a chave Chutes em ambiente protegido, escolher default quando cabivel e validar Prorevest via dois FAQs e busca.

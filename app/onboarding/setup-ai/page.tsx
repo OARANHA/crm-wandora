@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { podeConfigurarIa } from "@/lib/ai/governanca-da-ia";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
@@ -46,9 +47,14 @@ export default async function SetupAiPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h2 className="text-2xl font-semibold tracking-tight">{traduzir("Treine seu funcionário", idioma)}</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">
+          {traduzir("Treine seu funcionário", idioma)}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          {traduzir("Quem ele é, como fala e o que pode prometer. Dá para mudar tudo depois.", idioma)}
+          {traduzir(
+            "Quem ele é, como fala e o que pode prometer. Dá para mudar tudo depois.",
+            idioma,
+          )}
         </p>
       </header>
       {/*
@@ -56,14 +62,21 @@ export default async function SetupAiPage() {
         pessoa preencher abaixo produz um funcionário que responde. E é aqui que
         a chave passa a importar — um clique antes de ele ser criado com ela.
       */}
-      <InteligenciaDele
-        inicial={{
-          origem: retrato.inteligencia.origemDaChave,
-          provedor: retrato.inteligencia.provedor,
-          rotulo: retrato.inteligencia.rotulo,
-          final: retrato.inteligencia.chaveDaOrg?.final ?? null,
-        }}
-      />
+      {(await podeConfigurarIa(user, activeOrg.orgId, "credentials")) ? (
+        <InteligenciaDele
+          inicial={{
+            origem: retrato.inteligencia.origemDaChave,
+            provedor: retrato.inteligencia.provedor,
+            rotulo: retrato.inteligencia.rotulo,
+            final: retrato.inteligencia.chaveDaOrg?.final ?? null,
+          }}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          A inteligencia artificial ja e administrada pela plataforma ELUS. Voce so precisa treinar
+          seu funcionario.
+        </p>
+      )}
 
       <SetupAiForm capacidades={capacidades} conferencias={conferencias} />
     </div>

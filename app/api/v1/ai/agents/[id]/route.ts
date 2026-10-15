@@ -12,6 +12,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { validarMudancasTecnicas } from "@/lib/ai/governanca-da-ia";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -97,12 +98,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   let priorityPatch: number | null = null;
   if (rawBody !== null && typeof rawBody === "object" && "priority" in rawBody) {
     const p = (rawBody as { priority?: unknown }).priority;
-    if (
-      typeof p !== "number" ||
-      !Number.isInteger(p) ||
-      p < 0 ||
-      p > 1000
-    ) {
+    if (typeof p !== "number" || !Number.isInteger(p) || p < 0 || p > 1000) {
       return fail("validation_failed", t("priority inválido (0..1000)."), 422, { requestId });
     }
     priorityPatch = p;
@@ -134,6 +130,16 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   if (!existing) {
     return fail("not_found", t("Agent não encontrado."), 404, { requestId });
   }
+  const negadas = await validarMudancasTecnicas(
+    authz.user,
+    activeOrg.orgId,
+    { model: existing.model },
+    { model: patch.model },
+  );
+  if (negadas.length)
+    return fail("forbidden_platform_ai", "Modelo de IA gerenciado pela plataforma.", 403, {
+      requestId,
+    });
 
   // ─── CONTEÚDO DE VERSÃO PUBLICADA NÃO SE EDITA PELO CADASTRO ───────────
   //

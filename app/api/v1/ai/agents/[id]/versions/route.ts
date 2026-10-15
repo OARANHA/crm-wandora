@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mensagemDoEscopo, validarEscopoDaVersao } from "@/lib/ai/agents/escopo";
 import { versionCreateSchema } from "@/lib/ai/agents/validation";
+import { motivoDaRecusaTecnica } from "@/lib/ai/governanca-da-ia";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -32,16 +33,20 @@ type Ctx = { params: Promise<{ id: string }> };
 async function assertAgentInOrg(
   agentId: string,
   orgId: string,
-): Promise<{ ok: true; kind: string } | { ok: false }> {
+): Promise<{ ok: true; kind: string; published_version_id: string | null } | { ok: false }> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("ai_agents")
-    .select("id, kind, archived_at")
+    .select("id, kind, archived_at, published_version_id")
     .eq("id", agentId)
     .eq("organization_id", orgId)
     .maybeSingle();
   if (!data || data.archived_at) return { ok: false };
-  return { ok: true, kind: (data as { kind: string }).kind };
+  return {
+    ok: true,
+    kind: (data as { kind: string }).kind,
+    published_version_id: data.published_version_id,
+  };
 }
 
 export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
@@ -73,7 +78,11 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const { id } = await ctx.params;
   if (!UUID_RX.test(id)) return fail("invalid_request", "id inválido.", 400, { requestId });
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_agents" });
+  const authz = await requireRole("admin", {
+    requestId,
+    resource: "ai_agents",
+    allowPlatformAdmin: true,
+  });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
@@ -99,6 +108,13 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     return fail("not_found", t("Agent não encontrado."), 404, { requestId });
   }
 
+  const denied = await motivoDaRecusaTecnica(
+    authUser,
+    activeOrg.orgId,
+    agentCheck.published_version_id,
+    v,
+  );
+  if (denied) return fail(denied, "Escolha tecnica de IA nao autorizada.", 403, { requestId });
   const admin = createAdminClient();
 
   // Ordering: insert with retry on 23505 (race com unique(agent_id,version_number)).

@@ -6,6 +6,7 @@ import * as React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useT } from "@/hooks/i18n/useT";
 import { AgentForm, type ChannelSessionLite } from "./AgentForm";
+import type { AutonomiaIa } from "@/lib/ai/governanca-da-ia";
 import type { CoberturaPorFunil } from "./FunisDoAgente";
 import type { MaterialDoAcervo } from "./BasesDoAgente";
 import type { FunilDaResposta } from "@/hooks/pipelines/usePipelines";
@@ -35,6 +36,7 @@ interface Props {
   credentials: CredentialRow[];
   /** Provedores cuja chave veio na instalação — ver `AgentForm`. */
   provedoresDaInstalacao?: string[];
+  autonomiaTecnica?: AutonomiaIa;
   channelSessions: ChannelSessionLite[];
   routerMembership?: { routerId: string; routerName: string } | null;
   readOnly?: boolean;
@@ -75,6 +77,7 @@ export function AgentTabs(props: Props) {
           draftObsoleto={props.draftObsoleto}
           credentials={props.credentials}
           provedoresDaInstalacao={props.provedoresDaInstalacao}
+          autonomiaTecnica={props.autonomiaTecnica}
           channelSessions={props.channelSessions}
           funis={props.funis}
           cobertura={props.cobertura}
