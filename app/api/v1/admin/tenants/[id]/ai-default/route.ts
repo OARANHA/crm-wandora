@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
   const db = createAdminClient();
   const [orgResult, modelsResult, credentialsResult, agentsResult, bindingsResult] =
     await Promise.all([
-      db.from("organizations").select("id, settings").eq("id", orgId).maybeSingle(),
+      db.from("organizations").select("id, display_name, settings").eq("id", orgId).maybeSingle(),
       db
         .from("ai_models")
         .select("provider, model_id, display_name")
@@ -93,6 +93,7 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
   return ok(
     {
       organization_id: orgId,
+      organization_name: orgResult.data.display_name,
       padrao: {
         provider: current.provider,
         default_model: current.default_model,

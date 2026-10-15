@@ -2,6 +2,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PROVEDOR_POR_ID } from "@/lib/ai/pontos/provedores";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,7 @@ type Readiness = {
   credencial_organizacao_validada: boolean;
 };
 type Data = {
+  organization_name: string;
   padrao: { provider: string; default_model: string | null; configured: boolean };
   provedores: string[];
   modelos: Model[];
@@ -111,6 +113,11 @@ export function TenantAiPlatformDefault({ organizationId }: { organizationId: st
           publicadas e configurações próprias dos pontos continuam prevalecendo. As permissões de
           autonomia são controladas separadamente acima.
         </p>
+        {data && (
+          <p className="mt-2 text-sm font-medium">
+            Organização selecionada: {data.organization_name}
+          </p>
+        )}
       </div>
       {loading ? (
         <p className="text-sm text-muted-foreground">Consultando configuração…</p>
@@ -136,7 +143,7 @@ export function TenantAiPlatformDefault({ organizationId }: { organizationId: st
                 <SelectContent>
                   {data.provedores.map((id) => (
                     <SelectItem key={id} value={id}>
-                      {id}
+                      {PROVEDOR_POR_ID.get(id)?.rotulo ?? id}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -179,8 +186,17 @@ export function TenantAiPlatformDefault({ organizationId }: { organizationId: st
                 : "fallback da instalação (não salvo)"}
               .
             </p>
+            {provider === "custom" && (
+              <p>
+                Provedor personalizado significa um endpoint compatível com OpenAI, não um modelo
+                específico. A Base URL HTTPS e o token são cadastrados e validados em IA → Chaves de
+                acesso à IA, com esta organização ativa. Este painel escolhe somente o modelo
+                padrão; não cria nem altera credenciais. Não é necessário cadastrar essas chaves nas
+                variáveis de ambiente do servidor.
+              </p>
+            )}
             <p>
-              Credencial de {provider}:{" "}
+              Credencial de {PROVEDOR_POR_ID.get(provider)?.rotulo ?? provider}:{" "}
               {ready
                 ? availability?.credencial_organizacao_validada
                   ? "credencial própria validada"
