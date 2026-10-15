@@ -14,6 +14,7 @@ type Model = { provider: string; model_id: string; display_name: string };
 type Readiness = {
   provider: string;
   chave_instalacao: boolean;
+  gateway_instalacao: boolean;
   credencial_organizacao_validada: boolean;
 };
 type Data = {
@@ -191,6 +192,12 @@ export function TenantAiPlatformDefault({ organizationId }: { organizationId: st
               {data.pontos_com_configuracao_propria} ponto(s) com modelo próprio. Nenhum desses
               registros será sobrescrito.
             </p>
+            {!ready && availability?.gateway_instalacao && (
+              <p>
+                Gateway da instalação configurado; não foi comprovado que ele suporta este
+                provedor/modelo.
+              </p>
+            )}
             {models.length === 0 && (
               <p>Catálogo de modelos vazio para este provedor. Confirme o ID antes de usar.</p>
             )}

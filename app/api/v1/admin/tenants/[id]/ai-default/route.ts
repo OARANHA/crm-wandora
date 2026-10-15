@@ -84,7 +84,8 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
   const supported = PROVEDORES.map((p) => p.id);
   const status = supported.map((provider) => ({
     provider,
-    chave_instalacao: environment.gateway || environment.chavesDeProvedor[provider] === true,
+    chave_instalacao: environment.chavesDeProvedor[provider] === true,
+    gateway_instalacao: environment.gateway,
     credencial_organizacao_validada: (credentialsResult.data ?? []).some(
       (c) => c.provider === provider && c.is_active === true && c.validated_at != null,
     ),
