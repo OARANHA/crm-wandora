@@ -63,7 +63,7 @@ describe("capability canônica AES-GCM com prova síncrona do Superadmin", () =>
       base_url: "https://models.example.test/v1",
       api_key_last4: "9999",
     });
-    expect(inserted?.validated_at).toEqual(expect.any(String));
+    expect(inserted).toMatchObject({ validated_at: expect.any(String) });
     expect(JSON.stringify(inserted)).not.toContain("SYNTHETIC_ONLY_NEVER_REAL");
     expect(mock.validate).not.toHaveBeenCalled();
     expect(mock.audit).toHaveBeenCalledWith(
