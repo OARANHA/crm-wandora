@@ -4,6 +4,7 @@ import { useTenantDetail } from "@/hooks/useTenantDetail";
 import { TenantOverview } from "@/components/admin/tenants/TenantOverview";
 import { TenantActions } from "@/components/admin/tenants/TenantActions";
 import { TenantAiPermissions } from "@/components/admin/tenants/TenantAiPermissions";
+import { TenantAiPlatformDefault } from "@/components/admin/tenants/TenantAiPlatformDefault";
 import { SuspendedBanner } from "@/components/admin/tenants/SuspendedBanner";
 import { useT } from "@/hooks/i18n/useT";
 
@@ -54,6 +55,7 @@ export function TenantOverviewClient({ id }: TenantOverviewClientProps) {
         />
       </div>
       <TenantAiPermissions organizationId={organization.id} />
+      <TenantAiPlatformDefault organizationId={organization.id} />
     </div>
   );
 }
