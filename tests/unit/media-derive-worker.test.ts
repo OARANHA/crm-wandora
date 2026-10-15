@@ -106,6 +106,7 @@ function configResolvida(over: Partial<OrgLlmConfig> = {}): OrgLlmConfig {
     apiKey: "sk-test",
     origemDaChave: "credencial_da_organizacao",
     defaultModel: "gpt-5",
+    credentialId: null,
     params: {},
     enabledModels: [],
     orcamento: { modo: "off", tetoCents: 0, efetivoEm: null, limiarPct: 80 },
