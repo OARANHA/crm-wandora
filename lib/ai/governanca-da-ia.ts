@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 /**
  * Autonomia técnica é autorização de EDIÇÃO, nunca chave de execução.
  * Ao revogar, agentes publicados e credenciais existentes continuam intactos.
+ * Coluna isolada organizations.ai_autonomy: salvar settings não reabre acesso revogado.
  * Ausência/corrupção/erro de leitura: nenhum poder técnico é concedido ao tenant.
  */
 export const CHAVES_AUTONOMIA_IA = ["provider", "model", "credentials", "operator_model"] as const;
@@ -16,7 +17,6 @@ export const AUTONOMIA_IA_PADRAO: Readonly<AutonomiaIa> = Object.freeze({
   credentials: false,
   operator_model: false,
 });
-export const CHAVE_SETTINGS_AUTONOMIA_IA = "elus_ai_autonomy";
 
 type Ator = Pick<AuthUser, "is_platform_admin" | "platform_admin_scope" | "support">;
 
@@ -24,12 +24,11 @@ export function podeGerenciarIaDaPlataforma(user: Ator): boolean {
   return user.is_platform_admin === true && user.platform_admin_scope === "full" && !user.support;
 }
 
-export function interpretarAutonomiaIa(settings: unknown): AutonomiaIa {
-  const s =
-    settings && typeof settings === "object" && !Array.isArray(settings)
-      ? (settings as Record<string, unknown>)[CHAVE_SETTINGS_AUTONOMIA_IA]
-      : null;
-  const raw = s && typeof s === "object" && !Array.isArray(s) ? (s as Record<string, unknown>) : {};
+export function interpretarAutonomiaIa(value: unknown): AutonomiaIa {
+  const raw =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   return {
     provider: raw.provider === true,
     model: raw.model === true,
@@ -43,11 +42,11 @@ export async function lerAutonomiaIa(orgId: string): Promise<AutonomiaIa | null>
   try {
     const { data, error } = await createAdminClient()
       .from("organizations")
-      .select("settings")
+      .select("ai_autonomy")
       .eq("id", orgId)
       .maybeSingle();
     if (error || !data) return null;
-    return interpretarAutonomiaIa(data.settings);
+    return interpretarAutonomiaIa(data.ai_autonomy);
   } catch {
     return null;
   }

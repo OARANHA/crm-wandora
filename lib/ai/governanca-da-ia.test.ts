@@ -6,7 +6,6 @@ import {
   mudancasTecnicas,
   autonomiaEfetiva,
   validarMudancasTecnicas,
-  CHAVE_SETTINGS_AUTONOMIA_IA,
 } from "./governanca-da-ia";
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
@@ -32,7 +31,7 @@ function fakeDb(map: Record<string, unknown>, fail = false) {
                 fail
                   ? { data: null, error: { code: "DB_DOWN" } }
                   : {
-                      data: map[orgId] === undefined ? null : { settings: map[orgId] },
+                      data: map[orgId] === undefined ? null : { ai_autonomy: map[orgId] },
                       error: null,
                     },
             }),
@@ -60,20 +59,18 @@ describe("autonomia tecnica de IA por tenant", () => {
     expect(Object.values(interpretarAutonomiaIa({}))).toEqual([false, false, false, false]);
     expect(
       interpretarAutonomiaIa({
-        [CHAVE_SETTINGS_AUTONOMIA_IA]: {
-          provider: "true",
-          model: 1,
-          credentials: {},
-          operator_model: true,
-        },
+        provider: "true",
+        model: 1,
+        credentials: {},
+        operator_model: true,
       }),
     ).toEqual({ provider: false, model: false, credentials: false, operator_model: true });
   });
 
   it("tenant A nunca herda privilegios do tenant B", async () => {
     fakeDb({
-      [ORG_A]: { [CHAVE_SETTINGS_AUTONOMIA_IA]: { credentials: true } },
-      [ORG_B]: { [CHAVE_SETTINGS_AUTONOMIA_IA]: { model: true } },
+      [ORG_A]: { credentials: true },
+      [ORG_B]: { model: true },
     });
     expect((await autonomiaEfetiva(CLIENT, ORG_A)).credentials).toBe(true);
     expect((await autonomiaEfetiva(CLIENT, ORG_A)).model).toBe(false);
@@ -81,8 +78,15 @@ describe("autonomia tecnica de IA por tenant", () => {
     expect((await autonomiaEfetiva(CLIENT, ORG_B)).model).toBe(true);
   });
 
+  it("ignora grants antigos em settings e consulta somente a coluna protegida", async () => {
+    fakeDb({
+      [ORG_A]: { provider: false, model: false, credentials: false, operator_model: false },
+    });
+    expect((await autonomiaEfetiva(CLIENT, ORG_A)).credentials).toBe(false);
+  });
+
   it("falha na consulta é fail-closed mesmo quando existe concessao anterior", async () => {
-    fakeDb({ [ORG_A]: { [CHAVE_SETTINGS_AUTONOMIA_IA]: { credentials: true } } }, true);
+    fakeDb({ [ORG_A]: { credentials: true } }, true);
     expect((await autonomiaEfetiva(CLIENT, ORG_A)).credentials).toBe(false);
     expect((await autonomiaEfetiva(OWNER, ORG_A)).credentials).toBe(true);
     expect((await autonomiaEfetiva(SUPPORT, ORG_A)).credentials).toBe(false);
@@ -98,7 +102,7 @@ describe("autonomia tecnica de IA por tenant", () => {
   });
 
   it("nega so o campo tecnico nao autorizado, mantendo os outros separados", async () => {
-    fakeDb({ [ORG_A]: { [CHAVE_SETTINGS_AUTONOMIA_IA]: { model: true } } });
+    fakeDb({ [ORG_A]: { model: true } });
     const negadas = await validarMudancasTecnicas(
       CLIENT,
       ORG_A,

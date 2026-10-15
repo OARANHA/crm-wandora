@@ -10,7 +10,7 @@ import {
 } from "@/lib/auth/requirePlatformAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/lib/audit";
-import { CHAVE_SETTINGS_AUTONOMIA_IA, interpretarAutonomiaIa } from "@/lib/ai/governanca-da-ia";
+import { interpretarAutonomiaIa } from "@/lib/ai/governanca-da-ia";
 
 const paramsSchema = z.object({ id: z.string().uuid() });
 const bodySchema = z
@@ -36,14 +36,14 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
   const orgId = parsed.data.id;
   const { data, error } = await createAdminClient()
     .from("organizations")
-    .select("id, settings")
+    .select("id, ai_autonomy")
     .eq("id", orgId)
     .maybeSingle();
   if (error)
     return fail("internal_error", "Falha ao consultar permissoes de IA", 500, { requestId });
   if (!data) return fail("not_found", "Tenant not found", 404, { requestId });
   return ok(
-    { organization_id: orgId, permissions: interpretarAutonomiaIa(data.settings) },
+    { organization_id: orgId, permissions: interpretarAutonomiaIa(data.ai_autonomy) },
     { requestId },
   );
 }
@@ -66,16 +66,12 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
   const admin = createAdminClient();
   const { data: org, error: loadError } = await admin
     .from("organizations")
-    .select("id, settings")
+    .select("id, ai_autonomy")
     .eq("id", orgId)
     .maybeSingle();
   if (loadError) return fail("internal_error", "Falha ao ler configuracao", 500, { requestId });
   if (!org) return fail("not_found", "Tenant not found", 404, { requestId });
-  const settings =
-    org.settings && typeof org.settings === "object" && !Array.isArray(org.settings)
-      ? (org.settings as Record<string, unknown>)
-      : {};
-  const anterior = interpretarAutonomiaIa(settings);
+  const anterior = interpretarAutonomiaIa(org.ai_autonomy);
   if (
     Object.keys(anterior).every(
       (key) => anterior[key as keyof typeof anterior] === body.data[key as keyof typeof anterior],
@@ -83,13 +79,13 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
   ) {
     return ok({ organization_id: orgId, permissions: anterior, changed: false }, { requestId });
   }
-  const novo = { ...settings, [CHAVE_SETTINGS_AUTONOMIA_IA]: body.data };
-  // CAS sobre o jsonb inteiro evita perder alterações paralelas de outras telas.
+  // CAS exclusivamente na coluna de autorização; salvar settings em paralelo
+  // nunca pode ressuscitar uma permissão revogada.
   const { data: updated, error } = await admin
     .from("organizations")
-    .update({ settings: novo })
+    .update({ ai_autonomy: body.data })
     .eq("id", orgId)
-    .eq("settings", JSON.stringify(settings))
+    .eq("ai_autonomy", JSON.stringify(org.ai_autonomy ?? {}))
     .select("id")
     .maybeSingle();
   if (error) return fail("internal_error", "Falha ao atualizar permissoes", 500, { requestId });

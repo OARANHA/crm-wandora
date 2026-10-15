@@ -40,6 +40,24 @@ describe("gates tecnicos de IA — backend e UI", () => {
     const code = file("app/app/ai/agents/[id]/_actions.ts");
     expect(code).toContain("motivoDaRecusaTecnica");
   });
+  it("isolamento da coluna de grants e migracao resistente a writes concorrentes", () => {
+    const route = file("app/api/v1/admin/tenants/[id]/ai-permissions/route.ts");
+    const governance = file("lib/ai/governanca-da-ia.ts");
+    const migration = file("supabase/migrations/20261015031500_0506_org_ai_autonomy_protected.sql");
+    const baseline = file("supabase/baseline.sql");
+    expect(governance).toContain('.select("ai_autonomy")');
+    expect(governance).not.toContain("CHAVE_SETTINGS_AUTONOMIA_IA");
+    expect(route).toContain(".update({ ai_autonomy: body.data })");
+    expect(route).toContain('.eq("ai_autonomy", JSON.stringify(org.ai_autonomy ?? {}))');
+    expect(route).not.toContain(".update({ settings:");
+    expect(migration).toContain("fn_guard_organizations_ai_autonomy");
+    expect(migration).toContain("auth.role() = 'service_role'");
+    expect(migration).toContain("errcode = '42501'");
+    expect(migration).toContain("before insert or update on public.organizations");
+    expect(baseline).toContain('"ai_autonomy" "jsonb" DEFAULT');
+    expect(baseline).toContain("fn_guard_organizations_ai_autonomy()");
+  });
+
   it("superadmin escreve por rota propria e exige MFA/scope full", () => {
     const code = file("app/api/v1/admin/tenants/[id]/ai-permissions/route.ts");
     expect(code).toContain("requirePlatformAdminEscrita()");
