@@ -318,8 +318,10 @@ async function padraoDaOrganizacao(
       : `${llm.provider}/${defaultModel}`;
   if (daOrg !== null && daOrg.provider === llm.provider) {
     const id = idParaOProvider(llm.provider, modelId);
-    const model = id === null ? null : instanciar(llm.provider, daOrg.apiKey, id, daOrg.baseUrl);
-    if (model !== null) return { model, modelId, origem: "credencial_da_organizacao" };
+    if (id !== null) {
+      const model = instanciar(llm.provider, daOrg.apiKey, id, daOrg.baseUrl);
+      if (model !== null) return { model, modelId, origem: "credencial_da_organizacao" };
+    }
   }
   // Credencial custom pinada sem URL utilizável não cai em chave da instalação.
   if (llm.credentialId && llm.provider === "custom") return null;
@@ -501,10 +503,7 @@ async function credencialDaOrganizacao(
 
     return {
       provider,
-      baseUrl:
-        typeof data.base_url === "string" && data.base_url.trim() !== ""
-          ? data.base_url
-          : null,
+      baseUrl: typeof data.base_url === "string" ? data.base_url.trim() || null : null,
       apiKey: decryptKey({
         ciphertext: byteaToBuffer(data.api_key_encrypted),
         iv: byteaToBuffer(data.api_key_iv),
