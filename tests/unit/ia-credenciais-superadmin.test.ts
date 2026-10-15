@@ -153,7 +153,6 @@ describe("Superadmin cria a credencial na organização explicitamente seleciona
   });
 });
 
-
 describe("Isolamento de credenciais entre organizações A e B", () => {
   it("impede ativação em A de uma credencial validada pertencente a B", async () => {
     const orgB = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
@@ -176,7 +175,10 @@ describe("Isolamento de credenciais entre organizações A e B", () => {
             consultas.push({ tabela, filtros: { ...filtros } });
             if (tabela === "organizations") {
               return {
-                data: { id: ORG, settings: { llm: { provider: "anthropic", default_model: "haiku" } } },
+                data: {
+                  id: ORG,
+                  settings: { llm: { provider: "anthropic", default_model: "haiku" } },
+                },
                 error: null,
               };
             }
