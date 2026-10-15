@@ -39,6 +39,7 @@ import { TETO_TOOLS_POR_AGENTE } from "@/lib/mcp/tools/selecao-por-pacote";
 import { PROVEDORES } from "@/lib/ai/pontos/provedores";
 
 import { ModelPicker, useModelMeta } from "./ModelPicker";
+import { podePreservarChaveLegadaAoSalvar } from "@/lib/ai/agents/edicao-nao-tecnica";
 import { AUTONOMIA_IA_PADRAO, type AutonomiaIa } from "@/lib/ai/governanca-da-ia";
 import {
   CHAVE_DA_INSTALACAO,
@@ -424,6 +425,32 @@ export function AgentForm(props: Props) {
   const channelSession = props.channelSessions.find((c) => c.id === form.channel_session_id);
   const modelMeta = useModelMeta(form.provider, form.model);
 
+  // A falta de chave global NÃO impede salvar instruções de uma versão legada
+  // quando a plataforma bloqueou a troca da credencial. Publicação continua
+  // exigindo a chave realmente utilizável (ver publishBlockReason abaixo).
+  const manterChaveLegadaAoSalvar = podePreservarChaveLegadaAoSalvar({
+    editandoAgente: isEdit,
+    temVersaoPersistida:
+      props.mode === "edit" && Boolean(props.base ?? props.draft ?? props.published),
+    podeEditarCredencial: autonomia.credentials,
+    antes: {
+      provider: baseline.provider,
+      model: baseline.model,
+      credential_id: baseline.credential_id,
+      operator_model: baseline.operator_model,
+    },
+    depois: {
+      provider: form.provider,
+      model: form.model,
+      credential_id: form.credential_id,
+      operator_model: form.operator_model,
+    },
+  });
+  const faltaChaveInstalacao =
+    form.credential_id === CHAVE_DA_INSTALACAO &&
+    !(props.provedoresDaInstalacao ?? []).includes(form.provider);
+  const faltaCredencialParaPublicar = !form.credential_id || faltaChaveInstalacao;
+
   // ---------------------------------------------------------------------
   // Validação (espelha versionCreateSchema, no client; server revalida).
   // ---------------------------------------------------------------------
@@ -451,15 +478,12 @@ export function AgentForm(props: Props) {
         `${t("As instruções têm")} ${tamanhoDoPrompt.toLocaleString("pt-BR")} ${t("caracteres, e o máximo é 20.000. Corte")} ` +
         `${(tamanhoDoPrompt - 20000).toLocaleString("pt-BR")} ${t("para conseguir salvar.")}`;
     if (!form.model) errors.model = t("Escolha o modelo de inteligência artificial.");
-    if (!form.credential_id)
+    if (!form.credential_id && !manterChaveLegadaAoSalvar)
       errors.credential_id = t("Escolha a chave de acesso da empresa de inteligência artificial.");
     // Escolher "a chave desta instalação" para um provedor que a instalação NÃO
     // tem seria publicar um agente que morre em toda mensagem. A mesma recusa
     // existe no servidor (rota de versões); aqui ela chega antes do clique.
-    if (
-      form.credential_id === CHAVE_DA_INSTALACAO &&
-      !(props.provedoresDaInstalacao ?? []).includes(form.provider)
-    )
+    if (faltaChaveInstalacao && !manterChaveLegadaAoSalvar)
       errors.credential_id = `${t("Esta instalação não tem chave de")} ${form.provider}. ${t("Escolha outra empresa de IA ou cadastre uma chave.")}`;
     // ⚠️ O NÚMERO NÃO ENTRA AQUI — de propósito, e não por esquecimento.
     //
@@ -485,7 +509,7 @@ export function AgentForm(props: Props) {
       }
     }
     return errors;
-  }, [form, t, props.provedoresDaInstalacao]);
+  }, [form, t, faltaChaveInstalacao, manterChaveLegadaAoSalvar]);
 
   const isValid = Object.keys(validation).length === 0;
 
@@ -503,7 +527,7 @@ export function AgentForm(props: Props) {
     if (!isEdit) return t("Salve o agent antes de publicar.");
     const motivo = bloqueioDePublicacao({
       temRascunhoVigente: !!props.draft,
-      formularioValido: isValid,
+      formularioValido: isValid && !faltaCredencialParaPublicar,
       alteracoesNaoSalvas: dirty,
       provedor: form.provider,
       chave: {
@@ -534,7 +558,18 @@ export function AgentForm(props: Props) {
       case "numero_desconectado":
         return `${t("Número WhatsApp não está conectado (status:")} ${motivo.estado}).`;
     }
-  }, [isEdit, props, isValid, dirty, credSt, form.provider, form.credential_id, channelSession, t]);
+  }, [
+    isEdit,
+    props,
+    isValid,
+    faltaCredencialParaPublicar,
+    dirty,
+    credSt,
+    form.provider,
+    form.credential_id,
+    channelSession,
+    t,
+  ]);
 
   // ---------------------------------------------------------------------
   // Handlers
@@ -932,6 +967,12 @@ export function AgentForm(props: Props) {
             />
             {validation.credential_id ? (
               <p className="text-xs text-destructive">{validation.credential_id}</p>
+            ) : null}
+            {manterChaveLegadaAoSalvar && faltaCredencialParaPublicar ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Você pode salvar instruções e outros campos permitidos sem trocar a chave. Publicar
+                exige uma credencial válida, administrada pela plataforma.
+              </p>
             ) : null}
             {cred && credSt && credSt !== "validated" ? (
               <p className="text-xs text-amber-600 dark:text-amber-400">

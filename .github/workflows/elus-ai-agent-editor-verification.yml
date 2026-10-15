@@ -1,0 +1,55 @@
+name: ELUS AI agent editor verification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/elus-ai-agent-editor-verification.yml"
+      - "app/app/ai/agents/**"
+      - "lib/ai/agents/edicao-nao-tecnica*"
+      - "tests/unit/ia-edicao-nao-tecnica-autonomia.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck and governed agent edits
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint agent editing
+        run: >-
+          pnpm exec eslint
+          "app/app/ai/agents/[id]/_components/AgentForm.tsx"
+          lib/ai/agents/edicao-nao-tecnica.ts
+          lib/ai/agents/edicao-nao-tecnica.test.ts
+          tests/unit/ia-edicao-nao-tecnica-autonomia.test.ts
+      - name: Formatting
+        run: >-
+          pnpm exec prettier --check
+          "app/app/ai/agents/[id]/_components/AgentForm.tsx"
+          lib/ai/agents/edicao-nao-tecnica.ts
+          lib/ai/agents/edicao-nao-tecnica.test.ts
+          tests/unit/ia-edicao-nao-tecnica-autonomia.test.ts
+      - name: Agent edits and permissions regression
+        run: >-
+          pnpm exec vitest run
+          lib/ai/agents/edicao-nao-tecnica.test.ts
+          tests/unit/ia-edicao-nao-tecnica-autonomia.test.ts
+          tests/unit/ia-plataforma-provedor-gates.test.ts
+          lib/ai/governanca-da-ia.test.ts
+          --maxWorkers=2
