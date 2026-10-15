@@ -311,7 +311,15 @@ describe("provider custom pinado no padrão do tenant", () => {
                 tabela === "ai_purpose_bindings"
                   ? null
                   : tabela === "organizations"
-                    ? { settings: { llm: { provider: "custom", credential_id: pin, default_model: "gateway-model" } } }
+                    ? {
+                        settings: {
+                          llm: {
+                            provider: "custom",
+                            credential_id: pin,
+                            default_model: "gateway-model",
+                          },
+                        },
+                      }
                     : {
                         api_key_encrypted: "x",
                         api_key_iv: "y",
