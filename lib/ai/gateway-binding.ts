@@ -89,13 +89,15 @@ export async function resolverModeloDoPonto(
     if (llm?.credentialId && daOrg === null) return null;
     const idNoProvider = daOrg === null ? null : idParaOProvider(daOrg.provider, String(padrao));
     if (daOrg !== null && idNoProvider !== null) {
-      const model = instanciar(daOrg.provider, daOrg.apiKey, idNoProvider, null);
+      const model = instanciar(daOrg.provider, daOrg.apiKey, idNoProvider, daOrg.baseUrl);
       if (model !== null) {
         // `modelId` continua sendo o id CANÔNICO, não o traduzido: é ele que
         // casa com o catálogo de preço no log de custo.
         return { model, modelId: String(padrao), origem: "credencial_da_organizacao" };
       }
     }
+    // Se o custom foi pinado, jamais substituir seu endpoint pela chave da instalação.
+    if (llm?.credentialId && llm.provider === "custom") return null;
     // Sem credencial cadastrada sobra a chave da INSTALAÇÃO, e quem diz de QUEM
     // é essa chave é o provedor que a organização escolheu (issue #1181). A
     // leitura desse provedor é preguiçosa: id que já traz rota resolve sem ela,
@@ -301,7 +303,7 @@ async function provedorDoModeloNoCatalogo(modelId: string): Promise<string | nul
  */
 async function padraoDaOrganizacao(
   organizationId: string,
-  daOrg: { provider: string; apiKey: string } | null,
+  daOrg: { provider: string; apiKey: string; baseUrl: string | null } | null,
 ): Promise<ModeloResolvido | null> {
   const llm = await llmDaOrganizacao(organizationId);
   if (llm === null || llm.defaultModel === null) return null;
@@ -316,7 +318,7 @@ async function padraoDaOrganizacao(
       : `${llm.provider}/${defaultModel}`;
   if (daOrg !== null && daOrg.provider === llm.provider) {
     const id = idParaOProvider(llm.provider, modelId);
-    const model = id === null ? null : instanciar(llm.provider, daOrg.apiKey, id, null);
+    const model = id === null ? null : instanciar(llm.provider, daOrg.apiKey, id, daOrg.baseUrl);
     if (model !== null) return { model, modelId, origem: "credencial_da_organizacao" };
   }
   const model = await padraoDaInstalacao(() => Promise.resolve(llm.provider), modelId as ModelId);
@@ -463,7 +465,7 @@ async function llmDaOrganizacao(
  */
 async function credencialDaOrganizacao(
   organizationId: string,
-): Promise<{ provider: string; apiKey: string } | null> {
+): Promise<{ provider: string; apiKey: string; baseUrl: string | null } | null> {
   try {
     const admin = createAdminClient();
     const { data: org } = await admin
@@ -485,7 +487,7 @@ async function credencialDaOrganizacao(
     // obrigatório (CLAUDE.md, anti-pattern 10).
     let query = admin
       .from("ai_provider_credentials")
-      .select("api_key_encrypted, api_key_iv, api_key_tag")
+      .select("api_key_encrypted, api_key_iv, api_key_tag, base_url")
       .eq("organization_id", organizationId)
       .eq("provider", provider)
       .eq("is_active", true)
@@ -497,6 +499,7 @@ async function credencialDaOrganizacao(
 
     return {
       provider,
+      baseUrl: typeof data.base_url === "string" && data.base_url.trim() !== "" ? data.base_url : null,
       apiKey: decryptKey({
         ciphertext: byteaToBuffer(data.api_key_encrypted),
         iv: byteaToBuffer(data.api_key_iv),
