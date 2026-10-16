@@ -14,6 +14,10 @@ import { CHAVES_DO_CLIMA } from "@/lib/ai/decisao/metadados-do-clima";
 import { triggerHandoff } from "@/lib/ai/handoff/orchestrator";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
+import {
+  CAPACIDADE_ERP_ADMIN_READ,
+  resolverAutoridadeAdminWhatsapp,
+} from "@/lib/integracoes-erp/autoridade-admin-whatsapp";
 
 export const AI_HANDOFF_FROM_SENTIMENT_KEY = "ai-handoff-from-sentiment.v1";
 
@@ -22,15 +26,11 @@ export const aiHandoffFromSentimentHandler: EventHandler = {
   naOrgParada: "pula",
   events: ["ai.sentiment_alert"],
   async handle(row): Promise<HandlerResult> {
-    const messageId =
-      (row.payload?.["message_id"] as string | undefined) ?? row.entity_id ?? null;
-    const conversationIdHint =
-      (row.payload?.["conversation_id"] as string | undefined) ?? null;
-    const sentimentScore =
-      (row.payload?.["sentiment_score"] as number | undefined) ?? null;
+    const messageId = (row.payload?.["message_id"] as string | undefined) ?? row.entity_id ?? null;
+    const conversationIdHint = (row.payload?.["conversation_id"] as string | undefined) ?? null;
+    const sentimentScore = (row.payload?.["sentiment_score"] as number | undefined) ?? null;
     /** Qual motor mediu — a passagem marca "(percebido pelo Jev)" quando foi ele. */
-    const sentimentEngine =
-      (row.payload?.[CHAVES_DO_CLIMA.motor] as string | undefined) ?? null;
+    const sentimentEngine = (row.payload?.[CHAVES_DO_CLIMA.motor] as string | undefined) ?? null;
 
     if (!messageId && !conversationIdHint) {
       return {
@@ -42,12 +42,43 @@ export const aiHandoffFromSentimentHandler: EventHandler = {
 
     const admin = createAdminClient();
 
-    const boundary = messageId ? await serviceFromMessage(admin, row.organization_id, messageId) : null;
+    const boundary = messageId
+      ? await serviceFromMessage(admin, row.organization_id, messageId)
+      : null;
     if (!boundary || (conversationIdHint && boundary.conversation_id !== conversationIdHint)) {
-      return { consumer_key: AI_HANDOFF_FROM_SENTIMENT_KEY, status: "skipped", detail: "service_boundary_stale" };
+      return {
+        consumer_key: AI_HANDOFF_FROM_SENTIMENT_KEY,
+        status: "skipped",
+        detail: "service_boundary_stale",
+      };
     }
     const conversationId = boundary.conversation_id;
     const contactId = boundary.contact_id;
+
+    // O sentimento mede o texto, não a autoridade. Uma solicitação fiscal de um
+    // administrador comprovado NÃO é uma conversa de cliente a escalar pelo G2.
+    // Reusa exatamente o gate de identidade das tools ERP: contato da fronteira
+    // canônica -> WhatsApp vinculado -> membership admin ativo -> erp.admin.read.
+    // Frase "sou dono" não conta. Na dúvida, o handoff existente continua valendo.
+    // Pedido explícito de humano, opt-out e os demais gatilhos são independentes.
+    if (contactId) {
+      try {
+        const autoridade = await resolverAutoridadeAdminWhatsapp(
+          admin,
+          row.organization_id,
+          contactId,
+        );
+        if (autoridade?.capability === CAPACIDADE_ERP_ADMIN_READ) {
+          return {
+            consumer_key: AI_HANDOFF_FROM_SENTIMENT_KEY,
+            status: "skipped",
+            detail: "erp_admin_whatsapp_no_sentiment_handoff",
+          };
+        }
+      } catch {
+        logger.warn("[ai-handoff-from-sentiment] falha no gate admin; mantido handoff G2");
+      }
+    }
 
     // Best-effort: resolve the most recent open lead for this contact so the
     // orchestrator can write a timeline activity. If unavailable we still
