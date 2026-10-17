@@ -1,0 +1,57 @@
+name: DANFE XML offline feasibility
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/danfe-xml-offline-feasibility.yml"
+      - "scripts/diagnostics/danfe-xml-offline-proof.mjs"
+      - "tests/fixtures/danfe-xml-synthetic.xml"
+      - "docs/research/danfe-xml-native-spike.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-xml-to-pdf:
+    name: XML synthetic to PDF (no production wiring)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert syntax and synthetic-only fixture
+        run: |
+          node --check scripts/diagnostics/danfe-xml-offline-proof.mjs
+          grep -q 'EMPRESA TESTE EMITENTE' tests/fixtures/danfe-xml-synthetic.xml
+          grep -q 'CLIENTE TESTE DESTINATARIO' tests/fixtures/danfe-xml-synthetic.xml
+      - name: Install pinned optional test-only packages outside repo
+        run: |
+          mkdir -p "$RUNNER_TEMP/danfe-xml-poc"
+          printf '{"private":true,"name":"elus-danfe-xml-offline-test","version":"0.0.0"}\n' > "$RUNNER_TEMP/danfe-xml-poc/package.json"
+          npm install --prefix "$RUNNER_TEMP/danfe-xml-poc" --ignore-scripts --no-audit --no-fund --no-save --save-exact \
+            @brasil-fiscal/nfe@2.0.7 pdfkit@0.18.0 qrcode@1.5.4
+      - name: Generate candidate PDF with no runtime network
+        run: |
+          docker run --rm \
+            --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --user "$(id -u):$(id -g)" \
+            --memory 768m --pids-limit 128 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=128m \
+            --mount "type=bind,source=$RUNNER_TEMP/danfe-xml-poc,target=/poc" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/scripts/diagnostics/danfe-xml-offline-proof.mjs,target=/probe.mjs,readonly" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/tests/fixtures/danfe-xml-synthetic.xml,target=/probe/fixture.xml,readonly" \
+            --entrypoint node node:22-bookworm-slim /probe.mjs generate
+      - name: Prove PDF actually has selectable synthetic fiscal key
+        run: |
+          if ! command -v pdftotext >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq poppler-utils
+          fi
+          pdftotext -layout "$RUNNER_TEMP/danfe-xml-poc/proof.pdf" "$RUNNER_TEMP/danfe-xml-poc/proof.txt"
+          node scripts/diagnostics/danfe-xml-offline-proof.mjs verify "$RUNNER_TEMP/danfe-xml-poc/proof.txt"
+      - name: Explicit boundary
+        if: always()
+        run: |
+          echo "Offline-only synthetic XML. No VendaERP calls, secrets, WhatsApp or production code paths."
+          echo "Success proves candidate PDF generation only, not fiscal compliance or authorized XML compatibility."
