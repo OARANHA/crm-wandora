@@ -248,7 +248,10 @@ export async function loadPublishedAgentConfig(
        -- (grava só paused_at): o pausado vem aqui, e o turno sai no pausedAt.
        and v.status = 'published'
        and v.channel_session_id = $2
-     order by a.priority desc, a.created_at asc
+     -- Agentes publicados e ativos precedem os pausados: maior prioridade
+     -- entre os ativos vem primeiro. Se todos estiverem pausados, preserva
+     -- o agente pausado como resultado, sem ativar o fallback generico.
+     order by (a.paused_at is not null) asc, a.priority desc, a.created_at asc
      limit 1`,
     [organizationId, channelSessionId],
   );
