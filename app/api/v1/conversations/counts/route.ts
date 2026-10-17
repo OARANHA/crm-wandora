@@ -46,15 +46,16 @@ export type FiltroDeContagem = readonly [coluna: string, valor: string | boolean
  * e a segunda régua sempre diverge. Enquanto isso, o badge sob busca fica maior
  * que a lista, e isso está declarado, não esquecido.
  */
-export function filtrosAuxiliaresDaContagem(
-  sp: URLSearchParams,
-): FiltroDeContagem[] {
+export function filtrosAuxiliaresDaContagem(sp: URLSearchParams): FiltroDeContagem[] {
   const filtros: FiltroDeContagem[] = [];
   const canal = sp.get("channel_session_id");
   if (canal) filtros.push(["channel_session_id", canal]);
   // Somente UUID de usuário pode virar predicado de contagem.
   const atendente = sp.get("assigned_to");
-  if (atendente && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(atendente)) {
+  if (
+    atendente &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(atendente)
+  ) {
     filtros.push(["assigned_to_user_id", atendente]);
   }
   // O MARCADOR não entra nesta lista, e não é esquecimento: ele não é
