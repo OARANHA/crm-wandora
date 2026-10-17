@@ -1,0 +1,83 @@
+name: ELUS upstream Inbox assignee verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-inbox-assignee.yml"
+      - "components/inbox/InboxFilters.tsx"
+      - "components/inbox/InboxLayout.tsx"
+      - "components/inbox/SeletorDeAtendente.tsx"
+      - "hooks/inbox/useConversationCounts.ts"
+      - "app/api/v1/conversations/counts/route.ts"
+      - "lib/inbox/filtros-ativos.ts"
+      - "lib/i18n/dicionario.ts"
+      - "tests/unit/inbox-filtro-por-atendente.test.ts"
+      - "tests/unit/elus-inbox-assignee-ui.test.tsx"
+      - "tests/unit/badge-espelha-o-filtro.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inbox-assignee:
+    name: Inbox assignee parity and access
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint Inbox changes
+        run: >-
+          pnpm exec eslint
+          components/inbox/InboxFilters.tsx
+          components/inbox/InboxLayout.tsx
+          components/inbox/SeletorDeAtendente.tsx
+          hooks/inbox/useConversationCounts.ts
+          app/api/v1/conversations/counts/route.ts
+          lib/inbox/filtros-ativos.ts
+          tests/unit/inbox-filtro-por-atendente.test.ts
+          tests/unit/elus-inbox-assignee-ui.test.tsx
+          tests/unit/badge-espelha-o-filtro.test.ts
+
+      - name: Check new and isolated formatting
+        run: >-
+          pnpm exec prettier --check
+          .github/workflows/elus-upstream-inbox-assignee.yml
+          components/inbox/SeletorDeAtendente.tsx
+          hooks/inbox/useConversationCounts.ts
+          app/api/v1/conversations/counts/route.ts
+          lib/inbox/filtros-ativos.ts
+          tests/unit/inbox-filtro-por-atendente.test.ts
+          tests/unit/elus-inbox-assignee-ui.test.tsx
+          tests/unit/badge-espelha-o-filtro.test.ts
+
+      - name: Inbox regression tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/inbox-filtro-por-atendente.test.ts
+          tests/unit/elus-inbox-assignee-ui.test.tsx
+          tests/unit/badge-espelha-o-filtro.test.ts
+          tests/unit/limpar-filtros-limpa-o-campo.test.tsx
+          tests/invariants/gov-5b-inbox-scope-counts.test.ts
