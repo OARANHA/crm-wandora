@@ -231,3 +231,68 @@ por falha comprovada da release 1.84.0. O primeiro slice de código só deve
 nascer após definir e testar a estratégia para essas cinco colisões, sem
 apagar funcionalidades ELUS. Não houve execução de teste de banco,
 compilação, CI, merge nem deploy neste levantamento.
+
+### Gate de histórico Supabase — análise complementar após PR #130
+
+Em 2026-10-16, a [PR #130](https://github.com/OARANHA/crm-wandora/pull/130)
+foi integrada à distribuição, produzindo commit
+`e862f5c25b9ab8a5ab0bf3948eed9f1bdf4c6751`. Ela adicionou o
+verificador **read-only** de refs Git em
+`scripts/elus-upstream-migrations-preflight.mjs`. O gate **não executa**
+migrations, não consulta histórico aplicado e não prova compatibilidade de
+schema em produção.
+
+#### Duas identidades diferentes — não confundir
+
+1. **Supabase CLI / ledger:** conforme [CLI oficial](https://supabase.com/docs/reference/cli/supabase-migration-list)
+   e [guia de deploy](https://supabase.com/docs/guides/deployment/database-migrations),
+   o identificador de execução é o **timestamp** do início do nome;
+   `supabase_migrations.schema_migrations` guarda as versões aplicadas.
+2. **Doutrina DeskcommCRM:** o identificador sequencial `NNNN`
+   (`0502` a `0506`) é um requisito de unicidade do **repositório** e
+   seus verificadores, além do timestamp único. As cinco colisões
+   constatadas são dessa segunda espécie; não foi comprovada colisão de
+   timestamp entre os pares identificados.
+
+**Hipótese técnica ainda não aplicada:** renomear **somente** os
+`NNNN` das migrations específicas ELUS, preservando seus 14 dígitos de
+timestamp e o SQL, pode remover as colisões **de nomenclatura** sem fazer
+o CLI enxergá-las como versões novas. Antes, testar o comportamento real
+da **versão fixada do CLI** em Postgres descartável, verificar o campo
+`name` do ledger (quando existir), referências em código/testes,
+`MANIFEST.md`, `baseline.sql`, scripts e cobertura do gate. Não
+executar rename em migrations publicadas sem esse aceite.
+
+**Outro bloqueio independente:** há migrations novas do upstream com
+timestamps anteriores a `20261015031500` (a migration ELUS mais recente
+localizada). O CLI pode recusar inserir migrações antigas na história de
+um banco que já aplicou versões posteriores. Não executar
+`supabase db push --include-all`, `migration repair` ou inserir
+linhas no ledger para contornar isso sem prova individual de execução
+real e dependências. O fluxo de ELUS usa baseline/apêndice para
+instalações self-host, o que também exige reconciliação distinta dos
+arquivos de migration.
+
+#### Evidência pendente para decisão
+
+- **Identidade canônica do banco ELUS:** confirmar instância/projeto
+  correto **antes** de qualquer consulta. A única conexão Supabase
+  encontrada nesta sessão se identificou como outro projeto
+  (`elo.wandora`), **não** como ELUS.
+- **Read-only do ledger correto:** se autorizado e disponível,
+  confirmar a existência da tabela, versões realmente aplicadas
+  (incluindo timestamps das cinco migrations ELUS), versões ausentes
+  e limites da ferramenta de deploy. Não coletar segredos nem dados
+  de clientes para esse gate.
+- **Teste reproduzível de upgrade:** montar snapshot sanitizado/banco
+  descartável com versões históricas, simular renomeação de `NNNN`
+  mantendo timestamps, aplicar mudanças upstream em ordem comprovada,
+  testar integridade do ledger, esquema resultante, RBAC/RLS,
+  `test:db`, `test:db:update` e recursos ELUS.
+- **Release:** não tocar em `main` além do que já foi integrado pela
+  PR #130, nem publicar/deployar imagens da v1.84.0 até que schema,
+  código/overlay, CI, rollback e canário atendam ao runbook do Vigia.
+
+A pesquisa de contrato do CLI **não** é prova de estado atual do banco.
+O fato de PR #130 ter sido mergeada **não** significa que a versão
+DeskcommCRM 1.84.0 tenha sido incorporada.
