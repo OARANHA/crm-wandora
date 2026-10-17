@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { GOV_CONTACT_1, GOV_CONTACT_2, GOV_ORG, seedGov, sql } from "./gov-helpers";
+import { GOV_CONTACT_1, GOV_CONTACT_2, GOV_ORG, lastLine, seedGov, sql } from "./gov-helpers";
 
 const migration = readFileSync(
   join(
@@ -96,7 +96,7 @@ describe("ELUS 0504 — replay somente no banco efêmero com estado antigo", () 
     // Retry equivalente em outro contato DEVE atingir o índice 0504,
     // não cair em uma constraint de lane/contacto não relacionada.
     expect(
-      sql(`
+      lastLine(sql(`
         do $check$
         declare actual_constraint text;
         begin
@@ -116,7 +116,7 @@ describe("ELUS 0504 — replay somente no banco efêmero com estado antigo", () 
           end if;
         end $check$;
         select 1;
-      `),
+      `)),
     ).toBe("1");
   });
 });
