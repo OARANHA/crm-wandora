@@ -180,7 +180,10 @@ export function ConversationHeader({
     // de antes (uma linha), e quando aperta a barra desce para a linha de baixo.
     // Nenhuma ação some — um menu "mais" esconderia o "Lembrar" que a spec
     // `canais-baseline` clica, e, pior, esconderia ação de quem atende.
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
+    // No celular uma barra que QUEBRA consome várias fileiras de altura.
+    // Abaixo de md, mantemos os botões numa única faixa rolável horizontalmente;
+    // em desktop o wrap original permanece, sem esconder ações.
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background px-3 py-2 md:gap-3 md:px-4 md:py-3">
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-1.5">
           <ChannelLogo channel={conversation.channel_sessions} size={20} />
@@ -237,8 +240,8 @@ export function ConversationHeader({
           (#1625): na linha do nome ele alargava a identidade e empurrava a
           barra inteira para baixo. Ela também não é `shrink-0`, pelo mesmo
           motivo da barra. */}
-      <div className="flex min-w-0 flex-col items-end gap-1">
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <div className="flex min-w-0 flex-col items-end gap-1 max-md:w-full max-md:items-stretch">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5 max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[&>*]:shrink-0">
         {/* Primeira da barra e sem rótulo escrito: é ferramenta de LEITURA, não
             ação de atendimento, e não muda de lugar com o estado da conversa.
             Só o ícone porque a barra já quebrou a caixa útil em 1280px uma vez
