@@ -56,7 +56,9 @@ function deObjeto(erro: object): string | null {
   // Nomes dos campos, nunca os valores: um objeto qualquer pode carregar
   // cabeçalho, token ou corpo.
   const campos = Object.keys(erro);
-  return campos.length > 0 ? `erro sem mensagem (campos: ${campos.join(", ")})` : "erro sem mensagem";
+  return campos.length > 0
+    ? `erro sem mensagem (campos: ${campos.join(", ")})`
+    : "erro sem mensagem";
 }
 
 /** Texto legível de `erro`, com teto opcional (para caber no run). */
