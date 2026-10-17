@@ -55,7 +55,11 @@ function fakeSupabase(dados: Record<string, Linha[]>, maxRows = MAX_ROWS) {
       const executar = (faixa: [number, number] | null) => {
         const base = (dados[tabela] ?? []).filter((l) => filtros.every((f) => f(l)));
         const fatia = faixa ? base.slice(faixa[0], faixa[1] + 1) : base;
-        return { data: fatia.slice(0, maxRows), count: pediuCount ? base.length : null, error: null } as const;
+        return {
+          data: fatia.slice(0, maxRows),
+          count: pediuCount ? base.length : null,
+          error: null,
+        } as const;
       };
 
       const builder: Record<string, unknown> = {};
@@ -72,17 +76,27 @@ function fakeSupabase(dados: Record<string, Linha[]>, maxRows = MAX_ROWS) {
       builder.ilike = (coluna: string, padrao: string) => {
         registro.filtros.push([`${coluna} ilike`, padrao]);
         const alvo = padrao.replace(/%/g, "").toLowerCase();
-        filtros.push((l) => String(l[coluna] ?? "").toLowerCase().includes(alvo));
+        filtros.push((l) =>
+          String(l[coluna] ?? "")
+            .toLowerCase()
+            .includes(alvo),
+        );
         return builder;
       };
       builder.gte = (coluna: string, valor: unknown) => {
         registro.filtros.push([`${coluna} >=`, valor]);
-        filtros.push((l) => l[coluna] !== null && l[coluna] !== undefined && String(l[coluna]) >= String(valor));
+        filtros.push(
+          (l) =>
+            l[coluna] !== null && l[coluna] !== undefined && String(l[coluna]) >= String(valor),
+        );
         return builder;
       };
       builder.lte = (coluna: string, valor: unknown) => {
         registro.filtros.push([`${coluna} <=`, valor]);
-        filtros.push((l) => l[coluna] !== null && l[coluna] !== undefined && String(l[coluna]) <= String(valor));
+        filtros.push(
+          (l) =>
+            l[coluna] !== null && l[coluna] !== undefined && String(l[coluna]) <= String(valor),
+        );
         return builder;
       };
       builder.order = (coluna: string) => {
@@ -96,7 +110,10 @@ function fakeSupabase(dados: Record<string, Linha[]>, maxRows = MAX_ROWS) {
       // O caminho de quem NÃO paginou (e o da sabotagem): também cortado.
       builder.limit = (n: number) => {
         const resposta = executar(null);
-        return Promise.resolve({ ...resposta, data: (resposta.data ?? []).slice(0, Math.min(n, maxRows)) });
+        return Promise.resolve({
+          ...resposta,
+          data: (resposta.data ?? []).slice(0, Math.min(n, maxRows)),
+        });
       };
       return builder;
     },
@@ -175,7 +192,9 @@ describe("o CSV de auditoria lê além de 1.000", () => {
     const csv = await res.text();
 
     expect(res.status).toBe(200);
-    expect(dadosDoCsv(csv), "o arquivo saiu com um décimo do que o cabeçalho promete").toHaveLength(2500);
+    expect(dadosDoCsv(csv), "o arquivo saiu com um décimo do que o cabeçalho promete").toHaveLength(
+      2500,
+    );
     const audit = consultas.filter((c) => c.tabela === "api_audit_log");
     expect(audit[0]!.ordens, "ordem estável: created_at e id").toEqual(["created_at", "id"]);
     expect(audit.flatMap((c) => c.faixas)).toEqual([
