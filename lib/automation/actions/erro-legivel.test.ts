@@ -163,7 +163,11 @@ function ctxDeEnvio(): ActionCtx {
   };
 }
 
-function executar(tipo: string, ctx: ActionCtx, config: Record<string, unknown>): Promise<ActionResultDetail> {
+function executar(
+  tipo: string,
+  ctx: ActionCtx,
+  config: Record<string, unknown>,
+): Promise<ActionResultDetail> {
   const acao = getAction(tipo);
   if (!acao) throw new Error(`ação ${tipo} não está registrada`);
   return acao.execute(ctx, config);
@@ -178,7 +182,11 @@ const CONFIG_IA = {
 beforeEach(() => {
   vi.clearAllMocks();
   decidirPreGoLiveDoCanalViaSupabase.mockResolvedValue({ permite: true });
-  dadosDoFormularioDoContexto.mockResolvedValue({ dados: {}, origem: null, origemDaAbordagem: null });
+  dadosDoFormularioDoContexto.mockResolvedValue({
+    dados: {},
+    origem: null,
+    origemDaAbordagem: null,
+  });
 });
 
 describe("nenhum caminho de ação produz `[object Object]`", () => {
@@ -205,6 +213,4 @@ describe("nenhum caminho de ação produz `[object Object]`", () => {
     expect(r).toMatchObject({ status: "failed" });
     expect(r.error).toContain("JWT expired");
   });
-
-
 });
