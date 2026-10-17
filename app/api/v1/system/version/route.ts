@@ -9,6 +9,7 @@ import type { NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api/wrappers";
 import { loadAuthUser } from "@/lib/auth/server";
+import { semSmtpNaInstalacao } from "@/lib/email/estado";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractChangelogRange } from "@/lib/system/changelog";
@@ -179,9 +180,14 @@ export async function GET(_req: NextRequest): Promise<Response> {
   // para quem mais precisa lê-la.
   const faixa = latest ? extractChangelogRange(version?.changelog_raw ?? "", latest, running) : null;
 
+  // Apenas ao administrador da plataforma e somente para SINGLE_SERVER=1.
+  // Em erro de leitura SMTP a capability não afirma ausência de configuração.
+  const smtpConfigurado = !(await semSmtpNaInstalacao());
+
   return ok({
     current_version: running,
     is_owner: true,
+    smtp_configured: smtpConfigurado,
     latest_version: latest,
     update_available:
       // `!acabouDeInstalar` é o degrau histórico: na janela logo após um
