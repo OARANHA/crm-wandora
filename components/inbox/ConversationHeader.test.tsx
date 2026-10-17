@@ -206,3 +206,32 @@ describe("ConversationHeader — busca dentro da conversa (#1793)", () => {
     expect(arquivarMutate).not.toHaveBeenCalled();
   });
 });
+
+describe("ConversationHeader — canal da conversa, não número do cliente", () => {
+  it("mostra apelido da conexão antes do número, com truncamento", () => {
+    const atual = conversa("open");
+    atual.channel_sessions = {
+      display_name: "Peças",
+      phone_number: "+5511999112233",
+      provider: "waha",
+    };
+    render(<ConversationHeader conversation={atual} />);
+
+    const badge = screen.getByTestId("canal-da-conversa");
+    expect(badge).toHaveTextContent("Peças");
+    expect(badge).toHaveAttribute("title", "Entrou por Peças");
+    expect(badge).toHaveClass("max-w-[9rem]", "truncate");
+    expect(badge).not.toHaveTextContent("+5511999112233");
+  });
+
+  it("sem nome nem número do canal não inventa identidade", () => {
+    const atual = conversa("open");
+    atual.channel_sessions = {
+      display_name: null,
+      phone_number: null,
+      provider: "waha",
+    };
+    render(<ConversationHeader conversation={atual} />);
+    expect(screen.queryByTestId("canal-da-conversa")).toBeNull();
+  });
+});
