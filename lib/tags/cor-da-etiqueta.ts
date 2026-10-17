@@ -50,6 +50,18 @@ export const PALETA_DE_ETIQUETAS: readonly string[] = [
   "#6f6f6f",
 ];
 
+/** Nomes acessíveis, derivados da mesma paleta usada em Configurações e Inbox. */
+export const NOME_DO_TOM: Record<string, string> = {
+  "#ffe629": "Amarelo",
+  "#ffb224": "Âmbar",
+  "#e54d2e": "Vermelho",
+  "#12a594": "Verde-água",
+  "#0091ff": "Azul",
+  "#3e63dd": "Índigo",
+  "#ab4aba": "Roxo",
+  "#6f6f6f": "Cinza",
+};
+
 /** Etiqueta normalizada → cor. A chave é sempre `chaveDaEtiqueta`. */
 export type CoresPorEtiqueta = Readonly<Record<string, string>>;
 

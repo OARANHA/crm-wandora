@@ -33,6 +33,7 @@ import {
 } from "@/lib/branding/contraste";
 import { deltaEOklab } from "@/lib/branding/rampa";
 import {
+  NOME_DO_TOM,
   PALETA_DE_ETIQUETAS,
   chaveDaEtiqueta,
   corDeEtiquetaValida,
@@ -88,18 +89,18 @@ describe("a paleta de etiquetas", () => {
   });
 
   it("⭐ a tela não pode ganhar um tom sem nome (nem perder um)", () => {
-    // A fileira renderiza a paleta da lib e rotula com o mapa do painel: um tom
-    // novo sem entrada no mapa deixa um botão sem rótulo acessível.
-    const painel = readFileSync(join(raiz, "app/app/settings/tags/_painel.tsx"), "utf8");
-    const bloco = painel.slice(painel.indexOf("const NOME_DO_TOM"));
-    const mapa = bloco.slice(0, bloco.indexOf("};"));
-    const tonsNoMapa = [...mapa.matchAll(/"?(#[0-9a-f]{6})"?:/g)].map((m) => m[1]!);
-    expect(tonsNoMapa.sort()).toEqual([...PALETA_DE_ETIQUETAS].sort());
+    // A tela e o seletor importam nomes e cores do MESMO catálogo canônico.
+    expect(Object.keys(NOME_DO_TOM).sort()).toEqual([...PALETA_DE_ETIQUETAS].sort());
+    for (const tom of PALETA_DE_ETIQUETAS) {
+      expect(NOME_DO_TOM[tom]?.trim().length).toBeGreaterThan(1);
+    }
   });
 
   it("a fileira da tela usa a paleta da lib, não uma cópia própria", () => {
     const painel = readFileSync(join(raiz, "app/app/settings/tags/_painel.tsx"), "utf8");
     expect(painel).toContain("PALETA_DE_ETIQUETAS.map");
+    expect(painel).toContain("NOME_DO_TOM[tom]");
+    expect(painel).not.toContain("const NOME_DO_TOM");
     expect(painel).toContain('from "@/lib/tags/cor-da-etiqueta"');
   });
 });
