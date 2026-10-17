@@ -210,3 +210,48 @@ test('outro arquivo SQL fora do padrão não recebe exceção de legado', () => 
   assert.equal(result.status, 'blocked');
   assert.equal(result.reason, 'non_number_conflict');
 });
+
+
+test('CLI em git descartável projeta nomes sem modificar working tree', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'elus-projection-'));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  Object.assign(env, {
+    GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null',
+    GIT_AUTHOR_NAME: 'Teste', GIT_AUTHOR_EMAIL: 'teste@example.invalid',
+    GIT_COMMITTER_NAME: 'Teste', GIT_COMMITTER_EMAIL: 'teste@example.invalid',
+  });
+  const git = (...args) => execFileSync('git', args, { cwd: dir, env }).toString();
+  try {
+    git('init', '-q', '-b', 'elus');
+    const root = join(dir, 'supabase', 'migrations');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, '00001_initial_schema.sql'), '-- stub histórico\n');
+    writeFileSync(join(root, '20260930180000_0501_org_operante.sql'), 'select 1;\n');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'legacy');
+    git('branch', 'upstream');
+    writeFileSync(join(root, '20261001133000_0502_integracoes_erp_modulo_oficial.sql'), 'select 2;\n');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'elus');
+    git('switch', '-q', 'upstream');
+    writeFileSync(join(root, '20260930191523_0502_anotacao_simultanea_nao_apaga_a_outra.sql'), 'select 3;\n');
+    writeFileSync(join(root, '20261020000003_0686_tail.sql'), 'select 4;\n');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'upstream');
+    git('switch', '-q', 'elus');
+    const before = git('status', '--porcelain');
+    const script = fileURLToPath(new URL('../../scripts/elus-upstream-migrations-preflight.mjs', import.meta.url));
+    const cli = spawnSync(process.execPath, [script, 'elus', 'upstream', '--project-names'], {
+      cwd: dir, env, encoding: 'utf8',
+    });
+    assert.equal(cli.status, 1, 'projeção jamais libera gate de importação');
+    const payload = JSON.parse(cli.stdout);
+    assert.equal(payload.status, 'blocked', 'gate original ainda detecta legado e colisão');
+    assert.equal(payload.projection.status, 'proposal_only');
+    assert.equal(payload.projection.proposals.length, 1);
+    assert.equal(payload.projection.proposals[0].newNumber, '0687');
+    assert.equal(git('status', '--porcelain'), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
