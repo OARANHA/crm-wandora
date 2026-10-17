@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { inspectMigrations } from '../../scripts/elus-upstream-migrations-preflight.mjs';
+import { inspectMigrations, projectHistoricalNames } from '../../scripts/elus-upstream-migrations-preflight.mjs';
 
 const file = (name, sha = 'a'.repeat(40)) => ({ path: 'supabase/migrations/' + name, sha });
 const base = [file('20260930180000_0501_org_operante_e_suspensao_tipada.sql')];
@@ -110,4 +110,63 @@ test('CLI compara duas refs reais em repo descartável sem escrever no checkout'
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+
+test('projeção preserva version e SHA sem alterar arquivos existentes', () => {
+  const upstream = [...base, ...foreign, file('20261020000003_0686_ultima.sql')];
+  const result = projectHistoricalNames([...base, ...own], upstream);
+  assert.equal(result.status, 'proposal_only');
+  assert.equal(result.proposals.length, 5);
+  assert.deepEqual(result.proposals.map(p => p.newNumber), [
+    '0687', '0688', '0689', '0690', '0691',
+  ]);
+  for (const p of result.proposals) {
+    assert.equal(p.from.slice('supabase/migrations/'.length, 'supabase/migrations/'.length + 14), p.timestamp);
+    assert.equal(p.to.slice('supabase/migrations/'.length, 'supabase/migrations/'.length + 14), p.timestamp);
+    assert.equal(p.blobShaUnchanged, 'a'.repeat(40));
+    assert.equal(p.to.endsWith('.sql'), true);
+  }
+  assert.equal(result.upstreamPending, 6, 'renomear nomes não aplica nenhuma das 6 SQLs upstream');
+});
+
+test('não presume autoria quando colisão é de caminho diferente do overlay aprovado', () => {
+  const result = projectHistoricalNames(
+    [...base, file('20261001133000_0502_outra_migration.sql')],
+    [...base, foreign[0]],
+  );
+  assert.equal(result.status, 'blocked');
+  assert.equal(result.reason, 'collision_ownership_unknown');
+  assert.equal(result.proposals.length, 0);
+});
+
+test('recusa projeção se houver colisão adicional de timestamp', () => {
+  const result = projectHistoricalNames(
+    [...base, ...own],
+    [...base, ...foreign, file('20261001133000_0685_mesmo_timestamp.sql')],
+  );
+  assert.equal(result.status, 'blocked');
+  assert.equal(result.reason, 'non_number_conflict');
+});
+
+test('não ultrapassa o espaço de quatro dígitos NNNN', () => {
+  const result = projectHistoricalNames(
+    [...base, ...own],
+    [...base, ...foreign, file('20261020000003_9999_limite.sql')],
+  );
+  assert.equal(result.status, 'blocked');
+  assert.equal(result.reason, 'no_free_four_digit_number');
+});
+
+test('duas árvores sem migrations são NÃO MEDIDO, nunca sucesso', () => {
+  const result = projectHistoricalNames([], []);
+  assert.equal(result.status, 'blocked');
+  assert.equal(result.reason, 'migration_tree_missing');
+});
+
+test('sem colisão nominal não inventa renumeração nem confunde pendência upstream com sucesso', () => {
+  const result = projectHistoricalNames(base, [...base, file('20261020000003_0686_nova.sql')]);
+  assert.equal(result.status, 'no_name_collision');
+  assert.equal(result.proposals.length, 0);
+  assert.equal(result.upstreamPending, 1);
 });
