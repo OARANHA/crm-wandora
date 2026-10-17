@@ -159,9 +159,11 @@ describe("deep-link para conversa fora do filtro", () => {
     );
     // O controle: a lista continua no ar. Sem ele, este caso passaria também
     // num mundo em que a busca única espera — bastaria a lista ter respondido.
-    expect(
-      get.mock.calls.some((c) => (c[0] ?? "").startsWith("/api/v1/conversations?")),
-    ).toBe(true);
+    await waitFor(() =>
+      expect(get.mock.calls.some((c) => (c[0] ?? "").startsWith("/api/v1/conversations?"))).toBe(
+        true,
+      ),
+    );
   });
 
   it("entrega a conversa ao painel do contato com a lista ainda no ar", async () => {
