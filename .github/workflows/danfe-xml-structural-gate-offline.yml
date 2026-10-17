@@ -1,0 +1,42 @@
+name: DANFE XML structural gate offline
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/danfe-xml-structural-gate-offline.yml
+      - scripts/diagnostics/validar-envelope-nfe-offline.mjs
+      - docs/research/danfe-xml-structural-gate.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  xml-structural-gate-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify script syntax
+        run: node --check scripts/diagnostics/validar-envelope-nfe-offline.mjs
+      - name: Install parser in isolated temp directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/danfe-xml-structural-poc"
+          printf '{"private":true,"name":"elus-xml-structural-gate-offline","version":"0.0.0"}\n' > "$RUNNER_TEMP/danfe-xml-structural-poc/package.json"
+          npm install --prefix "$RUNNER_TEMP/danfe-xml-structural-poc" --ignore-scripts --no-audit --no-fund --no-save --save-exact fast-xml-parser@5.11.2
+      - name: Synthetic adversarial suite with zero network
+        run: |
+          docker run --rm \
+            --network none --read-only --user "$(id -u):$(id -g)" \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --memory 256m --pids-limit 96 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m \
+            --mount "type=bind,source=$RUNNER_TEMP/danfe-xml-structural-poc,target=/poc,readonly" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/scripts/diagnostics/validar-envelope-nfe-offline.mjs,target=/validar-envelope-nfe-offline.mjs,readonly" \
+            --entrypoint node node:22-bookworm-slim \
+            --max-old-space-size=96 /validar-envelope-nfe-offline.mjs
+      - name: Explicit experimental boundary
+        if: always()
+        run: |
+          echo "Only synthetic structural candidate; never SEFAZ authorization or signature proof."
+          echo "No VendaERP call, no production wiring, no XML artifact, no WhatsApp sender."
