@@ -1,0 +1,64 @@
+name: ELUS upstream timezones single catalog verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-timezones-single-catalog.yml"
+      - "lib/tempo/fusos.ts"
+      - "app/onboarding/welcome/_form.tsx"
+      - "app/app/settings/tenant/_form.tsx"
+      - "app/app/settings/profile/_form.tsx"
+      - "tests/unit/fusos-uma-lista-so-elus.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  single-timezone-catalog:
+    name: Single timezone catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint changed TS files
+        run: >-
+          pnpm exec eslint
+          lib/tempo/fusos.ts
+          app/onboarding/welcome/_form.tsx
+          app/app/settings/tenant/_form.tsx
+          app/app/settings/profile/_form.tsx
+          tests/unit/fusos-uma-lista-so-elus.test.ts
+
+      - name: Check gate and test formatting
+        run: >-
+          pnpm exec prettier --check
+          .github/workflows/elus-upstream-timezones-single-catalog.yml
+          tests/unit/fusos-uma-lista-so-elus.test.ts
+
+      - name: Targeted regression tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/fusos-uma-lista-so-elus.test.ts
