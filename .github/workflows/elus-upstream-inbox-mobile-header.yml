@@ -1,0 +1,56 @@
+name: ELUS upstream Inbox mobile header verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-inbox-mobile-header.yml"
+      - "components/inbox/ConversationHeader.tsx"
+      - "tests/unit/inbox-header-nao-trava.test.tsx"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-header:
+    name: Inbox mobile header
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint changed TSX files
+        run: >-
+          pnpm exec eslint
+          components/inbox/ConversationHeader.tsx
+          tests/unit/inbox-header-nao-trava.test.tsx
+
+      - name: Check workflow formatting
+        run: pnpm exec prettier --check .github/workflows/elus-upstream-inbox-mobile-header.yml
+
+      - name: Targeted regression tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/inbox-header-nao-trava.test.tsx
+          components/inbox/ConversationHeader.test.tsx
