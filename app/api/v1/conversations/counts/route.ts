@@ -52,6 +52,11 @@ export function filtrosAuxiliaresDaContagem(
   const filtros: FiltroDeContagem[] = [];
   const canal = sp.get("channel_session_id");
   if (canal) filtros.push(["channel_session_id", canal]);
+  // Somente UUID de usuário pode virar predicado de contagem.
+  const atendente = sp.get("assigned_to");
+  if (atendente && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(atendente)) {
+    filtros.push(["assigned_to_user_id", atendente]);
+  }
   // O MARCADOR não entra nesta lista, e não é esquecimento: ele não é
   // IGUALDADE numa coluna, é um `or=` sobre DUAS caixas — `conversations.tags`
   // e o campo calculado do contato. `conversations` não tem coluna `tag` (`tag`
@@ -120,6 +125,21 @@ export async function GET(req: NextRequest): Promise<Response> {
     return q;
   };
 
+  // Mesma fábrica, mas sem o atendente adicional do gerente: "Minhas" já
+  // impõe `assigned_to_user_id=user.id` e não pode combinar com outra pessoa.
+  const countExactSemFiltroDeAtendente = () => {
+    let q = supabase
+      .from("conversations")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", org);
+    for (const [coluna, valor] of auxiliares) {
+      if (coluna !== "assigned_to_user_id") q = q.eq(coluna, valor);
+    }
+    q = aplicarMarcadores(q, marcadores, modo);
+    if (soNaoLidas) q = q.gt("unread_count_for_assignee", 0);
+    return q;
+  };
+
   // Espelha tabToFilter (InboxLayout): unassigned = fila aberta sem dono;
   // mine = atribuídas a mim e ainda ABERTAS; all = tudo que o usuário VÊ.
   //
@@ -146,7 +166,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     // A aba "Automático". Antes ela pedia `status='ai_handling'`, escrito por UM
     // caminho só em produção — por isso vivia quase vazia.
     countExact().eq("comando_da_conversa", "automatico"),
-    countExact()
+    // A aba "Minhas" ignora a seleção de outro atendente aplicada às demais abas.
+    countExactSemFiltroDeAtendente()
       .eq("assigned_to_user_id", user.id)
       .not("status", "in", `(${CONVERSATION_TERMINAL_STATUSES.join(",")})`),
     countExact(),
