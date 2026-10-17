@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useT } from "@/hooks/i18n/useT";
-import { FUSOS_DO_ONBOARDING } from "@/lib/tempo/fusos";
+import { FUSOS_DO_ONBOARDING, FUSO_PADRAO } from "@/lib/tempo/fusos";
 
 import { acceptWelcome } from "@/app/actions/onboarding/acceptWelcome";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export function WelcomeForm({ defaultOrgName }: { defaultOrgName: string }) {
   const t = useT();
   const [displayName, setDisplayName] = useState(defaultOrgName);
   const [oQueFaz, setOQueFaz] = useState("");
-  const [timezone, setTimezone] = useState("America/Sao_Paulo");
+  const [timezone, setTimezone] = useState(FUSO_PADRAO);
   const [accepted, setAccepted] = useState(false);
   const [pending, startTransition] = useTransition();
 
