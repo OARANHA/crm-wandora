@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { soMudouOAutomaticoDaFila, type ConversationsFilters } from "@/hooks/inbox/useConversationsRealtime";
+import {
+  soMudouOAutomaticoDaFila,
+  type ConversationsFilters,
+} from "@/hooks/inbox/useConversationsRealtime";
 
 const fila: ConversationsFilters = { comando: ["aguardando"], channel_session_id: "canal-1" };
 const filaSemAutomatico: ConversationsFilters = {
