@@ -38,6 +38,14 @@ pela capacidade governada do target `vigia-managed-admin`, com autenticação
 guardada no próprio servidor. Nunca transportar chave/token/cookie para
 este repositório, para o modelo ou para o WhatsApp.
 
+## Gate separado de schema — ELUS 0504
+
+O deploy de imagens **não** reconcilia automaticamente a migration de banco 0504.
+Antes de habilitar entrega governada de DANFE, seguir o
+[runbook de reconciliação 0504](elus-governed-delivery-0504-schema-reconciliation.md):
+prova de catálogo e identidade da instância, recuperação real, risco de locks,
+autorização administrativa explícita e readback. PR/CI green não autorizam DDL.
+
 ## Sequência obrigatória
 
 1. **Real now e autoridade:** conferir `CLAUDE.md`, `AGENTS.md`,

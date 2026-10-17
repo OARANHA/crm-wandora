@@ -39,6 +39,8 @@ on:
       - "tests/unit/tool-read-nao-muta.test.ts"
       - "docs/specs/integracoes-erp*.md"
       - "docs/specs/governed-cross-conversation-delivery-v1.md"
+      - "docs/runbooks/elus-vigia-portainer.md"
+      - "docs/runbooks/elus-governed-delivery-0504-schema-reconciliation.md"
   workflow_dispatch:
 
 permissions:
