@@ -18,22 +18,12 @@ import { useT } from "@/hooks/i18n/useT";
 import { IDIOMAS_VISIVEIS } from "@/lib/i18n/registro";
 import { MOEDAS_SERVIDAS, simboloDaMoeda, type MoedaServida } from "@/lib/money";
 import { paisesOferecidos } from "@/lib/legal/perfil-do-pais";
+import { FUSOS_OFERECIDOS } from "@/lib/tempo/fusos";
 import { tenantSchema, type Locale, type TenantInput } from "@/lib/schemas/settings";
 
 interface Props {
   initial: TenantInput;
 }
-
-const TIMEZONES = [
-  "Africa/Luanda",
-  "America/Sao_Paulo",
-  "America/Manaus",
-  "America/Belem",
-  "America/Recife",
-  "America/Fortaleza",
-  "Europe/Lisbon",
-  "UTC",
-];
 
 export function TenantForm({ initial }: Props) {
   const t = useT();
@@ -104,7 +94,7 @@ export function TenantForm({ initial }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TIMEZONES.map((tz) => (
+                {FUSOS_OFERECIDOS.map(({ codigo: tz }) => (
                   <SelectItem key={tz} value={tz}>
                     {tz}
                   </SelectItem>
