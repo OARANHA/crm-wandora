@@ -374,3 +374,110 @@ com timestamp anterior à última migration ELUS tornam uma importação
 linear particularmente arriscada. O primeiro teste de evolução de
 schema deve ocorrer em uma **instalação descartável**, sem acesso
 a dados ou credenciais reais do cliente.
+
+
+### Prova de identidade e desvio de schema ELUS — leitura real de produção em 2026-10-16
+
+**Evidência operacional aprovada:** leitura `docker exec elus-app node -e`
+na VPS Vigia, via ticket protegido de leitura
+`adm_38309004dde8e70a280f9bc9` (exit 0, sem modificar estado).
+A aplicação tem `NEXT_PUBLIC_SUPABASE_URL` e `SUPABASE_DB_URL`
+configurados. O identificador Supabase da URL pública é
+`xxhilhvtxfqcvpwxfsgb`; a conexão PostgreSQL usa pooler com
+identificador de usuário compatível com esse mesmo projeto.
+**Nenhuma URL completa, usuário, senha ou token foi emitido.**
+
+O conector oficial Supabase, até então tratado **erroneamente** como
+`outro projeto`, retornou
+`id/ref=xxhilhvtxfqcvpwxfsgb`, nome `elo.wandora`,
+`ACTIVE_HEALTHY`, PostgreSQL major 17. Assim, a identificação do
+banco do ELUS está reconciliada pelo **identificador técnico**, mesmo
+com nome amigável diferente. Não consultar esse projeto como
+`inexistente` ou substituí-lo por outro banco.
+
+#### Histórico real de migrations (SELECT/list_migrations, read-only)
+
+O ledger `supabase_migrations.schema_migrations` contém
+**55 registros**, majoritariamente partes de carga inicial
+`deskcommcrm_baseline_part_001` a `_027`, além de extensões e
+atualizações ELUS posteriores. O esquema do ledger possui as
+colunas `version` (texto), `statements`, `name`, `created_by`,
+`idempotency_key`, `rollback`. Exemplos de versões de migração
+aplicadas por outra linha de execução, e **não** pelos timestamps
+dos nomes de arquivo do fork:
+
+- `20261001182302`: `0501_integracoes_erp_modulo_oficial`;
+- `20261003183619`: `org_operante_e_suspensao_tipada_0501`;
+- `20261004052008`: `0503_integracoes_erp_admin_whatsapp_readonly`;
+- `20261007014504`: `integracoes_erp_customer_resolution_v1`;
+- `20261015014133`: `0506_org_ai_autonomy_protected`.
+
+Logo **não** é válido chamar uma SQL de aplicada/não aplicada
+somente porque a versão de 14 dígitos do arquivo Git não aparece
+no ledger: instalações via MCP/baseline produzem outra história.
+A presença real de objetos também deve ser conferida.
+
+#### Divergência 0504 comprovada no catálogo PostgreSQL
+
+A migration própria
+`supabase/migrations/20261005150000_0504_integracoes_erp_entrega_danfe_governada.sql`
+requer `governed_delivery` nos CHECKs de `public.job_queue`
+e índice único parcial
+`uniq_job_queue_governed_delivery_origin_invoice`.
+O **arquivo `supabase/baseline.sql` da main** também contém
+esses objetos e o vocabulário exigido. No entanto, no PostgreSQL
+real lido por consulta de catálogo:
+
+| Invariante | Resultado real |
+|---|---|
+| `job_queue_kind_check` contém `governed_delivery` | **não** |
+| `job_queue_turn_needs_contact` contém `governed_delivery` | **não** |
+| `uniq_job_queue_governed_delivery_origin_invoice` presente | **não** |
+| Ledger possui versão `20261005150000` | **não** |
+| Ledger possui nome contendo `0504`, `danfe` ou `governed` | **não** |
+| Funções ERP provisionar/vincular/invalidar | presentes |
+| Tabelas ERP connections/admin bindings/customer links | presentes com RLS |
+| `organizations.ai_autonomy` e trigger guard | presentes |
+
+**Impacto fundamentado em código:** a função
+`solicitarEntregaDanfeAoClienteDaNota` de
+`lib/integracoes-erp/entrega-danfe-terceiro.ts` materializa o
+PDF e faz INSERT em `job_queue(kind='governed_delivery')`.
+No schema observado, o CHECK rejeita esse INSERT; o caminho de
+erro tenta remover a mídia recém-criada, audita `queue_failed` e
+não agenda a entrega. O worker de
+`workers/agent-worker/main.ts` já registra o handler
+`governed_delivery`. **Isto não prova que um pedido/canário
+específico falhou por esse motivo**: exige correlação da auditoria
+read-only por request/job se for necessário investigar incidente
+passado. Não chamar VendaERP real só para reproduzir.
+
+#### Decisão e gates da correção
+
+1. Tratar como **reconciliação do schema ELUS atual**, anterior e
+   independente da importação upstream 1.84.0. **Não registrar** 0504
+   como aplicada nem fazer `migration repair` por mera ausência;
+   já existe SQL canônica na árvore Git/baseline, reutilizar em vez
+   de criar outro provider/tabela.
+2. Comparar sem dados pessoais os CHECKs e índices com
+   `supabase/migrations/20261005150000_0504_...` e o
+   `supabase/baseline.sql`, dimensionar bloqueios/locks de
+   `ALTER TABLE` e índice único. Validar mudança em PG17
+   **descartável**, preferivelmente também PG15, com jobs sintéticos
+   pendentes e repetição/idempotência; testar RLS e worker;
+   exigir rollback e plano para zero indisponibilidade inesperada.
+3. Preparar revisão de código/CI e plano de aplicação **exclusiva**
+   ao projeto identificado `xxhilhvtxfqcvpwxfsgb`, com aprovação
+   administrativa explícita antes de qualquer DDL na produção.
+   O mero merge de PR de código **não aplica migrations** nessa
+   stack. Preservar imagem e schema vigentes até aceite.
+4. Só após saúde da instância, correção comprovada e auditoria,
+   retomar o próximo gate de integração das **106 migrations**
+   upstream; não misturar reconciliação 0504 com lote massivo
+   ou usar `db push --include-all` por aproximação.
+
+**Escopo desta investigação:** API Supabase read-only,
+`list_migrations`, consulta `information_schema`/`pg_catalog`,
+GitHub `main` para código SQL/baseline e leitura aprovada do
+contêiner. **Nenhuma mutação, canário, deploy, escrita em ledger
+ou leitura de linhas de cliente.**
