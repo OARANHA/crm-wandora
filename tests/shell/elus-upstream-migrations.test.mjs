@@ -170,3 +170,43 @@ test('sem colisão nominal não inventa renumeração nem confunde pendência up
   assert.equal(result.proposals.length, 0);
   assert.equal(result.upstreamPending, 1);
 });
+
+
+test('stub histórico idêntico permanece bloqueado no gate original, mas não impede a projeção nominal', () => {
+  const legacy = file('00001_initial_schema.sql', 'f'.repeat(40));
+  const elus = [...base, legacy, ...own];
+  const upstream = [...base, legacy, ...foreign, file('20261020000003_0686_ultima.sql')];
+  assert.equal(inspectMigrations(elus, upstream).issues.filter(i => i.type === 'invalid_filename').length, 2);
+  const projected = projectHistoricalNames(elus, upstream);
+  assert.equal(projected.status, 'proposal_only');
+  assert.equal(projected.proposals.length, 5);
+  assert.equal(projected.sharedLegacyExcludedFromProjection, legacy.path);
+  assert.equal(projected.upstreamPending, 6);
+});
+
+test('stub histórico com SHA diferente é bloqueado, sem normalização silenciosa', () => {
+  const result = projectHistoricalNames(
+    [...base, file('00001_initial_schema.sql', 'a'.repeat(40)), ...own],
+    [...base, file('00001_initial_schema.sql', 'b'.repeat(40)), ...foreign],
+  );
+  assert.equal(result.status, 'blocked');
+  assert.equal(result.reason, 'shared_legacy_mismatch');
+});
+
+test('stub histórico ausente de um lado impede a projeção', () => {
+  const result = projectHistoricalNames(
+    [...base, file('00001_initial_schema.sql', 'a'.repeat(40)), ...own],
+    [...base, ...foreign],
+  );
+  assert.equal(result.status, 'blocked');
+  assert.equal(result.reason, 'shared_legacy_mismatch');
+});
+
+test('outro arquivo SQL fora do padrão não recebe exceção de legado', () => {
+  const result = projectHistoricalNames(
+    [...base, ...own, file('00002_outra_migration.sql')],
+    [...base, ...foreign],
+  );
+  assert.equal(result.status, 'blocked');
+  assert.equal(result.reason, 'non_number_conflict');
+});
