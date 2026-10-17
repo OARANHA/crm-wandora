@@ -7,6 +7,8 @@ import type { RodadaDoBanco } from "@/lib/system/update-run";
 export interface SystemVersion {
   current_version: string;
   is_owner: boolean;
+  /** Exposto somente ao platform admin; false significa ausência comprovada no servidor único. */
+  smtp_configured?: boolean;
   latest_version?: string;
   update_available?: boolean;
   off_release?: boolean;
