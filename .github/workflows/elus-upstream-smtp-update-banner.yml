@@ -1,0 +1,68 @@
+name: ELUS upstream SMTP update panel verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-smtp-update-banner.yml"
+      - "lib/email/config.ts"
+      - "lib/email/estado.ts"
+      - "app/api/v1/system/version/route.ts"
+      - "app/api/v1/system/version/route.test.ts"
+      - "hooks/system/useSystemVersion.ts"
+      - "app/app/settings/atualizacao/_components/UpdatePanel.tsx"
+      - "app/app/settings/atualizacao/_components/UpdatePanel.test.tsx"
+      - "tests/unit/smtp-alerta-instalacao-elus.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smtp-panel:
+    name: SMTP capability and update banner
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint touched files
+        run: >-
+          pnpm exec eslint
+          lib/email/config.ts
+          lib/email/estado.ts
+          app/api/v1/system/version/route.ts
+          app/api/v1/system/version/route.test.ts
+          hooks/system/useSystemVersion.ts
+          app/app/settings/atualizacao/_components/UpdatePanel.tsx
+          app/app/settings/atualizacao/_components/UpdatePanel.test.tsx
+          tests/unit/smtp-alerta-instalacao-elus.test.ts
+
+      - name: Check workflow formatting
+        run: pnpm exec prettier --check .github/workflows/elus-upstream-smtp-update-banner.yml
+
+      - name: Targeted regression tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/smtp-alerta-instalacao-elus.test.ts
+          app/api/v1/system/version/route.test.ts
+          app/app/settings/atualizacao/_components/UpdatePanel.test.tsx
