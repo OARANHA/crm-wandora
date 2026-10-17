@@ -2,6 +2,7 @@ name: ERP read verification
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/erp-read-verification.yml"
       - "app/api/v1/integracoes-erp/**"
@@ -26,6 +27,8 @@ on:
       - "lib/channels/runtime.ts"
       - "lib/messaging/media/upload-validation.ts"
       - "supabase/migrations/**"
+      - "scripts/elus-upstream-migrations-preflight.mjs"
+      - "tests/shell/elus-upstream-migrations.test.mjs"
       - "tests/unit/integracoes-erp-*.test.ts"
       - "tests/invariants/integracoes-erp-provisionadora.test.ts"
       - "tests/unit/catalogo-tools-leigo-friendly.test.ts"
@@ -41,6 +44,27 @@ permissions:
   contents: read
 
 jobs:
+  migration-names:
+    name: Upstream migration name preflight (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check scripts/elus-upstream-migrations-preflight.mjs
+          node --check tests/shell/elus-upstream-migrations.test.mjs
+
+      - name: Run tests with disposable Git fixtures
+        run: node --test tests/shell/elus-upstream-migrations.test.mjs
+
   verify-erp-read:
     name: Typecheck and ERP read tests
     runs-on: ubuntu-latest
