@@ -80,3 +80,85 @@ O PR #7 do Elus (VendaERP) usa hoje uma migration `0501`. O upstream também pas
 a migration VendaERP precisa ser renumerada para o próximo número livre, atualizando migration,
 baseline/MANIFEST e qualquer referência/teste correspondente. Não editar a migration upstream já
 aplicada.
+
+## Preflight de atualização para DeskcommCRM 1.84.0 — 2026-10-16
+
+> **Somente levantamento, não sincronização concluída.** Não houve importação da release,
+> aplicação de migration, merge, publicação de imagens nem deploy nesta etapa.
+
+### Evidência de versão e distância
+
+- **Elus `main` medido:** `92ed055be0973cc2e4944fd82248a8bc687dbff5`
+  ([commit](https://github.com/OARANHA/crm-wandora/commit/92ed055be0973cc2e4944fd82248a8bc687dbff5)).
+- **Última sincronização upstream identificada:** [PR #9](https://github.com/OARANHA/crm-wandora/pull/9),
+  integrada, baseada no upstream `efed1d5745f87dfeaf3adbe8bc6165bc684a7a75`. Isso
+  descreve a âncora do último sync identificado, **não** garante ausência de ports
+  individuais posteriores.
+- **Versão upstream desejada:** [v1.84.0](https://github.com/melgarafael/DeskcommCRM/releases/tag/v1.84.0),
+  publicada em 2026-10-16, tag apontando para o commit
+  `a932e33d2cf3dd29a012c469cadbf80ad3a7c3da`.
+- **Delta no upstream entre a âncora da PR #9 e v1.84.0:** o compare retornou
+  `ahead_by=3645` commits. A API entregou somente os primeiros **300 caminhos**
+  no diff desse intervalo; **não** existe aqui um inventário completo de arquivos,
+  merges ou conflitos.
+- **Delta isolado entre upstream v1.83.0 e v1.84.0:** `187` commits e `227`
+  arquivos alterados, incluindo **seis migrations SQL** e `supabase/baseline.sql`.
+  Comparação:
+  [v1.83.0...v1.84.0](https://github.com/melgarafael/DeskcommCRM/compare/v1.83.0...v1.84.0).
+
+### Benefícios candidatos, ainda NÃO portados nem comprovados no Elus
+
+- Inbox: filtro por atendente, passagem de negócio entre funis, correções de escopo
+  de assumir/transferir conversa, handoff concorrente e escolha de agente ativo
+  antes do agente pausado.
+- Comercial: ações em lote de contatos; atualização opcional de leads repetidos
+  em fontes de webhook; origem de anúncio Click-to-WhatsApp disponível para IA.
+- Operação: correções em paginação da agenda Google, renderização do Inbox,
+  marcação como lida em resposta via WAHA QR e exportação administrativa CSV.
+- Cobrança: plano padrão no cadastro, provisionamento com resposta
+  `409 plano_obrigatorio` quando aplicável e regras de upgrade proporcional.
+- API da IA: acesso a roteadores via token `dsk_` com escopos apropriados.
+
+A existência ou ausência efetiva desses recursos no Elus deve ser provada
+**por código, um por um** antes de propor mudanças; a nota de release não é
+prova de que a distribuição ainda não os possua.
+
+### Gaps e riscos que bloqueiam um merge amplo
+
+1. **Histórico upstream longo:** não importar somente o patch v1.84.0 sobre
+   a âncora de outubro sem reconciliar dependências intermediárias.
+2. **Schema:** medir a próxima numeração livre de migration na `main` e
+   nas PRs concorrentes; revisar a tripla migration + baseline + MANIFEST e
+   testar atualização com dados, banco descartável PostgreSQL 15 e 17.
+3. **Produto Elus:** preservar o login/branding, políticas de convite e
+   cadastro, IA gerenciada pelo platform admin, autorização por tenant e
+   customizações de billing. Verificar especificamente a exigência de plano
+   padrão antes de alterar fluxos de cadastro ou provisionamento.
+4. **ERP/ISIS:** preservar VendaERP estritamente read-only, resolução fiscal
+   fail-closed, vínculo de identidade externa, DANFE e sender WhatsApp canônico.
+5. **WhatsApp/RBAC:** mudanças de leitura automática e visibilidade/transferência
+   precisam ser compatíveis com WAHA e políticas existentes; não criar bypass.
+6. **Infra/CI:** preservar `compose.portainer.yml`, runtime do worker,
+   rollback por digest; não importar workflows upstream sem revisão.
+7. **Prova ausente:** testes, CI de port da 1.84.0 e saúde de produção
+   pós-atualização **não foram realizados** nesta avaliação.
+
+### Decisão e próximos gates
+
+- **NO-GO para merge/deploy direto da v1.84.0.**
+- Medir o delta **completo** por árvore/commits no ambiente de desenvolvimento
+  autorizado e identificar integrações upstream já absorvidas, sem confundir
+  patch de release com atualização de todo o intervalo.
+- Dividir a atualização em PRs independentes: **(1)** correções operacionais
+  e segurança, **(2)** funcionalidades comerciais/Inbox/webhooks,
+  **(3)** cobrança/cadastro e alterações estruturais de schema.
+- Para cada fatia: `REAL NOW → PROVEN EVIDENCE → GAPS → REUSE GATE →
+  CORE/PROVIDER GATE → DECISION → testes → PR → CI`.
+- Após cada CI disparado, não fazer polling; o proprietário informará
+  `green` ou `red`. Merge, imagens e deploy requerem gates separados.
+- Produção não deve receber imagem upstream direta nem build pesado na VPS;
+  o deploy posterior exige SHA exato, digests/rollback, `prune:false` e
+  canário funcional.
+
+Este registro é datado e **não substitui** nova reconciliação de `main`,
+PRs, migrations ou runtime no momento da execução.
