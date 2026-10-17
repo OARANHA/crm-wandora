@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { filtrosAuxiliaresDaContagem } from "@/app/api/v1/conversations/counts/route";
 import { tabToFilter } from "@/components/inbox/InboxLayout";
+import { comAba, type InboxFiltersValue } from "@/components/inbox/InboxFilters";
 import type { ConversationsFilters } from "@/hooks/inbox/useConversationsRealtime";
 import { filtrosAuxiliaresAtivos } from "@/lib/inbox/filtros-ativos";
 
@@ -42,6 +43,17 @@ describe("filtro por atendente — as contagens espelham a lista", () => {
 });
 
 describe("filtro por atendente — a aba Minhas continua sendo só as minhas", () => {
+  it("trocar para Minhas remove a seleção do gerente para ela não ficar invisível", () => {
+    const antes: InboxFiltersValue = {
+      tab: "all",
+      search: "",
+      onlyUnread: false,
+      assigned_to: ATENDENTE,
+    };
+    expect(comAba(antes, "mine").assigned_to).toBeUndefined();
+    expect(comAba(antes, "closed").assigned_to).toBe(ATENDENTE);
+  });
+
   it("a aba Minhas traz assigned_to=me, que vence qualquer escolha", () => {
     expect(tabToFilter("mine").assigned_to).toBe("me");
   });
