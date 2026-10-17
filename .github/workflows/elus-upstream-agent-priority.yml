@@ -1,0 +1,59 @@
+name: ELUS upstream active-agent priority verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-agent-priority.yml"
+      - "lib/agent-engine/agent/agent-config.ts"
+      - "tests/unit/agent-pausado-prioridade-upstream.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent-priority:
+    name: Published active agent first
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint changed runtime and test
+        run: >-
+          pnpm exec eslint
+          lib/agent-engine/agent/agent-config.ts
+          tests/unit/agent-pausado-prioridade-upstream.test.ts
+
+      - name: Verify isolated formatting
+        run: >-
+          pnpm exec prettier --check
+          .github/workflows/elus-upstream-agent-priority.yml
+          tests/unit/agent-pausado-prioridade-upstream.test.ts
+
+      - name: Agent selection regression
+        run: >-
+          pnpm exec vitest run
+          tests/unit/agent-pausado-prioridade-upstream.test.ts
+          lib/agent-engine/agent/agent-config.test.ts
