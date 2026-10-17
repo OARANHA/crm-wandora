@@ -1,5 +1,5 @@
 "use client";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { hashKey, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { useRefetchDeSeguranca } from "@/hooks/realtime/useRefetchDeSeguranca";
@@ -10,7 +10,7 @@ import {
   marcadoresEscolhidos,
 } from "@/lib/inbox/marcador-da-conversa";
 import type { Conversation } from "@/lib/types/messaging";
-import type { ComandoDoBanco } from "@/lib/inbox/comando-da-conversa";
+import { ehAFila, type ComandoDoBanco } from "@/lib/inbox/comando-da-conversa";
 
 export interface ContactSummary {
   id: string;
@@ -117,15 +117,33 @@ interface ListResponse {
   meta?: { cursor?: string | null; has_more?: boolean };
 }
 
+/**
+ * Somente a transição do fato "automático ativo" dentro da própria Fila pode
+ * reutilizar temporariamente os dados da chave anterior. Troca de aba, canal,
+ * busca, atendente ou etiqueta nunca pode exibir resultados do filtro antigo.
+ */
+export function soMudouOAutomaticoDaFila(
+  anterior: ConversationsFilters,
+  atual: ConversationsFilters,
+): boolean {
+  const { comando: _anterior, ...restoAnterior } = anterior;
+  const { comando: _atual, ...restoAtual } = atual;
+  return ehAFila(anterior) && ehAFila(atual) && hashKey([restoAnterior]) === hashKey([restoAtual]);
+}
+
 export function useConversationsRealtime(
   filters: ConversationsFilters,
   orgId: string | null,
+  habilitada = true,
 ) {
   const qc = useQueryClient();
-  const queryKey = useMemo(() => ["conversations", filters] as const, [filters]);
+  // Chave inclui tenant: dados da organização anterior nunca podem servir de
+  // placeholder para a nova organização no mesmo QueryClient.
+  const queryKey = useMemo(() => ["conversations", orgId, filters] as const, [orgId, filters]);
 
   const query = useInfiniteQuery({
     queryKey,
+    enabled: habilitada,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) => {
       const qs = new URLSearchParams();
@@ -171,6 +189,14 @@ export function useConversationsRealtime(
     // chega de fora enquanto ninguém olha, e voltar para a aba é quando a
     // defasagem aparece. Segunda rede — a primeira é o Realtime.
     refetchOnWindowFocus: true,
+    // Não exibir itens de outro filtro; exceção apenas para a mudança interna
+    // de comando da Fila após o fato org-wide ser resolvido.
+    placeholderData: (anterior, queryAnterior) =>
+      queryAnterior &&
+      queryAnterior.queryKey[1] === orgId &&
+      soMudouOAutomaticoDaFila(queryAnterior.queryKey[2], filters)
+        ? anterior
+        : undefined,
   });
 
   const onChange = useCallback(() => {

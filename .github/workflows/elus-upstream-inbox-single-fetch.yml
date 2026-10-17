@@ -1,0 +1,70 @@
+name: ELUS upstream Inbox single queue fetch verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-inbox-single-fetch.yml"
+      - "hooks/inbox/useConversationsRealtime.ts"
+      - "components/inbox/InboxLayout.tsx"
+      - "components/inbox/ConversationList.tsx"
+      - "tests/unit/inbox-fila-uma-busca-so.test.tsx"
+      - "tests/unit/inbox-fila-cache-restrito-elus.test.ts"
+      - "tests/unit/deep-link-nao-espera-a-lista.test.tsx"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inbox-single-fetch:
+    name: Inbox queue fetch and cache isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint Inbox changes
+        run: >-
+          pnpm exec eslint
+          hooks/inbox/useConversationsRealtime.ts
+          components/inbox/InboxLayout.tsx
+          components/inbox/ConversationList.tsx
+          tests/unit/inbox-fila-uma-busca-so.test.tsx
+          tests/unit/inbox-fila-cache-restrito-elus.test.ts
+          tests/unit/deep-link-nao-espera-a-lista.test.tsx
+
+      - name: Check isolated formatting
+        run: >-
+          pnpm exec prettier --check
+          .github/workflows/elus-upstream-inbox-single-fetch.yml
+          tests/unit/inbox-fila-uma-busca-so.test.tsx
+          tests/unit/inbox-fila-cache-restrito-elus.test.ts
+
+      - name: Inbox regressions
+        run: >-
+          pnpm exec vitest run
+          tests/unit/inbox-fila-uma-busca-so.test.tsx
+          tests/unit/inbox-fila-cache-restrito-elus.test.ts
+          tests/unit/deep-link-nao-espera-a-lista.test.tsx
+          tests/unit/inbox-aba-minhas-sem-fechadas.test.ts

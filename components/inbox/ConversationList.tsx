@@ -113,7 +113,9 @@ export function ConversationList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  if (q.isLoading) {
+  // Query desabilitada enquanto a Fila espera o fato da org ainda é PENDING.
+  // Refetch com dados existentes não pode apagar a lista visível.
+  if (q.isPending && items.length === 0) {
     return (
       <div className="space-y-3 p-3">
         {[1, 2, 3, 4, 5].map((i) => (
@@ -123,7 +125,8 @@ export function ConversationList({
     );
   }
 
-  if (q.isError) {
+  // Erro de atualização não substitui dados já visíveis por tela de erro.
+  if (q.isError && q.data === undefined) {
     return (
       <div className="p-4 text-center text-sm text-muted-foreground">
         <p>{t("Erro ao carregar conversas.")}</p>
