@@ -75,18 +75,18 @@ jobs:
           # O fork ELUS não tem releases/tags v1.x publicadas. Comparar com o
           # upstream oficial, sem inferir "última release" por ordenação de tags.
           release="$(gh api repos/melgarafael/DeskcommCRM/releases/latest --jq .tag_name)"
-          if [[ ! "$release" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then
+          if [[ ! "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "FATAL: upstream não forneceu release estável válida" >&2
             exit 1
           fi
           # O script de isolamento usa tags locais; o origin do ELUS não as tem.
           # Buscar apenas os dois scripts comparados, no runner descartável.
           for tag in "$release" v1.63.0; do
-            git fetch --no-tags --depth=1 https://github.com/melgarafael/DeskcommCRM.git \\
+            git fetch --no-tags --depth=1 https://github.com/melgarafael/DeskcommCRM.git \
               "+refs/tags/${tag}:refs/tags/${tag}"
             git cat-file -e "${tag}:hostgator-setup-kit/update.sh"
           done
-          printf 'CONFERENCIA_KIT_RELEASE=%s\\n' "$release" >> "$GITHUB_ENV"
+          printf 'CONFERENCIA_KIT_RELEASE=%s\n' "$release" >> "$GITHUB_ENV"
       - name: Apply baseline twice and run actual SQL invariants
         run: >-
           pnpm test:db
