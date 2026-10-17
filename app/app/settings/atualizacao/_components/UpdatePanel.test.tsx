@@ -183,3 +183,31 @@ describe("tela de atualização — a rodada conta a disputa do banco", () => {
     expect(screen.getByText(/\.update\.log/)).toBeInTheDocument();
   });
 });
+
+describe("painel de atualização — aviso de SMTP só com evidência", () => {
+  it("instalação sem SMTP mostra problema do login e configuração ao administrador", () => {
+    renderTela({ ...CHANGELOG_LONGO, smtp_configured: false });
+    const aviso = screen.getByTestId("aviso-sem-smtp");
+    expect(aviso).toHaveTextContent("Sem SMTP configurado");
+    expect(aviso).toHaveTextContent("recuperação de senha");
+    expect(aviso).toHaveTextContent("/admin/email");
+    expect(aviso).toHaveTextContent("update.sh");
+  });
+
+  it("no meio de uma atualização o aviso permanece fora do cartão de estado", () => {
+    renderTela({ ...rodada(), smtp_configured: false });
+    const aviso = screen.getByTestId("aviso-sem-smtp");
+    expect(aviso).toBeInTheDocument();
+    expect(aviso.closest("[data-slot=card]")).toBeNull();
+  });
+
+  it("com SMTP configurado o aviso não aparece", () => {
+    renderTela({ ...CHANGELOG_LONGO, smtp_configured: true });
+    expect(screen.queryByTestId("aviso-sem-smtp")).toBeNull();
+  });
+
+  it("sem campo de evidência não declara SMTP ausente", () => {
+    renderTela({ ...CHANGELOG_LONGO });
+    expect(screen.queryByTestId("aviso-sem-smtp")).toBeNull();
+  });
+});
