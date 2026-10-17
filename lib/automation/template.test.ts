@@ -76,4 +76,16 @@ describe("renderTemplate", () => {
     expect(renderTemplate("Olá, {{primeiro_nome}}!", {})).toBe("Olá, !");
     expect(renderTemplate("{{primeiro_nome}}", { contact: { name: null } })).toBe("");
   });
+  it("não usa propriedades herdadas como campos personalizados", () => {
+    const campos = Object.create({ servico: "não autorizado" }) as Record<string, unknown>;
+    expect(renderTemplate("X{{servico}}Y", { lead: { custom_fields: campos } })).toBe("XY");
+  });
+  it("formata somente valores resolvidos, preservando a marcação do operador", () => {
+    const saida = renderTemplate(
+      "<strong>{{nome}}</strong>",
+      { contact: { name: "Ana & Bia" } },
+      (valor) => valor.replaceAll("&", "&amp;"),
+    );
+    expect(saida).toBe("<strong>Ana &amp; Bia</strong>");
+  });
 });
