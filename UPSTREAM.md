@@ -162,3 +162,72 @@ prova de que a distribuição ainda não os possua.
 
 Este registro é datado e **não substitui** nova reconciliação de `main`,
 PRs, migrations ou runtime no momento da execução.
+
+### Inventário verificável de sobreposições (2026-10-16)
+
+**Método:** comparar os `blob SHA` de arquivos das três árvores Git: distribuição ELUS
+(`92ed055b`), upstream antes da última importação (`efed1d57`) e
+upstream v1.84.0 (`a932e33d`). Foram lidos diretórios completos
+(`truncated=false`) via Git Trees para `app`, `lib`, `components`,
+`supabase`, `docs`, `scripts`, `tests`, `workers`, `.github`,
+`.agents`, `.changes` e `hooks`. Também foi inspecionada a árvore raiz.
+A medição **não** afirma cobrir exaustivamente todos os diretórios da raiz.
+
+Considerou-se **sobreposição** o caminho de mesmo nome com SHA alterado tanto
+no ELUS quanto no upstream em relação à árvore antiga, cujo conteúdo atual
+**não** coincide. Sobreposição indica necessidade de reconciliação manual,
+mas **não** prova que o Git produziria um conflito textual.
+
+| Área | Sobreposições comprovadas por SHA | Exemplos relevantes |
+|---|---:|---|
+| `app/` | 23 | Login, Marca, rotas de agentes, credenciais e telas de IA |
+| `lib/` | 33 | Agent engine/checkpoint, MCP, runtime IA, auth, branding e mensagens |
+| `components/` | 1 | `inbox/CRMSidePanel.tsx` |
+| `supabase/` | 2 | `baseline.sql` e `migrations/MANIFEST.md` |
+| `docs/` | 3 | Arquitetura de Marca, índice e mapa de jornadas |
+| `tests/` | 9 | Testes de branding, agenda, gateway, mídia e arquitetura |
+| `workers/` | 1 | `agent-worker/main.ts` |
+| `scripts/`, `.github/`, `.agents/`, `.changes/`, `hooks/` | 0 | Sem sobreposição pela regra acima nesses diretórios |
+| **Total nas áreas medidas** | **72** | Arquivos de raiz independentes não contabilizados |
+
+Outras alterações no mesmo nome existem na raiz (por exemplo `AGENTS.md`,
+`CLAUDE.md`, `Dockerfile.worker`, `package.json` e `pnpm-lock.yaml`),
+mas **não** entraram nessa contagem. Os 72 são risco de integração, não
+número de defeitos nem prova de conflito no `git merge`.
+
+#### Bloqueio de migrations realmente observado
+
+A comparação completa de `supabase/migrations/` mostrou **106 migrations SQL
+presentes no upstream v1.84.0 e ausentes no ELUS**, após a âncora da PR #9.
+Cinco migrations próprias do ELUS são ausentes do upstream; todas têm
+**número lógico `NNNN` coincidente** com migrations upstream de outro domínio:
+
+| `NNNN` | Migration existente no ELUS | Migration upstream diferente |
+|---|---|---|
+| `0502` | `20261001133000_0502_integracoes_erp_modulo_oficial.sql` | `20260930191523_0502_anotacao_simultanea_nao_apaga_a_outra.sql` |
+| `0503` | `20261003231500_0503_integracoes_erp_admin_whatsapp_readonly.sql` | `20261001120300_0503_trigger_imutavel_cobre_flags_e_debounce.sql` |
+| `0504` | `20261005150000_0504_integracoes_erp_entrega_danfe_governada.sql` | `20261001120400_0504_credencial_de_mapas.sql` |
+| `0505` | `20261006213000_0505_integracoes_erp_customer_resolution_v1.sql` | `20261001120500_0505_demanda_marca_proximo_passo_com_o_caso.sql` |
+| `0506` | `20261015031500_0506_org_ai_autonomy_protected.sql` | `20261001120600_0506_selecao_de_empresas_na_prospeccao.sql` |
+
+**Importante:** não foi identificada coincidência de **timestamp de 14
+algarismos** entre esses cinco pares. Isso **não elimina** a colisão dos
+números `NNNN`, que a doutrina e o gate
+`scripts/checar-colisao-de-migration.sh` exigem únicos. Esta verificação é
+de árvores versionadas; o histórico real de migrations aplicadas na produção
+**não foi consultado**. **Não renumerar ou reaplicar migrations já publicadas
+por suposição**, nem apagar entradas do ledger.
+
+A fonte canônica `CLAUDE.md` exige a tripla migration, `baseline.sql` e
+`MANIFEST.md`, além de testes de instalação e upgrade com banco contendo
+dados. Antes de importar schema, desenhar transição explicitamente compatível
+com instalações existentes e provar idempotência, ordem de execução, histórico
+de timestamps e unicidade de `NNNN` no resultado final. Verificar também
+PRs abertas com migration, cuja população não foi exaurida nesta análise.
+
+**Decisão atual:** manter a PR de preflight como documentação em Draft. A
+importação funcional permanece **bloqueada por reconciliação do schema**, não
+por falha comprovada da release 1.84.0. O primeiro slice de código só deve
+nascer após definir e testar a estratégia para essas cinco colisões, sem
+apagar funcionalidades ELUS. Não houve execução de teste de banco,
+compilação, CI, merge nem deploy neste levantamento.
