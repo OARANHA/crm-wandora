@@ -14,13 +14,12 @@ describe("rotuloDoCanalDaConversa — leitura única do nome do canal", () => {
   });
 
   it("não mostra identificador do transporte nem badge sem canal identificável", () => {
-    expect(
-      rotuloDoCanalDaConversa({
-        display_name: " ",
-        phone_number: null,
-        waha_session_name: "org_2dd5e6ea",
-      }),
-    ).toBeNull();
+    const canal = {
+      display_name: " ",
+      phone_number: null,
+      waha_session_name: "org_2dd5e6ea",
+    };
+    expect(rotuloDoCanalDaConversa(canal)).toBeNull();
     expect(rotuloDoCanalDaConversa(null)).toBeNull();
     expect(rotuloDoCanalDaConversa(undefined)).toBeNull();
   });
