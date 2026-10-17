@@ -1,6 +1,7 @@
 import { assertAgendaEffectSupabase } from "@/lib/agenda/efeito";
 import { protecaoAgendaSupabase } from "@/lib/agenda/protecao-followup";
 import { registerAction } from "@/lib/automation/actions";
+import { mensagemDeErro } from "@/lib/automation/actions/erro-legivel";
 import type { ActionCtx, ActionResultDetail } from "@/lib/automation/types";
 import { renderTemplate } from "@/lib/automation/template";
 import { serviceForAutomation } from "@/lib/atendimento/origem-automacao";
@@ -68,7 +69,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     return {
       type: "send_whatsapp_message",
       status: "failed",
-      error: err instanceof Error ? err.message : String(err),
+      error: mensagemDeErro(err),
     };
   }
 }

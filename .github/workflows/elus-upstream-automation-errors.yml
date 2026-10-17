@@ -1,0 +1,70 @@
+name: ELUS upstream automation errors verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-automation-errors.yml"
+      - "lib/automation/actions/erro-legivel.ts"
+      - "lib/automation/actions/erro-legivel.test.ts"
+      - "lib/automation/actions/send-ai-message.ts"
+      - "lib/automation/actions/send-whatsapp.ts"
+      - "lib/automation/actions/call-webhook.ts"
+      - "lib/automation/actions/create-or-move-lead.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readable-automation-errors:
+    name: Test readable automation errors
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint automation actions and regression tests
+        run: >-
+          pnpm exec eslint
+          lib/automation/actions/erro-legivel.ts
+          lib/automation/actions/erro-legivel.test.ts
+          lib/automation/actions/send-ai-message.ts
+          lib/automation/actions/send-whatsapp.ts
+          lib/automation/actions/call-webhook.ts
+          lib/automation/actions/create-or-move-lead.ts
+
+      - name: Format new regression files
+        run: >-
+          pnpm exec prettier --check
+          .github/workflows/elus-upstream-automation-errors.yml
+          lib/automation/actions/erro-legivel.ts
+          lib/automation/actions/erro-legivel.test.ts
+
+      - name: Automation regression tests
+        run: >-
+          pnpm exec vitest run
+          lib/automation/actions/erro-legivel.test.ts
+          lib/automation/actions/send-ai-message.test.ts
+          lib/automation/actions/call-webhook.test.ts
+          lib/automation/actions/create-or-move-lead.test.ts
