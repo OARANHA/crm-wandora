@@ -137,7 +137,9 @@ export function useConversationsRealtime(
   habilitada = true,
 ) {
   const qc = useQueryClient();
-  const queryKey = useMemo(() => ["conversations", filters] as const, [filters]);
+  // Chave inclui tenant: dados da organização anterior nunca podem servir de
+  // placeholder para a nova organização no mesmo QueryClient.
+  const queryKey = useMemo(() => ["conversations", orgId, filters] as const, [orgId, filters]);
 
   const query = useInfiniteQuery({
     queryKey,
@@ -190,7 +192,9 @@ export function useConversationsRealtime(
     // Não exibir itens de outro filtro; exceção apenas para a mudança interna
     // de comando da Fila após o fato org-wide ser resolvido.
     placeholderData: (anterior, queryAnterior) =>
-      queryAnterior && soMudouOAutomaticoDaFila(queryAnterior.queryKey[1], filters)
+      queryAnterior &&
+      queryAnterior.queryKey[1] === orgId &&
+      soMudouOAutomaticoDaFila(queryAnterior.queryKey[2], filters)
         ? anterior
         : undefined,
   });
