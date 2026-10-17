@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import type { AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
 import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
+import { roleAtLeast } from "@/lib/auth/types";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
 
 /**
@@ -225,6 +226,10 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const filters: ConversationsFilters = useMemo(
     () => ({
       ...tabToFilter(filterValue.tab, automaticoDaOrg),
+      // "Minhas" sempre significa o próprio usuário, nunca a seleção do gerente.
+      assigned_to:
+        tabToFilter(filterValue.tab, automaticoDaOrg).assigned_to ??
+        (roleAtLeast(activeOrg?.role, "manager") ? filterValue.assigned_to : undefined),
       // A tela NÃO pede o que a rota recusa: o hook trata falha com
       // `showApiError`, então digitar a primeira letra de qualquer busca faria
       // piscar um erro na cara de quem digita. A regra é a MESMA que o schema
@@ -241,6 +246,8 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
     [
       filterValue.tab,
       automaticoDaOrg,
+      activeOrg?.role,
+      filterValue.assigned_to,
       filterValue.search,
       filterValue.channel_session_id,
       filterValue.tag,
