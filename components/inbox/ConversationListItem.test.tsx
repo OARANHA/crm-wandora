@@ -34,3 +34,25 @@ describe("ConversationListItem — etiqueta de grupo", () => {
     expect(screen.queryByText("Grupo")).toBeNull();
   });
 });
+
+describe("ConversationListItem — rótulo do canal na lista", () => {
+  it("prefere o nome que a organização deu ao número", () => {
+    render(
+      <ConversationListItem
+        {...conversaDeExemplo.props}
+        mostrarCanal
+        conversation={{
+          ...conversaDeExemplo.conversation,
+          channel_sessions: {
+            display_name: "Vendas",
+            phone_number: "+5511988877766",
+            provider: "waha",
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("Vendas")).toBeInTheDocument();
+    expect(screen.getByTitle("Entrou por Vendas")).toBeInTheDocument();
+    expect(screen.queryByText("+5511988877766")).toBeNull();
+  });
+});
