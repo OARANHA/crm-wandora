@@ -1,4 +1,4 @@
-name: ELUS upstream automation errors verification
+name: ELUS upstream automation verification
 
 on:
   pull_request:
@@ -11,6 +11,8 @@ on:
       - "lib/automation/actions/send-whatsapp.ts"
       - "lib/automation/actions/call-webhook.ts"
       - "lib/automation/actions/create-or-move-lead.ts"
+      - "lib/automation/template.ts"
+      - "lib/automation/template.test.ts"
   workflow_dispatch:
 
 permissions:
@@ -18,7 +20,7 @@ permissions:
 
 jobs:
   readable-automation-errors:
-    name: Test readable automation errors
+    name: Test automation errors and templates
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -53,6 +55,8 @@ jobs:
           lib/automation/actions/send-whatsapp.ts
           lib/automation/actions/call-webhook.ts
           lib/automation/actions/create-or-move-lead.ts
+          lib/automation/template.ts
+          lib/automation/template.test.ts
 
       - name: Format new regression files
         run: >-
@@ -60,6 +64,8 @@ jobs:
           .github/workflows/elus-upstream-automation-errors.yml
           lib/automation/actions/erro-legivel.ts
           lib/automation/actions/erro-legivel.test.ts
+          lib/automation/template.ts
+          lib/automation/template.test.ts
 
       - name: Automation regression tests
         run: >-
@@ -68,3 +74,4 @@ jobs:
           lib/automation/actions/send-ai-message.test.ts
           lib/automation/actions/call-webhook.test.ts
           lib/automation/actions/create-or-move-lead.test.ts
+          lib/automation/template.test.ts
