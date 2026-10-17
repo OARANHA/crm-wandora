@@ -4,7 +4,8 @@ import { neutralizarFormula } from "./neutralizar-formula";
 
 describe("neutralizarFormula", () => {
   it("começo de célula com =, +, -, @, TAB ou CR ganha a aspa", () => {
-    for (const c of ["=1+1", "+cmd", "-cmd", "@x", "\tx", "\rx"]) expect(neutralizarFormula(c)).toBe(`'${c}`);
+    for (const c of ["=1+1", "+cmd", "-cmd", "@x", "\tx", "\rx"])
+      expect(neutralizarFormula(c)).toBe(`'${c}`);
   });
 
   it("todo trecho depois de ;, vírgula, LF ou CR também ganha", () => {
