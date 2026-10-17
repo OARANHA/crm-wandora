@@ -31,6 +31,7 @@ on:
       - "tests/shell/elus-upstream-migrations.test.mjs"
       - "tests/unit/integracoes-erp-*.test.ts"
       - "tests/invariants/integracoes-erp-provisionadora.test.ts"
+      - "tests/invariants/elus-governed-delivery-0504-replay.test.ts"
       - "tests/unit/catalogo-tools-leigo-friendly.test.ts"
       - "tests/unit/capacidade-alcancavel-pelo-agente.test.ts"
       - "tests/unit/selecao-por-pacote.test.ts"
