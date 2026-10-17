@@ -220,7 +220,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
    * e completa quando a resposta chega; a janela é de ~200ms e o rótulo nunca
    * discorda do filtro, porque os dois usam a mesma convenção.
    */
-  const { data: automaticoDaOrg } = useAutomaticoAtivo();
+  const { data: automaticoDaOrg, isLoading: automaticoCarregando } = useAutomaticoAtivo();
   const composerRef = useRef<ComposerHandle | null>(null);
 
   const filters: ConversationsFilters = useMemo(
@@ -260,7 +260,11 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
 
   // We need the selected conversation object for header / composer / side panel.
   // Source it from the same query the list uses to avoid an extra request.
-  const listQ = useConversationsRealtime(filters, orgId);
+  // Só a Fila depende do fato de atendimento automático. Evita o primeiro
+  // GET provisório (comando=aguardando) que seria descartado ao saber que a
+  // organização não tem agente ativo. Outras abas e deep-links não esperam.
+  const filaEsperaOFatoDaOrg = filterValue.tab === "unassigned" && automaticoCarregando;
+  const listQ = useConversationsRealtime(filters, orgId, !filaEsperaOFatoDaOrg);
   const inList = useMemo(() => {
     const all = listQ.data?.pages.flatMap((p) => p.data) ?? [];
     return all.find((c) => c.id === selectedId) ?? null;
