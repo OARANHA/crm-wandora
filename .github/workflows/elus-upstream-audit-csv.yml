@@ -1,0 +1,64 @@
+name: ELUS upstream audit CSV verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-audit-csv.yml"
+      - "app/api/v1/audit/export/**"
+      - "lib/csv/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-csv:
+    name: Audit CSV pagination and spreadsheet safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint changed application and test files
+        run: >-
+          pnpm exec eslint
+          app/api/v1/audit/export/route.ts
+          app/api/v1/audit/export/route.test.ts
+          lib/csv/neutralizar-formula.ts
+          lib/csv/neutralizar-formula.test.ts
+
+      - name: Check formatting
+        run: >-
+          pnpm exec prettier --check
+          .github/workflows/elus-upstream-audit-csv.yml
+          app/api/v1/audit/export/route.ts
+          app/api/v1/audit/export/route.test.ts
+          lib/csv/neutralizar-formula.ts
+          lib/csv/neutralizar-formula.test.ts
+
+      - name: Audit export and CSV injection regression
+        run: >-
+          pnpm exec vitest run
+          app/api/v1/audit/export/route.test.ts
+          lib/csv/neutralizar-formula.test.ts
