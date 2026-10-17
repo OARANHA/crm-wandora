@@ -1,10 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
-import {
-  type ModoDeEtiqueta,
-  marcadoresEscolhidos,
-} from "@/lib/inbox/marcador-da-conversa";
+import { type ModoDeEtiqueta, marcadoresEscolhidos } from "@/lib/inbox/marcador-da-conversa";
 
 export interface ConversationCounts {
   /**
@@ -48,10 +45,7 @@ export interface FiltrosDaContagem {
  * Contagens por visão do inbox (G4-02). O endpoint usa o client RLS-scoped —
  * um agent em modo own* recebe a contagem do seu escopo, não o total da org.
  */
-export function useConversationCounts(
-  orgId: string | null,
-  filtros: FiltrosDaContagem = {},
-) {
+export function useConversationCounts(orgId: string | null, filtros: FiltrosDaContagem = {}) {
   const qs = new URLSearchParams();
   if (filtros.unread) qs.set("unread", "true");
   for (const marcador of marcadoresEscolhidos(
