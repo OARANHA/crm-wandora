@@ -172,17 +172,17 @@ describe("header do inbox — não trava a largura da tela", () => {
       "max-md:pb-1",
       "max-md:[&>*]:shrink-0",
     ]) {
-      expect(barra.className.split(/\\s+/), `a barra móvel perdeu ${classe}`).toContain(classe);
+      expect(barra.className.split(/\s+/), `a barra móvel perdeu ${classe}`).toContain(classe);
     }
     for (const classe of ["max-md:w-full", "max-md:items-stretch"]) {
-      expect(coluna.className.split(/\\s+/), `coluna móvel perdeu ${classe}`).toContain(classe);
+      expect(coluna.className.split(/\s+/), `coluna móvel perdeu ${classe}`).toContain(classe);
     }
     for (const classe of ["gap-2", "px-3", "py-2", "md:gap-3", "md:px-4", "md:py-3"]) {
-      expect(header.className.split(/\\s+/), `header perdeu espaçamento ${classe}`).toContain(classe);
+      expect(header.className.split(/\s+/), `header perdeu espaçamento ${classe}`).toContain(classe);
     }
 
     // A melhoria é condicional: desktop mantém a quebra sem perder ações.
-    expect(barra.className.split(/\\s+/)).toContain("flex-wrap");
+    expect(barra.className.split(/\s+/)).toContain("flex-wrap");
     for (const rotulo of ["Assumir", "Transferir", "Fechar"]) {
       expect(screen.getByText(rotulo)).toBeInTheDocument();
     }
