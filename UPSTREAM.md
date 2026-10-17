@@ -316,3 +316,61 @@ O maior NNNN da tag v1.84.0 é 0686. A união virtual após essas cinco substitu
 **Risco maior de ordem:** entre as 106 migrations upstream ainda ausentes, **89** têm timestamp menor ou igual ao da última migration ELUS (20261015031500); 17 são posteriores. A renumeração nominal, portanto, não autoriza usar db push ou repair sem reconciliar o histórico real do banco e testar as dependências em PostgreSQL descartável com dados.
 
 A PR #132 agrega projeção em memória (opção --project-names) e testes, sem renomear migration, sem tocar em banco/ledger, sem deploy e sem integrar Deskcomm 1.84.0. Permanece Draft até validação de CI relatada pelo proprietário. NNNN 0687–0691 são **candidatos, não números reservados**: conferir PRs e refs antes de qualquer rename efetivo.
+
+
+### Gate operacional depois da PR #132 — separar deploy de schema
+
+Em 16/10/2026, o proprietário relatou **CI green** da
+[PR #132](https://github.com/OARANHA/crm-wandora/pull/132). O GitHub
+confirmou a PR pronta e mergeável contra
+`e862f5c25b9ab8a5ab0bf3948eed9f1bdf4c6751` e aceitou o **squash
+merge**: SHA **`9edbcdf60cec58a04968e8c26c3459b0ce938db3`**.
+As PRs #130 e #132 agora integram a `main`. A projeção da PR #132
+continua **read-only**: nenhuma das 106 migrations upstream foi
+integrada, executada ou declarada compatível.
+
+#### Distinção descoberta lendo o deploy real do ELUS
+
+O `compose.portainer.yml` da `main` opera serviços de aplicação
+(`app`, `worker`, WAHA, cache e scheduler). A conexão de dados é
+fornecida por variáveis `SUPABASE_*`; **não há serviço Postgres
+nem etapa de `supabase db push` ou execução de `baseline.sql`
+definidos nesse Compose**. Isso comprova o comportamento **declarado
+pela fonte do deploy**, não comprova o estado de produção da stack
+Portainer Vigia nem a identidade do projeto Supabase.
+
+O runbook `docs/runbooks/elus-vigia-portainer.md` descreve
+`CI green → merge → imagens GHCR → deploy das imagens → health/version`.
+Não descreve migração automática de schema na atualização da stack.
+Os caminhos genéricos de instalação/atualização do DeskcommCRM,
+`scripts/test-db.sh` e `scripts/test-update-com-dados.sh`,
+usam **`supabase/baseline.sql`** (inclusive em Postgres 15 e 17
+efêmero e com dados), não provam que o ELUS **implantado** usa o
+Supabase CLI para atualizar o schema.
+
+**Conclusão operacional:** exigir **dois gates distintos**, que não
+podem ser substituídos um pelo outro:
+
+1. **Banco/compatibilidade:** identificar o banco de produção ELUS
+   por capacidade administrativa do Vigia sem expor credenciais;
+   verificar autorização read-only e o histórico aplicável
+   (ledger Supabase se existir, mecanismo de baseline se for o real,
+   efeitos de instalações antigas); preparar plano SQL idempotente
+   governado com rollback real e testes em banco descartável. Não
+   usar o conector Supabase de `elo.wandora`: a listagem de projetos
+   acessíveis nesta sessão não mostrou um projeto identificado como
+   ELUS.
+2. **Imagens/deploy:** somente após compatibilidade de schema,
+   confirmar imagens app/worker para o SHA escolhido, preservar
+   digests em execução e seguir o runbook Portainer do Vigia;
+   exigir health e version exata. **Nenhum deploy foi feito nesta
+   rodada**, e o merge da #132 não o autoriza implicitamente.
+
+**Novo critério para a importação da v1.84.0:** não considerar
+`NNNN` nem a presença de uma linha no ledger como substituto
+da verificação do objeto real no catálogo do Postgres; não marcar
+migrations como aplicadas sem comprovar seus efeitos. As 89 migrations
+com timestamp anterior à última migration ELUS tornam uma importação
+linear particularmente arriscada. O primeiro teste de evolução de
+schema deve ocorrer em uma **instalação descartável**, sem acesso
+a dados ou credenciais reais do cliente.
