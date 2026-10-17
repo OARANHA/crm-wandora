@@ -1,0 +1,60 @@
+name: ELUS upstream Inbox command status accessibility
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-inbox-command-status.yml"
+      - "components/inbox/ConversationListItem.tsx"
+      - "tests/unit/inbox-ponto-comando-acessivel-elus.test.tsx"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  status-accessibility:
+    name: Accessible Inbox command status
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint focused files
+        run: >-
+          pnpm exec eslint
+          components/inbox/ConversationListItem.tsx
+          tests/unit/inbox-ponto-comando-acessivel-elus.test.tsx
+
+      - name: Check workflow formatting
+        run: >-
+          pnpm exec prettier --check
+          .github/workflows/elus-upstream-inbox-command-status.yml
+
+      - name: Inbox regression tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/inbox-ponto-comando-acessivel-elus.test.tsx
+          components/inbox/ConversationListItem.test.tsx
+          tests/unit/inbox-selecionada-legivel-elus.test.tsx
+          tests/unit/inbox-rotulo-do-canal-elus.test.ts
