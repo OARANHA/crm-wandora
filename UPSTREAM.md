@@ -296,3 +296,23 @@ arquivos de migration.
 A pesquisa de contrato do CLI **não** é prova de estado atual do banco.
 O fato de PR #130 ter sido mergeada **não** significa que a versão
 DeskcommCRM 1.84.0 tenha sido incorporada.
+
+### Projeção de renumeração nominal — 16/10/2026
+
+PR técnica em Draft: [#132](https://github.com/OARANHA/crm-wandora/pull/132), baseada na main e862f5c25b9ab8a5ab0bf3948eed9f1bdf4c6751.
+
+A análise completa por Git Trees confirmou 412 arquivos SQL no ELUS e 513 na v1.84.0. Desses, 411 e 512, respectivamente, seguem o formato canônico de 14 dígitos + NNNN + slug. Há também um stub legado compartilhado e NÃO canônico, supabase/migrations/00001_initial_schema.sql, com blob SHA idêntico 0f90a85bad9ec6d1a111656048ca66bb65d6ddf4 nas duas refs. O verificador canônico da PR #130 continua sinalizando o nome inválido; a projeção da PR #132 apenas exclui da simulação o mesmo stub com SHA igual nas duas refs. Não concede permissão de executar SQL.
+
+| Migration do ELUS | NNNN existente | NNNN candidato | Timestamp conservado |
+|---|---|---|---|
+| integracoes_erp_modulo_oficial | 0502 | 0687 | 20261001133000 |
+| integracoes_erp_admin_whatsapp_readonly | 0503 | 0688 | 20261003231500 |
+| integracoes_erp_entrega_danfe_governada | 0504 | 0689 | 20261005150000 |
+| integracoes_erp_customer_resolution_v1 | 0505 | 0690 | 20261006213000 |
+| org_ai_autonomy_protected | 0506 | 0691 | 20261015031500 |
+
+O maior NNNN da tag v1.84.0 é 0686. A união virtual após essas cinco substituições soma 517 migrations canônicas distintas, sem duplicidade de NNNN, timestamp ou alteração de blob SQL. **Isso prova apenas compatibilidade nominal, não execução do schema.**
+
+**Risco maior de ordem:** entre as 106 migrations upstream ainda ausentes, **89** têm timestamp menor ou igual ao da última migration ELUS (20261015031500); 17 são posteriores. A renumeração nominal, portanto, não autoriza usar db push ou repair sem reconciliar o histórico real do banco e testar as dependências em PostgreSQL descartável com dados.
+
+A PR #132 agrega projeção em memória (opção --project-names) e testes, sem renomear migration, sem tocar em banco/ledger, sem deploy e sem integrar Deskcomm 1.84.0. Permanece Draft até validação de CI relatada pelo proprietário. NNNN 0687–0691 são **candidatos, não números reservados**: conferir PRs e refs antes de qualquer rename efetivo.
