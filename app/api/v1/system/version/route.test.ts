@@ -4,12 +4,14 @@ import { NextRequest } from "next/server";
 import { loadAuthUser } from "@/lib/auth/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/lib/audit";
+import { semSmtpNaInstalacao } from "@/lib/email/estado";
 
 vi.mock("@/lib/auth/server", () => ({
   loadAuthUser: vi.fn(),
   mfaEmDivida: vi.fn(async () => false),
 }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
+vi.mock("@/lib/email/estado", () => ({ semSmtpNaInstalacao: vi.fn(async () => false) }));
 // A escrita da instalação passa por requirePlatformAdminEscrita (scope 'full' +
 // MFA em dia): o dublê entrega a linha REAL de `platform_admins`, para que a
 // regra rode de verdade em vez de ser encenada.
@@ -55,6 +57,7 @@ let runSelectError: { message: string } | null;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(semSmtpNaInstalacao).mockResolvedValue(false);
   pa.row = { user_id: "11111111-1111-4111-8111-111111111111", scope: "full", mfa_required: false, revoked_at: null };
   inserted = null;
   runRow = null;
@@ -863,5 +866,33 @@ describe("POST /api/v1/system/update", () => {
     const body = await res.json();
     expect(body.error.code).toBe("state_conflict");
     expect(body.error.message).toBe("Já existe uma atualização em andamento.");
+  });
+});
+
+describe("GET /api/v1/system/version — SMTP restrito ao platform admin", () => {
+  it("retorna false quando a capability comprova falta de SMTP", async () => {
+    vi.mocked(loadAuthUser).mockResolvedValue(OWNER as never);
+    vi.mocked(semSmtpNaInstalacao).mockResolvedValue(true);
+    const { GET } = await import("../version/route");
+    const response = await GET(get());
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.data.smtp_configured).toBe(false);
+    expect(semSmtpNaInstalacao).toHaveBeenCalledOnce();
+  });
+
+  it("com SMTP presente ou diagnóstico não conclusivo não afirma ausência", async () => {
+    vi.mocked(loadAuthUser).mockResolvedValue(OWNER as never);
+    const { GET } = await import("../version/route");
+    const body = await (await GET(get())).json();
+    expect(body.data.smtp_configured).toBe(true);
+  });
+
+  it("membro comum não recebe campo nem provoca leitura administrativa de SMTP", async () => {
+    vi.mocked(loadAuthUser).mockResolvedValue(MEMBRO as never);
+    const { GET } = await import("../version/route");
+    const body = await (await GET(get())).json();
+    expect(body.data.smtp_configured).toBeUndefined();
+    expect(semSmtpNaInstalacao).not.toHaveBeenCalled();
   });
 });
