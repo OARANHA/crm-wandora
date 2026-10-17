@@ -112,3 +112,17 @@ export function nomeDoCanal(
   if (telefone) return telefone;
   return t("Número sem nome");
 }
+
+/**
+ * Rótulo da linha E do cabeçalho da conversa, com a mesma precedência
+ * da tela de Conexões: nome amigável, depois número do CANAL.
+ * Sem os dois, não exibe badge (nem identificador interno do transporte).
+ */
+export function rotuloDoCanalDaConversa(
+  canal: { display_name?: string | null; phone_number?: string | null } | null | undefined,
+  t: (texto: string) => string = (texto) => texto,
+): string | null {
+  if (!canal) return null;
+  if (!canal.display_name?.trim() && !canal.phone_number?.trim()) return null;
+  return nomeDoCanal(canal, t);
+}
