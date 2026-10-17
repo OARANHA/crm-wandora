@@ -25,5 +25,9 @@ export function filtrosAuxiliaresAtivos(filters: ConversationsFilters): string[]
   if (filters.tag) ativos.push("Etiqueta");
   if (filters.channel_session_id) ativos.push("Canal");
   if (filters.is_group) ativos.push("Grupos");
+  // "me" e "unassigned" identificam a aba, não um filtro extra.
+  if (filters.assigned_to && filters.assigned_to !== "me" && filters.assigned_to !== "unassigned") {
+    ativos.push("Atendente");
+  }
   return ativos;
 }
