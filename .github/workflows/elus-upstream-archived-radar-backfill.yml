@@ -1,0 +1,73 @@
+name: ELUS upstream archived conversation backfill DB verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-archived-radar-backfill.yml"
+      - "supabase/baseline.sql"
+      - "tests/invariants/conversa-arquivada-nao-gera-pendencia.test.ts"
+      - "tests/invariants/atualizacao-nao-reduplica-demanda.test.ts"
+      - ".changes/elus-upstream-184-archived-radar-backfill-20261017.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    name: Backfill static checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint database regression test
+        run: pnpm exec eslint tests/invariants/conversa-arquivada-nao-gera-pendencia.test.ts
+      - name: Check workflow formatting
+        run: pnpm exec prettier --check .github/workflows/elus-upstream-archived-radar-backfill.yml
+
+  postgres-invariants:
+    name: Backfill R2 — PostgreSQL ${{ matrix.major }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        major: [15, 17]
+    env:
+      TEST_DB_IMAGE: pgvector/pgvector:pg${{ matrix.major }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply baseline twice and run actual SQL invariants
+        run: >-
+          pnpm test:db
+          tests/invariants/conversa-arquivada-nao-gera-pendencia.test.ts
+          tests/invariants/atualizacao-nao-reduplica-demanda.test.ts
