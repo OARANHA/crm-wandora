@@ -67,7 +67,9 @@ describe("filtro por atendente — a aba Minhas continua sendo só as minhas", (
 
 describe("filtro por atendente — lista vazia diz que há filtro ligado", () => {
   it("o atendente escolhido é nomeado, e a lista vazia vira 'vazio por filtro'", () => {
-    expect(filtrosAuxiliaresAtivos({ assigned_to: ATENDENTE } as ConversationsFilters)).toEqual(["Atendente"]);
+    expect(filtrosAuxiliaresAtivos({ assigned_to: ATENDENTE } as ConversationsFilters)).toEqual([
+      "Atendente",
+    ]);
   });
 
   it("a aba Minhas (`me`) não é filtro ligado por cima da aba", () => {
