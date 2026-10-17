@@ -34,7 +34,8 @@ import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useContactTagVocabulary } from "@/hooks/contacts/useContactTagVocabulary";
 import { useConversationTagVocabulary } from "@/hooks/inbox/useConversationTags";
 import { useConversationCounts } from "@/hooks/inbox/useConversationCounts";
-import type { Role, VisibilityMode } from "@/lib/auth/types";
+import { roleAtLeast, type Role, type VisibilityMode } from "@/lib/auth/types";
+import { SeletorDeAtendente } from "@/components/inbox/SeletorDeAtendente";
 
 export type InboxTab = "unassigned" | "mine" | "all" | "closed" | "archived" | "ai";
 
@@ -84,6 +85,13 @@ export interface InboxFiltersValue {
   tagMode?: ModoDeEtiqueta;
   /** A aba "Grupos" (Task 10): manda `is_group=true` na listagem. */
   onlyGroups?: boolean;
+  /** Somente conversas atribuídas a este usuário; gerência, fora da aba Minhas. */
+  assigned_to?: string;
+}
+
+/** Minhas usa o próprio atendente e nunca mantém uma seleção anterior invisível. */
+export function comAba(value: InboxFiltersValue, tab: InboxTab): InboxFiltersValue {
+  return { ...value, tab, ...(tab === "mine" ? { assigned_to: undefined } : {}) };
 }
 
 interface Props {
@@ -189,18 +197,22 @@ export function InboxFilters({ value, onChange }: Props) {
   // manda o atendente procurar trabalho que não existe — a regra já estava escrita
   // na rota; faltava alcançar os filtros ao lado da aba.
   const { data: counts } = useConversationCounts(activeOrg?.orgId ?? null, {
+    assigned_to: value.tab === "mine" ? undefined : value.assigned_to,
     unread: value.onlyUnread,
     tag: etiquetas,
     tagMode: value.tagMode,
     channel_session_id: value.channel_session_id,
   });
 
+  const mostrarSeletorDeAtendente =
+    roleAtLeast(activeOrg?.role, "manager") && value.tab !== "mine";
+
   const tabs = activeOrg
     ? visibleInboxTabs(activeOrg.role, activeOrg.visibility_mode)
     : INBOX_TABS.map((t) => t.value);
   const moveTab = (direction: -1 | 1) => {
     const next = tabs[tabs.indexOf(value.tab) + direction];
-    if (next) onChange({ ...value, tab: next });
+    if (next) onChange(comAba(value, next));
   };
   const countFor: Partial<Record<InboxTab, number>> = {
     // `fila` é o nome novo; `unassigned` é o alias que a rota versionada mantém.
@@ -400,7 +412,7 @@ export function InboxFilters({ value, onChange }: Props) {
           </button>
         </div>
 
-        {(showChannelSwitch || mostrarSeletorDeTag) && (
+        {(showChannelSwitch || mostrarSeletorDeTag || mostrarSeletorDeAtendente) && (
           <div className="flex gap-2">
             {showChannelSwitch && (
               <Select
@@ -531,6 +543,12 @@ export function InboxFilters({ value, onChange }: Props) {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            {mostrarSeletorDeAtendente && (
+              <SeletorDeAtendente
+                value={value.assigned_to}
+                onChange={(atendente) => onChange({ ...value, assigned_to: atendente })}
+              />
+            )}
           </div>
         )}
       </div>
@@ -539,7 +557,7 @@ export function InboxFilters({ value, onChange }: Props) {
           sublinhado continuam com a altura compacta do Inbox. */}
       <Tabs
         value={value.tab}
-        onValueChange={(v) => onChange({ ...value, tab: v as InboxTab })}
+        onValueChange={(v) => onChange(comAba(value, v as InboxTab))}
         className="px-3"
       >
         <div className="flex items-center gap-1">
