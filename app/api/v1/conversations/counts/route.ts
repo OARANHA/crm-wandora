@@ -46,12 +46,18 @@ export type FiltroDeContagem = readonly [coluna: string, valor: string | boolean
  * e a segunda régua sempre diverge. Enquanto isso, o badge sob busca fica maior
  * que a lista, e isso está declarado, não esquecido.
  */
-export function filtrosAuxiliaresDaContagem(
-  sp: URLSearchParams,
-): FiltroDeContagem[] {
+export function filtrosAuxiliaresDaContagem(sp: URLSearchParams): FiltroDeContagem[] {
   const filtros: FiltroDeContagem[] = [];
   const canal = sp.get("channel_session_id");
   if (canal) filtros.push(["channel_session_id", canal]);
+  // Somente UUID de usuário pode virar predicado de contagem.
+  const atendente = sp.get("assigned_to");
+  if (
+    atendente &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(atendente)
+  ) {
+    filtros.push(["assigned_to_user_id", atendente]);
+  }
   // O MARCADOR não entra nesta lista, e não é esquecimento: ele não é
   // IGUALDADE numa coluna, é um `or=` sobre DUAS caixas — `conversations.tags`
   // e o campo calculado do contato. `conversations` não tem coluna `tag` (`tag`
@@ -108,12 +114,14 @@ export async function GET(req: NextRequest): Promise<Response> {
   // ⚠️ TODA contagem nasce daqui, e daqui já sai com `organization_id` E com os
   // filtros auxiliares. Herdar tira a opção de esquecer: não existe o caminho
   // "montei uma contagem e não pus o filtro".
-  const countExact = () => {
+  const countExact = (ignorarAtendente = false) => {
     let q = supabase
       .from("conversations")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", org);
-    for (const [coluna, valor] of auxiliares) q = q.eq(coluna, valor);
+    for (const [coluna, valor] of auxiliares) {
+      if (!ignorarAtendente || coluna !== "assigned_to_user_id") q = q.eq(coluna, valor);
+    }
     // O marcador entra pela régua da LISTA — a mesma função, não uma segunda.
     q = aplicarMarcadores(q, marcadores, modo);
     if (soNaoLidas) q = q.gt("unread_count_for_assignee", 0);
@@ -146,7 +154,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     // A aba "Automático". Antes ela pedia `status='ai_handling'`, escrito por UM
     // caminho só em produção — por isso vivia quase vazia.
     countExact().eq("comando_da_conversa", "automatico"),
-    countExact()
+    // A aba "Minhas" ignora a seleção de outro atendente aplicada às demais abas.
+    countExact(true)
       .eq("assigned_to_user_id", user.id)
       .not("status", "in", `(${CONVERSATION_TERMINAL_STATUSES.join(",")})`),
     countExact(),

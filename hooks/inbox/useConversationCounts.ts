@@ -1,10 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
-import {
-  type ModoDeEtiqueta,
-  marcadoresEscolhidos,
-} from "@/lib/inbox/marcador-da-conversa";
+import { type ModoDeEtiqueta, marcadoresEscolhidos } from "@/lib/inbox/marcador-da-conversa";
 
 export interface ConversationCounts {
   /**
@@ -40,16 +37,15 @@ export interface FiltrosDaContagem {
   /** E ou OU entre as etiquetas escolhidas (#1274). `e` é o padrão. */
   tagMode?: ModoDeEtiqueta;
   channel_session_id?: string;
+  /** Atendente selecionado pelo gerente; deve compor também a chave do cache. */
+  assigned_to?: string;
 }
 
 /**
  * Contagens por visão do inbox (G4-02). O endpoint usa o client RLS-scoped —
  * um agent em modo own* recebe a contagem do seu escopo, não o total da org.
  */
-export function useConversationCounts(
-  orgId: string | null,
-  filtros: FiltrosDaContagem = {},
-) {
+export function useConversationCounts(orgId: string | null, filtros: FiltrosDaContagem = {}) {
   const qs = new URLSearchParams();
   if (filtros.unread) qs.set("unread", "true");
   for (const marcador of marcadoresEscolhidos(
@@ -60,6 +56,7 @@ export function useConversationCounts(
   // URL sem mudar o sentido do filtro.
   if (filtros.tagMode === "ou") qs.set("modo", "ou");
   if (filtros.channel_session_id) qs.set("channel_session_id", filtros.channel_session_id);
+  if (filtros.assigned_to) qs.set("assigned_to", filtros.assigned_to);
   const sufixo = qs.toString();
 
   return useQuery({
