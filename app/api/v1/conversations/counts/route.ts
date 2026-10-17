@@ -113,28 +113,15 @@ export async function GET(req: NextRequest): Promise<Response> {
   // ⚠️ TODA contagem nasce daqui, e daqui já sai com `organization_id` E com os
   // filtros auxiliares. Herdar tira a opção de esquecer: não existe o caminho
   // "montei uma contagem e não pus o filtro".
-  const countExact = () => {
-    let q = supabase
-      .from("conversations")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", org);
-    for (const [coluna, valor] of auxiliares) q = q.eq(coluna, valor);
-    // O marcador entra pela régua da LISTA — a mesma função, não uma segunda.
-    q = aplicarMarcadores(q, marcadores, modo);
-    if (soNaoLidas) q = q.gt("unread_count_for_assignee", 0);
-    return q;
-  };
-
-  // Mesma fábrica, mas sem o atendente adicional do gerente: "Minhas" já
-  // impõe `assigned_to_user_id=user.id` e não pode combinar com outra pessoa.
-  const countExactSemFiltroDeAtendente = () => {
+  const countExact = (ignorarAtendente = false) => {
     let q = supabase
       .from("conversations")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", org);
     for (const [coluna, valor] of auxiliares) {
-      if (coluna !== "assigned_to_user_id") q = q.eq(coluna, valor);
+      if (!ignorarAtendente || coluna !== "assigned_to_user_id") q = q.eq(coluna, valor);
     }
+    // O marcador entra pela régua da LISTA — a mesma função, não uma segunda.
     q = aplicarMarcadores(q, marcadores, modo);
     if (soNaoLidas) q = q.gt("unread_count_for_assignee", 0);
     return q;
@@ -167,7 +154,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     // caminho só em produção — por isso vivia quase vazia.
     countExact().eq("comando_da_conversa", "automatico"),
     // A aba "Minhas" ignora a seleção de outro atendente aplicada às demais abas.
-    countExactSemFiltroDeAtendente()
+    countExact(true)
       .eq("assigned_to_user_id", user.id)
       .not("status", "in", `(${CONVERSATION_TERMINAL_STATUSES.join(",")})`),
     countExact(),
