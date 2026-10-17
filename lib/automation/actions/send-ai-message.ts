@@ -15,6 +15,7 @@ import { protecaoAgendaSupabase } from "@/lib/agenda/protecao-followup";
  * este repo já pagou antes: conserto por instância, não por classe.
  */
 import { registerAction } from "@/lib/automation/actions";
+import { mensagemDeErro } from "@/lib/automation/actions/erro-legivel";
 import type { ActionCtx, ActionResultDetail } from "@/lib/automation/types";
 import { serviceForAutomation } from "@/lib/atendimento/origem-automacao";
 import { assertServiceBoundarySupabase } from "@/lib/atendimento/origem";
@@ -84,7 +85,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
       status: "skipped",
       detail: {
         reason: "elegibilidade_indeterminada",
-        error: err instanceof Error ? err.message.slice(0, 160) : "erro",
+        error: mensagemDeErro(err, 160),
       },
     };
   }
@@ -104,7 +105,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
 
   let boundary: ServiceBoundary;
   try { boundary = await serviceForAutomation(ctx, contact.id, sessionId); }
-  catch (error) { return { type: TIPO, status: "failed", error: error instanceof Error ? error.message : String(error) }; }
+  catch (error) { return { type: TIPO, status: "failed", error: mensagemDeErro(error) }; }
   let texto: string;
   try {
     await assertAgendaEffectSupabase(ctx.admin, { organizationId: ctx.organizationId, contactId: contact.id });
@@ -125,7 +126,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     // Teto de gasto atingido, credencial inválida, provider fora. A causa vai
     // inteira para o registro do run — é o que a tela mostra a quem pergunta
     // "por que a IA não escreveu?".
-    const causa = err instanceof Error ? err.message : String(err);
+    const causa = mensagemDeErro(err);
     logger.error("[automation.send_ai_message] a IA não conseguiu escrever", {
       organizationId: ctx.organizationId,
       ruleId: ctx.ruleId,
@@ -178,7 +179,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     return {
       type: TIPO,
       status: "failed",
-      error: err instanceof Error ? err.message : String(err),
+      error: mensagemDeErro(err),
     };
   }
 }
