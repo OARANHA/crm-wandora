@@ -85,11 +85,25 @@ const elusHistoricalOverlayV184 = new Set([
 ]);
 
 export function projectHistoricalNames(elusFiles, upstreamFiles) {
-  const report = inspectMigrations(elusFiles, upstreamFiles);
-  const sqlFiles = [...elusFiles, ...upstreamFiles].filter(f => f.path.endsWith('.sql'));
+  // Stub histórico já presente nos DOIS ancestrais, com SHA exatamente igual.
+  // Só a projeção nominal o exclui. O gate canônico inspectMigrations
+  // CONTINUA acusando o nome fora do padrão e mantendo exit != 0 no CLI.
+  const sharedLegacyPath = 'supabase/migrations/00001_initial_schema.sql';
+  const legacyElus = elusFiles.filter(f => f.path === sharedLegacyPath);
+  const legacyUpstream = upstreamFiles.filter(f => f.path === sharedLegacyPath);
+  if (legacyElus.length || legacyUpstream.length) {
+    if (legacyElus.length !== 1 || legacyUpstream.length !== 1 ||
+        legacyElus[0].sha !== legacyUpstream[0].sha) {
+      return { status: 'blocked', reason: 'shared_legacy_mismatch', proposals: [] };
+    }
+  }
+  const comparableElus = elusFiles.filter(f => f.path !== sharedLegacyPath);
+  const comparableUpstream = upstreamFiles.filter(f => f.path !== sharedLegacyPath);
+  const report = inspectMigrations(comparableElus, comparableUpstream);
+  const sqlFiles = [...comparableElus, ...comparableUpstream].filter(f => f.path.endsWith('.sql'));
   if (sqlFiles.length === 0 ||
-      !elusFiles.some(f => migrationPath.test(f.path)) ||
-      !upstreamFiles.some(f => migrationPath.test(f.path))) {
+      !comparableElus.some(f => migrationPath.test(f.path)) ||
+      !comparableUpstream.some(f => migrationPath.test(f.path))) {
     return { status: 'blocked', reason: 'migration_tree_missing', proposals: [] };
   }
 
@@ -115,7 +129,7 @@ export function projectHistoricalNames(elusFiles, upstreamFiles) {
   }
 
   const proposals = collisions.map((issue, index) => {
-    const original = elusFiles.find(f => f.path === issue.elus);
+    const original = comparableElus.find(f => f.path === issue.elus);
     const [, version, oldNumber, suffix] = migrationPath.exec(issue.elus);
     const nextNumber = String(highest + index + 1).padStart(4, '0');
     return {
@@ -129,13 +143,14 @@ export function projectHistoricalNames(elusFiles, upstreamFiles) {
   });
 
   const rename = new Map(proposals.map(p => [p.from, p.to]));
-  const virtuallyRenamed = elusFiles.map(f => ({ ...f, path: rename.get(f.path) ?? f.path }));
-  const verified = inspectMigrations(virtuallyRenamed, upstreamFiles);
+  const virtuallyRenamed = comparableElus.map(f => ({ ...f, path: rename.get(f.path) ?? f.path }));
+  const verified = inspectMigrations(virtuallyRenamed, comparableUpstream);
   if (verified.issues.length !== 0) {
     return { status: 'blocked', reason: 'virtual_reconciliation_failed', proposals: [] };
   }
   return {
     status: 'proposal_only',
+    sharedLegacyExcludedFromProjection: legacyElus.length ? sharedLegacyPath : null,
     proposals,
     upstreamPending: verified.counts.pending,
     note: 'Somente projeção em memória, sem renomear arquivo ou aplicar SQL. Não prova ledger real, ordem SQL, baseline, CI ou compatibilidade de upgrade. Números candidatos não estão reservados contra novas PRs.',
