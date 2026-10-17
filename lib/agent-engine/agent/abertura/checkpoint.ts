@@ -20,6 +20,7 @@ import { z } from "zod";
 import { currentExecutionBoundary, guardServiceEffect } from "@/lib/atendimento/fronteira-server";
 
 import type { Queryable } from "../../queue/queue";
+import { insertInboxItem } from "../../db/repository";
 import {
   DECLARACAO_INSTRUCTION,
   declaracaoDoTurnoSchema,
@@ -183,4 +184,43 @@ export function parseCheckpointText(text: string): CheckpointContent {
     );
   }
   return parsed.data;
+}
+
+/**
+ * Recuperação durável apenas quando o sender já aceitou um efeito do turno.
+ *
+ * Um erro LLM no checkpoint não pode reexecutar a consulta ERP nem mensagens
+ * de uma tentativa anterior. NÃO inventa checkpoint: abre um alerta navegável
+ * e só permite liquidar o job depois de persistir a pendência humana.
+ *
+ * Com zero envios aceitos, o erro segue ao caller e à fila normalmente.
+ */
+export async function registrarFalhaCheckpointAposEnvio(
+  db: Parameters<typeof insertInboxItem>[0],
+  input: {
+    tenantId: string;
+    conversationId: string;
+    jobId: string;
+    houveEnvioAceito: boolean;
+  },
+): Promise<boolean> {
+  if (!input.houveEnvioAceito) return false;
+
+  await insertInboxItem(
+    db,
+    input.tenantId,
+    {
+      kind: "other",
+      severity: "critical",
+      title: "Checkpoint do agente não concluído após envio",
+      body:
+        "Uma mensagem já foi aceita no atendimento, mas o checkpoint não pôde ser " +
+        "persistido. Revise a conversa e o job antes de acionar novamente o agente. " +
+        "Não há checkpoint nem declaração de intenções fabricados nesta falha.",
+      refKind: "conversation",
+      refId: input.conversationId,
+    },
+    "kind_ref_e_titulo",
+  );
+  return true;
 }
