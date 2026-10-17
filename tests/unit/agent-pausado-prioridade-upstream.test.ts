@@ -32,9 +32,8 @@ describe("DeskcommCRM v1.84 — seleção de agente publicado por canal", () => 
     // No PostgreSQL: (paused_at IS NOT NULL) é false para ativos;
     // ASC coloca false antes de true. Prioridade só desempata nesse grupo.
     const ordenacao = sql.match(/order by ([^\n]+)\s+limit 1/i)?.[1];
-    expect(ordenacao).toBe(
-      "(a.paused_at is not null) asc, a.priority desc, a.created_at asc",
-    );
+    const esperado = "(a.paused_at is not null) asc, a.priority desc, a.created_at asc";
+    expect(ordenacao).toBe(esperado);
   });
 
   it("não elimina agente pausado da busca: se for o único, continua selecionável", async () => {
