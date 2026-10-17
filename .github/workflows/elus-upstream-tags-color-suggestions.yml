@@ -1,0 +1,72 @@
+name: ELUS upstream tags color suggestions verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-tags-color-suggestions.yml"
+      - "components/inbox/ContactTagsEditor.tsx"
+      - "components/inbox/ConversationTagsEditor.tsx"
+      - "components/tags/SeletorDeCorDaEtiqueta.tsx"
+      - "components/tags/DialogoDeNovaEtiqueta.tsx"
+      - "hooks/tags/useDefinirCorDaEtiqueta.ts"
+      - "app/app/settings/tags/_painel.tsx"
+      - "lib/tags/cor-da-etiqueta.ts"
+      - "tests/unit/tags-sugestao-abre-dialogo-de-cor.test.tsx"
+      - "tests/unit/tags-do-contato-com-sugestao.test.tsx"
+      - "tests/unit/paleta-de-etiquetas-elus-compatibilidade.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tags-color-suggestions:
+    name: Tags colors roles and dialogs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint touched TS and TSX files
+        run: >-
+          pnpm exec eslint
+          components/inbox/ContactTagsEditor.tsx
+          components/inbox/ConversationTagsEditor.tsx
+          components/tags/SeletorDeCorDaEtiqueta.tsx
+          components/tags/DialogoDeNovaEtiqueta.tsx
+          hooks/tags/useDefinirCorDaEtiqueta.ts
+          app/app/settings/tags/_painel.tsx
+          lib/tags/cor-da-etiqueta.ts
+          tests/unit/tags-sugestao-abre-dialogo-de-cor.test.tsx
+          tests/unit/paleta-de-etiquetas-elus-compatibilidade.test.ts
+
+      - name: Check workflow formatting
+        run: pnpm exec prettier --check .github/workflows/elus-upstream-tags-color-suggestions.yml
+
+      - name: Targeted tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/tags-sugestao-abre-dialogo-de-cor.test.tsx
+          tests/unit/tags-do-contato-com-sugestao.test.tsx
+          tests/unit/paleta-de-etiquetas-elus-compatibilidade.test.ts
+          tests/unit/tags-cor-de-etiqueta.test.ts
