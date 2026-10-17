@@ -262,6 +262,41 @@ Evidência observável do turno que fechou o aceite:
 A prova é do fluxo e de seus invariantes; os identificadores acima são recibos
 datados de produção, não configuração a ser reutilizada em outra organização.
 
+### Confirmação do proprietário e origem das PRs — 12/10/2026
+
+O proprietário confirmou que **recebeu a DANFE no WhatsApp** no canário de
+05/10/2026. A reconciliação somente leitura no Supabase `elo.wandora`
+comprovou `crm_erp_prepare_admin_danfe success=true` às 11h45min58s UTC,
+`send_ledger.accepted` e a mensagem de saída de 11h46min06s UTC, como
+`document/application/pdf`, com armazenamento privado e estado `read`.
+Nenhuma nova consulta ao VendaERP foi necessária para essa reconciliação.
+
+A [PR #36](https://github.com/OARANHA/crm-wandora/pull/36) ligou o PDF
+preparado à próxima `send_message` documental, preservando o sender core
+e sem expor `storage_path` ao modelo. A
+[PR #37](https://github.com/OARANHA/crm-wandora/pull/37) passou a renderizar
+a URL pública allowlisted diretamente pelo Chromium, eliminando o fetch
+HTTP genérico anterior. Seu merge
+`220e827c8cc7e732612179bce26c07739fe80380` precedeu o canário,
+mas a cronologia Git **não comprova a versão exata implantada** naquele
+minuto.
+
+**O contrato canônico comprovado** é a autoridade administrativa, a
+validação do PDF, o bucket privado da conversa e o único fluxo de entrega
+`send_message → before_send → send_ledger → sendMessageHandler → WAHA`.
+Isso não exige manter a implementação histórica do navegador.
+
+**Prova histórica não é funcionamento atual.** Após a PR #77, o renderer
+passou a usar Playwright com egress restrito. Embora a PR #100 tenha
+sido implantada com saúde e versão verificadas, o canário de 11/10/2026
+às 23h48 (Brasília) falhou em duas preparações de DANFE com
+`danfe_download_failed`, `pdf_validacao`,
+`extracao_sem_texto_apos_screen_dom_nao_confirmado` e
+`destino_fora_origem`, entregando apenas texto e **zero PDFs**.
+Ver [issue #55](https://github.com/OARANHA/crm-wandora/issues/55).
+Não restaurar o Chromium legado sem revisão SSRF nem repetir consultas
+reais ao VendaERP apenas para diagnosticar.
+
 ## Resolução NFe → cliente CRM
 
 A composição nova parte de uma NFe conhecida, localiza o pedido exato e mantém `pessoaID`, CPF/CNPJ
