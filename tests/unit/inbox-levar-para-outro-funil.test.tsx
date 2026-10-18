@@ -55,6 +55,8 @@ vi.mock("@/hooks/contacts/useUpdateContact", () => ({
   useUpdateContact: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  // DANFE fica sem permissão de resposta neste cenário de negócios, sem consultas ERP.
+  usePermission: () => false,
   useAuth: () => ({
     user: { support: null, is_platform_admin: false },
     activeOrg: { orgId: "org-1", name: "Org", role: estado.papel },

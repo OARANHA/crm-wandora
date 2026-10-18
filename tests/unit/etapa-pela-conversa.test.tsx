@@ -133,7 +133,11 @@ vi.mock("@/hooks/inbox/useConversationTags", () => ({
 }));
 vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({ useContactTagVocabulary: () => ({ data: [] }) }));
 vi.mock("@/hooks/contacts/useUpdateContact", () => ({ useUpdateContact: () => ({ mutate: vi.fn(), isPending: false }) }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support: null } }) }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({
+  // DANFE fica sem permissão de resposta neste cenário de negócios, sem consultas ERP.
+  usePermission: () => false,
+  useAuth: () => ({ user: { support: null } }),
+}));
 vi.mock("@/components/contacts/RoteirosDoContato", () => ({ RoteirosDoContato: () => null }));
 
 const conversation = {
