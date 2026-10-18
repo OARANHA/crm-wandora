@@ -44733,6 +44733,155 @@ begin
 end
 $$;
 
+-- 0506 — ELUS AI autonomous grants isolated from legacy settings writes.
+-- 0506 ELUS: autonomia tecnica de IA isolada das settings mutaveis do tenant.
+-- Nao armazenar grants em organizations.settings: rotas manager+ gravam snapshots
+-- inteiros dessa coluna e podem ressuscitar um grant que o Superadmin revogou.
+-- A coluna isolada permite atualizar settings sem tocar em autorizacoes.
+alter table public.organizations
+  add column if not exists ai_autonomy jsonb not null default '{}'::jsonb;
+
+comment on column public.organizations.ai_autonomy is
+  'ELUS: grants tecnicos de IA emitidos somente via Superadmin full/MFA. Objetos com flags provider, model, credentials e operator_model; ausencia = false. Isolado de settings para nao ressuscitar revogacoes por writes concorrentes.';
+
+-- O grant de tabela para authenticated eh ALL no baseline. RLS orgs_write_platform_admin
+-- nao distingue scope full de support_readonly, portanto proteger no banco tambem.
+-- Nenhuma operacao JWT authenticated, inclusive via SECURITY DEFINER, pode escrever
+-- a coluna. A API governada usa service_role, apos autenticar full/MFA e auditar.
+create or replace function public.fn_guard_organizations_ai_autonomy()
+returns trigger
+language plpgsql
+security invoker
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v_changed boolean;
+  v_privileged boolean;
+begin
+  if tg_op = 'INSERT' then
+    v_changed := new.ai_autonomy is distinct from '{}'::jsonb;
+  else
+    v_changed := new.ai_autonomy is distinct from old.ai_autonomy;
+  end if;
+
+  if v_changed then
+    v_privileged :=
+      auth.role() = 'service_role'
+      or (current_user = 'postgres' and auth.uid() is null and auth.role() is null);
+    if not coalesce(v_privileged, false) then
+      raise exception 'elus_ai_autonomy_restricted'
+        using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_organizations_ai_autonomy on public.organizations;
+create trigger trg_guard_organizations_ai_autonomy
+before insert or update on public.organizations
+for each row
+execute function public.fn_guard_organizations_ai_autonomy();
+
+revoke all on function public.fn_guard_organizations_ai_autonomy()
+  from public, anon, authenticated;
+
+-- ---- atribuição respeita a carteira (migration 0507) ----
+create or replace function public.fn_conversation_assign(
+  p_organization_id uuid,
+  p_conversation_id uuid,
+  p_to_user_id uuid,
+  p_reason text,
+  p_expected_assignee uuid default null::uuid,
+  p_enforce_expected boolean default false
+)
+returns setof public.conversations
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_from uuid;
+  v_conv public.conversations%rowtype;
+begin
+  if not public.fn_support_write_allowed(p_organization_id) then
+    raise exception 'support_readonly' using errcode = '42501';
+  end if;
+
+  if auth.uid() is not null
+     and not public.fn_role_at_least(p_organization_id, 'agent') then
+    raise exception 'caller_not_authorized_for_org'
+      using hint = 'caller must be an active agent+ member of the organization';
+  end if;
+
+  if p_to_user_id is not null then
+    if coalesce(public.fn_member_role_in_org(p_to_user_id, p_organization_id), 'none')
+         not in ('agent', 'manager', 'admin') then
+      raise exception 'assignee_not_eligible_member'
+        using hint = 'target must be an active agent+ member of the organization';
+    end if;
+  end if;
+
+  select assigned_to_user_id
+    into v_from
+    from public.conversations
+   where id = p_conversation_id
+     and organization_id = p_organization_id
+   for no key update;
+
+  if not found then
+    return;
+  end if;
+
+  if p_enforce_expected and v_from is distinct from p_expected_assignee then
+    return;
+  end if;
+
+  if auth.uid() is not null
+     and not public.fn_can_view_conversation(p_organization_id, v_from) then
+    raise exception 'conversation_outside_visibility_scope' using errcode = '42501';
+  end if;
+
+  update public.conversations
+     set assigned_to_user_id = p_to_user_id,
+         assigned_to_user_name = case
+           when p_to_user_id is null then null
+           else (
+             select raw_user_meta_data ->> 'full_name'
+               from auth.users
+              where id = p_to_user_id
+           )
+         end,
+         assigned_at = case when p_to_user_id is null then null else now() end,
+         assignee_kind = case when p_to_user_id is null then null else 'user' end,
+         status = case when p_to_user_id is null then 'open' else 'claimed' end,
+         status_changed_at = now(),
+         unread_count_for_assignee = 0,
+         bot_silenced_until = case
+           when p_reason = 'routing' then bot_silenced_until
+           when p_to_user_id is null then (
+             case when last_handoff_at is null then null else bot_silenced_until end
+           )
+           else 'infinity'::timestamptz
+         end,
+         updated_at = now()
+   where id = p_conversation_id
+   returning * into v_conv;
+
+  insert into public.conversation_assignment_events
+    (organization_id, conversation_id, from_user_id, to_user_id, changed_by, reason)
+  values
+    (p_organization_id, p_conversation_id, v_from, p_to_user_id, auth.uid(), p_reason);
+
+  return next v_conv;
+end;
+$function$;
+
+revoke all on function public.fn_conversation_assign(uuid, uuid, uuid, text, uuid, boolean)
+  from public, anon;
+grant execute on function public.fn_conversation_assign(uuid, uuid, uuid, text, uuid, boolean)
+  to authenticated, service_role;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -46288,56 +46437,3 @@ create unique index if not exists uniq_job_queue_governed_delivery_origin_invoic
     ((payload->>'codigo_nfe'))
   )
   where kind='governed_delivery';
-
--- 0506 — ELUS AI autonomous grants isolated from legacy settings writes.
--- 0506 ELUS: autonomia tecnica de IA isolada das settings mutaveis do tenant.
--- Nao armazenar grants em organizations.settings: rotas manager+ gravam snapshots
--- inteiros dessa coluna e podem ressuscitar um grant que o Superadmin revogou.
--- A coluna isolada permite atualizar settings sem tocar em autorizacoes.
-alter table public.organizations
-  add column if not exists ai_autonomy jsonb not null default '{}'::jsonb;
-
-comment on column public.organizations.ai_autonomy is
-  'ELUS: grants tecnicos de IA emitidos somente via Superadmin full/MFA. Objetos com flags provider, model, credentials e operator_model; ausencia = false. Isolado de settings para nao ressuscitar revogacoes por writes concorrentes.';
-
--- O grant de tabela para authenticated eh ALL no baseline. RLS orgs_write_platform_admin
--- nao distingue scope full de support_readonly, portanto proteger no banco tambem.
--- Nenhuma operacao JWT authenticated, inclusive via SECURITY DEFINER, pode escrever
--- a coluna. A API governada usa service_role, apos autenticar full/MFA e auditar.
-create or replace function public.fn_guard_organizations_ai_autonomy()
-returns trigger
-language plpgsql
-security invoker
-set search_path = pg_catalog, public, pg_temp
-as $$
-declare
-  v_changed boolean;
-  v_privileged boolean;
-begin
-  if tg_op = 'INSERT' then
-    v_changed := new.ai_autonomy is distinct from '{}'::jsonb;
-  else
-    v_changed := new.ai_autonomy is distinct from old.ai_autonomy;
-  end if;
-
-  if v_changed then
-    v_privileged :=
-      auth.role() = 'service_role'
-      or (current_user = 'postgres' and auth.uid() is null and auth.role() is null);
-    if not coalesce(v_privileged, false) then
-      raise exception 'elus_ai_autonomy_restricted'
-        using errcode = '42501';
-    end if;
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_guard_organizations_ai_autonomy on public.organizations;
-create trigger trg_guard_organizations_ai_autonomy
-before insert or update on public.organizations
-for each row
-execute function public.fn_guard_organizations_ai_autonomy();
-
-revoke all on function public.fn_guard_organizations_ai_autonomy()
-  from public, anon, authenticated;

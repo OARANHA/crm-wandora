@@ -9385,6 +9385,9 @@ export const DICIONARIO: Traducoes = {
   "Conversa do caso sem contato associado.": { es: "La conversación del caso no tiene contacto asociado." },
   "Conversa não encontrada.": { es: "Conversación no encontrada." },
   "Conversa sem contato/canal.": { es: "Conversación sin contacto/canal." },
+  "Esta conversa não está na sua carteira.": {
+    es: "Esta conversación no está en su cartera.",
+  },
   "corpo inválido": { es: "cuerpo inválido" },
   "Corpo inválido.": { es: "Cuerpo inválido." },
   "Corpo inválido para desconectar.": { es: "Cuerpo inválido para desconectar." },

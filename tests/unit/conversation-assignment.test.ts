@@ -19,6 +19,7 @@ import { audit, isServiceRoleConfigured } from "@/lib/audit";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { AuthUser } from "@/lib/auth/types";
+import type * as ImpersonateSupport from "@/lib/impersonate/support";
 
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
@@ -40,6 +41,7 @@ interface RpcCall {
 
 interface StubState {
   assignRows: Array<Record<string, unknown>>;
+  assignError: { code: string; message: string } | null;
   rpcCalls: RpcCall[];
   targetMember: { role: string } | null;
 }
@@ -55,7 +57,9 @@ function makeSupabaseStub(state: StubState) {
   return {
     rpc: async (fn: string, args: Record<string, unknown>) => {
       state.rpcCalls.push({ fn, args });
-      if (fn === "fn_conversation_assign") return { data: state.assignRows, error: null };
+      if (fn === "fn_conversation_assign") {
+        return { data: state.assignRows, error: state.assignError };
+      }
       return { data: null, error: null };
     },
   };
@@ -95,6 +99,7 @@ function agentSession(state: StubState) {
 function stubState(overrides: Partial<StubState> = {}): StubState {
   return {
     assignRows: [CONV_ROW],
+    assignError: null,
     rpcCalls: [],
     targetMember: { role: "agent" },
     ...overrides,
@@ -224,11 +229,41 @@ describe("POST /transfer — reatribuição imediata (G1-06d)", () => {
     const res = await POST(postReq("transfer", { to_user_id: TARGET_ID }), params);
     expect(res.status).toBe(404);
   });
+
+  it("conversa fora da carteira → 403 sem recibo falso de transferência", async () => {
+    const state = stubState({
+      assignRows: [],
+      assignError: { code: "42501", message: "conversation_outside_visibility_scope" },
+    });
+    agentSession(state);
+    const { POST } = await import("@/app/api/v1/conversations/[id]/transfer/route");
+    const res = await POST(postReq("transfer", { to_user_id: TARGET_ID }), params);
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error).toMatchObject({
+      code: "forbidden",
+      message: "Esta conversa não está na sua carteira.",
+    });
+    expect(vi.mocked(audit)).not.toHaveBeenCalled();
+  });
+
+  it("não confunde outra recusa 42501 com conversa fora da carteira", async () => {
+    const state = stubState({
+      assignRows: [],
+      assignError: { code: "42501", message: "support_readonly" },
+    });
+    agentSession(state);
+    const { POST } = await import("@/app/api/v1/conversations/[id]/transfer/route");
+    const res = await POST(postReq("transfer", { to_user_id: TARGET_ID }), params);
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("internal_error");
+  });
 });
 
 // Este teste isola o handler; autoridade de suporte é exercitada na suíte própria.
 vi.mock("@/lib/impersonate/support", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/impersonate/support")>(),
+  ...(await importOriginal<typeof ImpersonateSupport>()),
   requireSupportWrite: vi.fn(async () => null),
   authenticatedSessionId: vi.fn(async () => "f2200000-0000-4000-8000-000000000099"),
 }));
