@@ -71,5 +71,23 @@ jobs:
           tests/unit/apendice-do-baseline-nao-diverge-da-cadeia.test.ts
           tests/unit/varredura-anon-e-o-ultimo-bloco.test.ts
 
+      - name: Resolve published upstream kit and fetch comparison tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="$(gh api repos/melgarafael/DeskcommCRM/releases/latest --jq .tag_name)"
+          if [[ ! "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "FATAL: upstream não forneceu release estável válida" >&2
+            exit 1
+          fi
+          for tag in "$release" v1.63.0; do
+            git fetch --no-tags --depth=1 https://github.com/melgarafael/DeskcommCRM.git \
+              "+refs/tags/${tag}:refs/tags/${tag}"
+            git cat-file -e "${tag}:hostgator-setup-kit/update.sh"
+          done
+          printf 'CONFERENCIA_KIT_RELEASE=%s\n' "$release" >> "$GITHUB_ENV"
+
       - name: PostgreSQL 15 invariant
         run: pnpm test:db tests/invariants/atribuicao-respeita-carteira.test.ts
