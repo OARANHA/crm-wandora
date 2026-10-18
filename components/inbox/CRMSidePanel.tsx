@@ -6,12 +6,13 @@ import { LeadEnrichment } from "./LeadEnrichment";
 import { ErpDanfeCard } from "./ErpDanfeCard";
 import type { ProspectEnrichment } from "@/lib/prospecting/schema";
 import { useAuth } from "@/hooks/auth/AuthProvider";
+import { roleAtLeast } from "@/lib/auth/types";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 
 import type { Locale } from "date-fns";
 import Link from "next/link";
 import { useT } from "@/hooks/i18n/useT";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { Card } from "@/components/ui/card";
@@ -28,6 +29,7 @@ import { ConversationTagsEditor } from "./ConversationTagsEditor";
 import { ContactTagsEditor } from "./ContactTagsEditor";
 import { useDefaultPipeline } from "@/hooks/pipelines/useDefaultPipeline";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
+import { MoveToOtherPipelineDialog } from "@/components/kanban/MoveToOtherPipelineDialog";
 import { CustomFieldsEditor, type CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
@@ -350,11 +352,15 @@ function InboxLeadEditor({
   selecionadoId,
   onSelecionar,
   onSalvo,
+  podeLevarParaOutroFunil,
+  onTrocouDeNegocio,
 }: {
   leads: LeadRow[];
   selecionadoId: string | null;
   onSelecionar: (id: string) => void;
   onSalvo: () => void;
+  podeLevarParaOutroFunil: boolean;
+  onTrocouDeNegocio: () => void;
 }) {
   const t = useT();
   const ativo = leads.find((l) => l.id === selecionadoId) ?? leads[0]!;
@@ -400,6 +406,12 @@ function InboxLeadEditor({
         </div>
       )}
       <EtapaDoNegocio key={`etapa-${ativo.id}`} lead={ativo} onMovido={onSalvo} />
+      <LevarParaOutroFunil
+        key={`levar-${ativo.id}`}
+        lead={ativo}
+        podeLevar={podeLevarParaOutroFunil}
+        onTrocouDeNegocio={onTrocouDeNegocio}
+      />
       <CamposDoFunil
         key={ativo.id}
         leadId={ativo.id}
@@ -460,6 +472,70 @@ function EtapaDoNegocio({ lead, onMovido }: { lead: LeadRow; onMovido: () => voi
   );
 }
 
+/**
+ * "Levar para outro funil" no lead ATIVO da conversa — o que faltava ao lado de
+ * "Etapa do funil". Antes, mudar de funil exigia sair, abrir o Kanban, achar o
+ * card e usar a mesma ação lá.
+ *
+ * Nada de transferência é reimplementado aqui: abre o MESMO diálogo do quadro
+ * (`components/kanban/MoveToOtherPipelineDialog`, o que `KanbanCardActions`
+ * usa), que por sua vez reusa `useMoveLeadToPipeline` / `useDestinosDeFunil` e a
+ * rota `POST /api/v1/leads/[id]/clone` — a rota cria o negócio no funil destino
+ * (primeira etapa aberta) e encerra a origem com o motivo canônico.
+ *
+ * O portão é o do Kanban: `pipeline.move_card` (agent+) — a MESMA chave de
+ * `usePermission` em `KanbanCardActions` e o mesmo piso que `POST /clone` exige
+ * (`requireRole("agent")`). Aqui a régua entra escrita como `roleAtLeast` porque
+ * este painel já resolve `podeCriarTarefa` assim (o `usePermission` não sobrevive
+ * aos dublês de `useAuth` dos testes do painel); a semântica é idêntica — floor
+ * `agent` mais o atalho do platform admin. Mostrar a ação a quem o servidor
+ * recusaria seria prometer o que não se cumpre.
+ *
+ * O erro sai como toast pelo `onError` do hook (o próprio `showApiError` do
+ * quadro, em `ApiErrorToast`), e o diálogo fica ABERTO para o operador ler e
+ * corrigir — igual ao card.
+ */
+function LevarParaOutroFunil({
+  lead,
+  podeLevar,
+  onTrocouDeNegocio,
+}: {
+  lead: LeadRow;
+  podeLevar: boolean;
+  onTrocouDeNegocio: () => void;
+}) {
+  const t = useT();
+  const [aberto, setAberto] = useState(false);
+  if (!podeLevar) return null;
+
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7 w-full text-xs"
+        data-testid="inbox-levar-para-outro-funil"
+        onClick={() => setAberto(true)}
+      >
+        {t("Levar para outro funil")}
+      </Button>
+      <MoveToOtherPipelineDialog
+        open={aberto}
+        onOpenChange={(next) => {
+          setAberto(next);
+          // Fechar — confirmar OU cancelar — relê o resumo: quem decide se a
+          // seleção muda é o diff de ids em `load`, não este evento. Assim um
+          // cancelamento não troca o negócio ativo por engano.
+          if (!next) onTrocouDeNegocio();
+        }}
+        leadId={lead.id}
+        pipelineId={lead.pipeline_id}
+      />
+    </>
+  );
+}
+
 function CamposDoFunil({
   leadId,
   pipelineId,
@@ -513,8 +589,11 @@ function CamposDoFunil({
 }
 
 export function CRMSidePanel({ conversation }: Props) {
-  const { user } = useAuth();
+  const { user, activeOrg } = useAuth();
   const readonly = user.support?.access_mode === "support_readonly";
+  // Mesma porta de escrita do Kanban: pipeline.move_card / requireRole("agent").
+  // Não oferecer ação a viewer nem em suporte somente-leitura.
+  const podeLevarParaOutroFunil = !readonly && ((user.is_platform_admin && !user.support) || roleAtLeast(activeOrg?.role, "agent"));
   const localeDaData = useLocaleDeData();
   const t = useT();
   const contact = conversation?.contacts ?? null;
@@ -545,6 +624,10 @@ export function CRMSidePanel({ conversation }: Props) {
   const [erro, setErro] = useState(false);
   const [tentativa, setTentativa] = useState(0);
 
+  // Snapshot da última leitura: identifica o negócio novo após transferência.
+  const idsDeNegocioVistos = useRef<Set<string>>(new Set());
+  const procurarNovoNegocio = useRef(false);
+
   const [tagEditorOpen, setTagEditorOpen] = useState(false);
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [leadAtivoId, setLeadAtivoId] = useState<string | null>(null);
@@ -565,6 +648,8 @@ export function CRMSidePanel({ conversation }: Props) {
       setDemandas(null);
       setFatos([]); setHistorico([]);
       setLeadAtivoId(null);
+      idsDeNegocioVistos.current.clear();
+      procurarNovoNegocio.current = false;
       return;
     }
     let cancelled = false;
@@ -593,6 +678,15 @@ export function CRMSidePanel({ conversation }: Props) {
         setEnrichment(r.data.enrichment ?? null);
         setEnrichmentError(r.data.enrichment_error ?? false);
         setLeads(r.data.leads);
+        // A rota cria o destino e encerra a origem. Eleger o novo lead pelo ID,
+        // sem alterar a escolha ativa se o operador apenas cancelou o diálogo.
+        const idsAgora = new Set(r.data.leads.map((lead) => lead.id));
+        if (procurarNovoNegocio.current) {
+          const novo = r.data.leads.find((lead) => !idsDeNegocioVistos.current.has(lead.id));
+          procurarNovoNegocio.current = false;
+          if (novo) setLeadAtivoId(novo.id);
+        }
+        idsDeNegocioVistos.current = idsAgora;
         setOrders(r.data.orders);
         setActivities(r.data.activities);
         // `?? []` e não `?? null`: aqui a leitura DEU CERTO. Cair em `null`
@@ -638,6 +732,10 @@ export function CRMSidePanel({ conversation }: Props) {
   // que falhou depois — e escrita que parece ter dado certo é o defeito que
   // esta tela inteira combate.
   const recarregar = useCallback(() => setTentativa((n) => n + 1), []);
+  const aoTrocarDeNegocio = useCallback(() => {
+    procurarNovoNegocio.current = true;
+    setTentativa((n) => n + 1);
+  }, []);
 
   const tags = contact?.tags ?? [];
   const displayName = rotuloDoContato(contact, t);
@@ -837,6 +935,8 @@ export function CRMSidePanel({ conversation }: Props) {
             selecionadoId={leadAtivoId}
             onSelecionar={setLeadAtivoId}
             onSalvo={recarregar}
+            podeLevarParaOutroFunil={podeLevarParaOutroFunil}
+            onTrocouDeNegocio={aoTrocarDeNegocio}
           /></fieldset>
         ) : (
           <SemLista vazio="Sem leads." erro={erro} onTentarDeNovo={() => setTentativa((n) => n + 1)} />
