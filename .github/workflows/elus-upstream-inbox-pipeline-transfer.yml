@@ -1,0 +1,61 @@
+name: ELUS upstream Inbox pipeline transfer verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/elus-upstream-inbox-pipeline-transfer.yml"
+      - ".changes/elus-upstream-184-inbox-pipeline-transfer-20261017.md"
+      - "components/inbox/CRMSidePanel.tsx"
+      - "tests/unit/inbox-levar-para-outro-funil.test.tsx"
+      - "tests/unit/elus-inbox-pipeline-transfer-overlay.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inbox-pipeline-transfer:
+    name: Inbox move-to-pipeline regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint touched code
+        run: >-
+          pnpm exec eslint
+          components/inbox/CRMSidePanel.tsx
+          tests/unit/inbox-levar-para-outro-funil.test.tsx
+          tests/unit/elus-inbox-pipeline-transfer-overlay.test.ts
+
+      - name: Check workflow formatting
+        run: pnpm exec prettier --check .github/workflows/elus-upstream-inbox-pipeline-transfer.yml
+
+      - name: Targeted interaction and ELUS overlay tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/inbox-levar-para-outro-funil.test.tsx
+          tests/unit/elus-inbox-pipeline-transfer-overlay.test.ts
+          tests/unit/inbox-campos-lead.test.tsx
+          tests/unit/inbox-leads-recentes-com-funil.test.tsx
+          tests/unit/etapa-pela-conversa.test.tsx

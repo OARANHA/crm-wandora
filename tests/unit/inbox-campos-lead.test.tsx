@@ -191,6 +191,8 @@ describe("painel do inbox — o botão diz o que faz (issue #908)", () => {
 });
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  // DANFE fica sem permissão de resposta neste cenário de negócios, sem consultas ERP.
+  usePermission: () => false,
   useAuth: () => ({ user: { support: null } }),
   useActiveOrg: () => ({ currency: "BRL", country: null }),
 }));

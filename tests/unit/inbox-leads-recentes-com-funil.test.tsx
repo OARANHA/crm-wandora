@@ -46,7 +46,11 @@ vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({
 vi.mock("@/hooks/contacts/useUpdateContact", () => ({
   useUpdateContact: () => ({ mutate: vi.fn(), isPending: false }),
 }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support: null } }) }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({
+  // DANFE fica sem permissão de resposta neste cenário de negócios, sem consultas ERP.
+  usePermission: () => false,
+  useAuth: () => ({ user: { support: null } }),
+}));
 
 function renderPainel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
