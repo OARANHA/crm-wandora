@@ -43,6 +43,8 @@ mesma intenção/texto cru, precisam concordar.
 indiscriminada do repositório. Pare a descoberta quando houver evidência suficiente para uma decisão
 segura e declare o que ficou não medido.
 
+**Métodos operacionais complementares:** antes de corrigir falhas, aplicar diagnóstico da causa, TDD e verificação com evidências conforme [`docs/doctrine/superpowers-adaptacao.md`](docs/doctrine/superpowers-adaptacao.md). Esse guia não instala plugins nem altera a precedência ou os gates de `CLAUDE.md`.
+
 **Continuidade com upstream.** Este repositório pode carregar skills, doutrina e artefatos herdados.
 Não renomeie, duplique ou reescreva conteúdo herdado só por identidade. Prefira overlays locais
 pequenos e bindings específicos quando necessários, para preservar a capacidade de reconciliar
